@@ -1,4 +1,4 @@
-#This version has been writen to work with a non-refacored hartree_fock.py
+#This version supports the OO hartree_fock.py
 
 import numpy
 from copy import deepcopy
@@ -20,7 +20,7 @@ def make_SAD_Guess(molecule,basis):
     density_matrix = []
     for atom in molecule.Atoms:
         density_matrix = dirrectSum(fock_matrix, SADget[basis][atom.Label]) 
-    return density_matrix, deepcopy(density_matrix)
+    return HF.Density_matrix(density_matrix, deepcopy(density_matrix)) 
 
 def readGuess(alpha_ref, beta_ref, state, molecule):
     alpha_density = HF.makeTemplateMatrix(molecule.NOrbitals) 
@@ -29,8 +29,7 @@ def readGuess(alpha_ref, beta_ref, state, molecule):
     beta_MOs = HF.Excite(beta_ref, state.BetaOccupancy, molecule.NBetaElectrons)
     alpha_density = HF.make_density_matrix(alpha_density, alpha_MOs, molecule.NAlphaElectrons)
     beta_density = HF.make_density_matrix(beta_density, beta_MOs, molecule.NBetaElectrons)
-        
-    return alpha_MOs, beta_MOs, alpha_density, beta_density 
+    return alpha_MOs, beta_MOs, HF.Density_matrix(alpha_density, beta_density) 
 
 def coreGuess(core_fock, X, Xt, molecule):
     MOs, energies = HF.make_MOs(X, Xt, core_fock)
@@ -43,5 +42,4 @@ def sadGuess(molecule, basis):
     total_density = make_SAD_Guess(molecule, basis)
     alpha_density = 0.5 * total_density
     beta_density = deepcopy(alpha_density)
-
-    return HF.Density_matrix(alpha_density, beta_density)
+    return HF.Density_matrix(alpha_density, beta_density) 
