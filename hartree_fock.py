@@ -7,6 +7,8 @@ from numpy import dot
 from scipy.linalg import sqrtm
 numpy.set_printoptions(precision = 5, linewidth = 100)  #Makes the arrays print nicely in the output 
 
+#the MOM and excited state functions haven't made it to the version  
+
 ########################### DIIS Object ############################
 
 class DIIS_system:
