@@ -36,7 +36,7 @@ def coreGuess(core_fock, X, Xt, molecule):
     template_matrix = HF.makeTemplateMatrix(molecule.NOrbitals)
     alpha_density = HF.make_density_matrix(template_matrix, MOs, molecule.NAlphaElectrons)
     beta_density = deepcopy(alpha_density)
-    return MOs, deepcopy(MOs), alpha_density, beta_density 
+    return MOs, deepcopy(MOs), HF.Density_matrix(alpha_density, beta_density) 
 
 def sadGuess(molecule, basis):
     total_density = make_SAD_Guess(molecule, basis)

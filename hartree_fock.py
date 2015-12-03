@@ -172,56 +172,56 @@ def Excite(matrix,occupancy, NElectrons):
 
 class Density_matrix:
     def __init__(self, alpha_matrix, beta_matrix):
-        alpha = alpha_matrix
-        beta = beta_matrix
-        total = alpha_matrix + beta_matrix 
+        self.alpha = alpha_matrix
+        self.beta = beta_matrix
+        self.total = alpha_matrix + beta_matrix 
 
 class Fock_matrix:
     def __init__(self):
-        core = []
-        alpha = []
-        beta = []
+        self.core = []
+        self.alpha = []
+        self.beta = []
 
     def resetFocks(self):
     #sets the alpha and beta fock matrcies as the core 
         self.alpha = copy.deepcopy(self.core)
         self.beta = copy.deepcopy(self.core)
 
-def makeFockMatrices(self, densities, shell_pairs,template_matrix):
-       self.resetFocks() 
-       coulomb_matrix = copy.deepcopy(template_matrix)
-       alpha_exchange_matrix = copy.deepcopy(template_matrix)
-       beta_exchange_matrix = copy.deepcopy(template_matrix)
-#      old_alpha_density_matrix = copy.deepcopy(alpha_density_matrix)
-#      old_beta_density_matrix = copy.deepcopy(beta_density_matrix)
-#      screen = numpy.zeroes((shell_pair1.Centre1.Cgtf.NAngMom,\
-#                             shell_pair1.Centre2.Cgtf.NAngMom,\
-#                             shell_pair2.Centre1.Cgtf.NAngMom,\
-#                             shell_pair2.Centre2.Cgtf.NAngMom)
-# Use guess/current MOs (supplied or newly calculated) to calculate two-electron contributions to Fock matrix
-       for shell_pair1 in shell_pairs:
-          ia_vec = shell_pair1.Centre1.Ivec
-          ib_vec = shell_pair1.Centre2.Ivec
-          for shell_pair2 in shell_pairs:
-             ic_vec = shell_pair2.Centre1.Ivec
-             id_vec = shell_pair2.Centre2.Ivec
-#             for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
-#                for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
-#                   for l in range(0,shell_pair2.Centre1.Cgtf.NAngMom):
-#                      for s in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
-#                         screen[m,n,l,s] = overlap_matrix[ia_vec[m]][ib_vec[n]]*overlap_matrix[ic_vec[l]][id_vec[s]]
-             coulomb,exchange = integrals.two_electron(shell_pair1,shell_pair2)
-             for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
-                for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
-                   for l in range(0,shell_pair2.Centre1.Cgtf.NAngMom):
-                      for s in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
-                         coulomb_matrix[ia_vec[m]][ib_vec[n]] += densities.total[ic_vec[l]][id_vec[s]]*coulomb[m][n][l][s]
-                         alpha_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.alpha[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
-                         beta_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.beta[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
-          for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
-             for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
-                self.alpha[ia_vec[m]][ib_vec[n]] += (coulomb_matrix[ia_vec[m]][ib_vec[n]] + alpha_exchange_matrix[ia_vec[m]][ib_vec[n]])
-                self.beta[ia_vec[m]][ib_vec[n]] += (coulomb_matrix[ia_vec[m]][ib_vec[n]] + beta_exchange_matrix[ia_vec[m]][ib_vec[n]])
+    def makeFockMatrices(self, densities, shell_pairs,template_matrix):
+           self.resetFocks() 
+           coulomb_matrix = copy.deepcopy(template_matrix)
+           alpha_exchange_matrix = copy.deepcopy(template_matrix)
+           beta_exchange_matrix = copy.deepcopy(template_matrix)
+#           old_alpha_density_matrix = copy.deepcopy(alpha_density_matrix)
+#           old_beta_density_matrix = copy.deepcopy(beta_density_matrix)
+#           screen = numpy.zeroes((shell_pair1.Centre1.Cgtf.NAngMom,\
+#                                 shell_pair1.Centre2.Cgtf.NAngMom,\
+#                                 shell_pair2.Centre1.Cgtf.NAngMom,\
+#                                 shell_pair2.Centre2.Cgtf.NAngMom)
+#      Use guess/current MOs (supplied or newly calculated) to calculate two-electron contributions to Fock matrix
+           for shell_pair1 in shell_pairs:
+              ia_vec = shell_pair1.Centre1.Ivec
+              ib_vec = shell_pair1.Centre2.Ivec
+              for shell_pair2 in shell_pairs:
+                 ic_vec = shell_pair2.Centre1.Ivec
+                 id_vec = shell_pair2.Centre2.Ivec
+#                 for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
+#                    for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
+#                       for l in range(0,shell_pair2.Centre1.Cgtf.NAngMom):
+#                          for s in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
+#                             screen[m,n,l,s] = overlap_matrix[ia_vec[m]][ib_vec[n]]*overlap_matrix[ic_vec[l]][id_vec[s]]
+                 coulomb,exchange = integrals.two_electron(shell_pair1,shell_pair2)
+                 for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
+                    for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
+                       for l in range(0,shell_pair2.Centre1.Cgtf.NAngMom):
+                          for s in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
+                             coulomb_matrix[ia_vec[m]][ib_vec[n]] += densities.total[ic_vec[l]][id_vec[s]]*coulomb[m][n][l][s]
+                             alpha_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.alpha[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
+                             beta_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.beta[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
+              for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
+                 for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
+                    self.alpha[ia_vec[m]][ib_vec[n]] += (coulomb_matrix[ia_vec[m]][ib_vec[n]] + alpha_exchange_matrix[ia_vec[m]][ib_vec[n]])
+                    self.beta[ia_vec[m]][ib_vec[n]] += (coulomb_matrix[ia_vec[m]][ib_vec[n]] + beta_exchange_matrix[ia_vec[m]][ib_vec[n]])
 
 
 class ShellPair:
@@ -242,9 +242,10 @@ class Shell:
     
 def make_MOs(X,Xt,fock_matrix):        
     transformed_fock_matrix = numpy.dot(Xt,numpy.dot(fock_matrix,X))    #orthoginalizing the fock matrix             
+    orbital_energies,Cp = numpy.linalg.eigh(transformed_fock_matrix)    #solving the Roothan equations in the orthoginal basis 
     MOs = numpy.dot(X,Cp)                                               #transforming back into the orginal basis
     return MOs,orbital_energies
-    
+   
 def make_density_matrix(density_matrix,MOs,NElectrons):
     # Construct one-electron density matrix
     n_basis_functions = len(density_matrix)
@@ -360,8 +361,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         density = Init.sadGuess(molecule, system.BasisSets[0])
         alpha_MOs = copy.deepcopy(template_matrix)
         beta_MOs = copy.deepcopy(template_matrix)
-    
-    energy = calculate_energy(density, fock)
+        
+    energy = calculate_energy(fock, density)
     dE = energy 
     if system.UseDIIS != True:
         DIIS.error = 0     #set to zero so the convergence criterta is met when not using DIIS
@@ -375,14 +376,14 @@ def do(system, molecule,state, alpha_reference, beta_reference):
 
     while ((abs(dE)) > c.energy_convergence):
         num_iterations += 1 
-        fock.makeFockMatrices(density, sehell_pairs, template_matrix) 
+        fock.makeFockMatrices(density, shell_pairs, template_matrix) 
        
-        if molecule.multiplicity != 1:
+        if molecule.Multiplicity != 1:
            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, focks)
 
        #preforming DIIS starting from the first variational fock matrix 
         if system.UseDIIS == True and num_iterations > 1: 
-           fock.alpha, fock.beta = DIIS.DoDIIS(self, fock, density)
+           fock.alpha, fock.beta = DIIS.DoDIIS(fock, density)
 
         if system.MOM_Type != "fixed":
             alpha_reference = copy.deepcopy(alpha_MOs)
@@ -402,7 +403,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         density.beta = make_density_matrix(density.beta,beta_MOs,molecule.NBetaElectrons)
         density.total = numpy.ndarray.tolist(numpy.add(density.alpha,density.beta))            
        
-        energy = calculate_energy(density, fock)
+        old_energy = energy
+        energy = calculate_energy(fock, density)
         dE = energy - old_energy
               
 #        print "Overlap Matrix"
@@ -425,13 +427,13 @@ def do(system, molecule,state, alpha_reference, beta_reference):
 #        print 'Alpha exchange matrix'
 #        print alpha_exchange_matrix
 #        print 'Alpha Fock matrix'
-#        print alpha_fock_matrix
+#        print fock.alpha
         print 'Alpha orbital energies'
         print alpha_orbital_energies
         print 'Alpha MO coefficients'
         print alpha_MOs
         print 'Alpha density matrix'
-        print alpha_density_matrix
+        print density.alpha
         print "Beta MO coeficents"
         print beta_MOs
 #        print "Beta Density Matrix"
