@@ -75,9 +75,9 @@ class System:
         except:
             self.UseDIIS = True 
         try:
-            self.DIISSize = input.DIIS_Size
+            self.DIIS_Size = input.DIIS_Size
         except:
-            self.DIISSize = 15
+            self.DIIS_Size = 15
         try:
             #will need to add code to check if the data is avalible for SAD guess
             # for the givej molecule and basis

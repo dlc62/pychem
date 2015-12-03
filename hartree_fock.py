@@ -124,6 +124,49 @@ class DIIS_system:
         self.storeExtrapolated(alpha_fock, beta_fock, densities)
         return alpha_fock, beta_fock 
 
+########################## MOM and Excited State Functions  ########################### 
+
+def maximumOverlapMethod(reference, new_MOs, energies, NElectrons, overlap_matrix):
+    P_vector = numpy.zeros(len(new_MOs))
+    dagger = numpy.transpose(reference[:,range(NElectrons)]) 
+    MO_overlap = dagger.dot(overlap_matrix.dot(new_MOs))
+    
+    #sum the overlap of the individual AOs 
+    if len(numpy.shape(MO_overlap)) == 1:
+        P_vector = MO_overlap
+    else: 
+        for i in xrange(len(new_MOs)):
+            P_vector[i] = sum(MO_overlap[:,i])
+    
+    sorted_MOs, sorted_energies = Sort_MOs(new_MOs, energies, numpy.abs(P_vector)) 
+    return sorted_MOs, sorted_energies 
+
+def Sort_MOs(MOs, energies,p):
+#sorts MOs and energies in decending order 
+#based on a vector p (the overlap vector)
+    temp = [[p[i],MOs[:,i],energies[i]] for i in range(len(p))] 
+    temp = sorted(temp, key = lambda temp: temp[0], reverse = True)     #sorts the elements on the basis of the p values (temp[0])
+    new_MOs = numpy.array([line[1] for line in temp])
+    new_energies = [line[2] for line in temp]
+    return numpy.transpose(new_MOs), new_energies
+
+
+def Excite(matrix,occupancy, NElectrons):
+#This function permutes the an array give an list describing the
+#orbital occupancy 
+    new_matrix = copy.deepcopy(matrix)
+    frm = []                        #list to contain the indexes orbitatals to be excited from
+    to = []                         #list to contain the indexes of the orbitals to be excited to
+    for i in range(NElectrons):
+        if occupancy[i] == 0:
+            frm.append(i)
+    for i in range(NElectrons,len(occupancy)):
+        if occupancy[i] == 1:
+            to.append(i)
+    for i in range(len(to)):
+        new_matrix[:,[frm[i],to[i]]] = new_matrix[:,[to[i],frm[i]]]
+    
+    return new_matrix
 
 ########################### Basic HF Functions ############################
 
@@ -284,8 +327,7 @@ def do(system, state, molecule, alpha_reference, beta_reference):
     num_iterations = 0
     isFirstCalc = (alpha_reference[0][0] == None)
     fock = Fock_matrix() 
-    density = Desnity_matrix()
-    DIIS = DIISsystem(c.DIIS_MAX_CONVERGENCE, system.DIIS_size)
+    DIIS = DIIS_system(c.DIIS_MAX_CONDITION, system.DIIS_Size)
     
     #setting up the values that are constant througout the calculation
     nuclear_repulsion_energy = integrals.nuclear_repulsion(molecule)
@@ -330,7 +372,7 @@ def do(system, state, molecule, alpha_reference, beta_reference):
 #    print '****************************************************'
 
 
-    while (abs(dE)) > c.energy_convergence):
+    while ((abs(dE)) > c.energy_convergence):
         num_iterations += 1 
         fock.makeFockMatrices(density, sehell_pairs, template_matrix) 
        
@@ -353,7 +395,7 @@ def do(system, state, molecule, alpha_reference, beta_reference):
             alpha_MOs, alpha_orbital_energies = maximumOverlapMethod(alpha_reference, alpha_MOs, alpha_orbital_energies,
                                                                     molecule.NAlphaElectrons, overlap_matrix)
             beta_MOs, beta_orbital_energies = maximumOverlapMethod(beta_reference, beta_MOs, beta_orbital_energies,
-                                                                    molecule.NBetaElectrons, overlap_matrix
+                                                                    molecule.NBetaElectrons, overlap_matrix)
 
         density.alpha = make_density_matrix(density.alpha,alpha_MOs,molecule.NAlphaElectrons)
         density.beta = make_density_matrix(density.beta,beta_MOs,molecule.NBetaElectrons)
