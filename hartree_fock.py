@@ -323,16 +323,17 @@ def constrainedUHF(overlap_matrix, density, molecule, fock):
 #                                                                 #
 ###################################################################
 
-def do(system, state, molecule, alpha_reference, beta_reference):
+def do(system, molecule,state, alpha_reference, beta_reference):
     num_iterations = 0
     isFirstCalc = (alpha_reference[0][0] == None)
     fock = Fock_matrix() 
     DIIS = DIIS_system(c.DIIS_MAX_CONDITION, system.DIIS_Size)
+    print molecule 
     
     #setting up the values that are constant througout the calculation
     nuclear_repulsion_energy = integrals.nuclear_repulsion(molecule)
     template_matrix =  makeTemplateMatrix(molecule.NOrbitals)    
-    fock.core, overlap, shell_pairs = makeCoreMatrices(template_matrix, molecule) 
+    fock.core, overlap_matrix, shell_pairs = makeCoreMatrices(template_matrix, molecule) 
     fock.resetFocks()
 
 #    print '****************************************************'
