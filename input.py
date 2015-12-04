@@ -9,12 +9,12 @@ UseMOM = True
 MOM_Type = "mutable"
 SCFGuess = "core"
 #Excitations = [[-1,1]] # HOMO -> LUMO (last of occ -> first of unocc), only for single electron excitations from reference
-UseDIIS = False 
+UseDIIS = True 
 #Excitations = 'Single' # Approximates CIS (single electron transition energies)
 #Excitations = 'Double' # Approximate CID matrix elements -> need to define Method for this
 # Molecule
 Charge = 1 
-Multiplicity = 1
+Multiplicity = 0
 #Multiplicity = 3
 #Coords = [['C', 6.0, 0.0, 0.0, 0.0],
 #          ['H', 1.0, 0.0, 0.0, 1.0],
