@@ -380,7 +380,9 @@ def do(system, molecule,state, alpha_reference, beta_reference):
 #    print ' Hartree-Fock iterations '
 #    print '****************************************************'
 
-
+    print "energy Figures"
+    print abs(dE)
+    print c.energy_convergence
     while ((abs(dE)) > c.energy_convergence):
         num_iterations += 1 
         fock.makeFockMatrices(density, shell_pairs, template_matrix) 
