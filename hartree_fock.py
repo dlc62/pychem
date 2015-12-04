@@ -333,6 +333,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     num_iterations = 0
     isFirstCalc = (alpha_reference[0][0] == None)
     fock = Fock_matrix() 
+    if molecule.NOrbitals < system.DIIS_Size:
+        system.DIIS_Size = molecule.NOrbitals
     DIIS = DIIS_system(c.DIIS_MAX_CONDITION, system.DIIS_Size)
     print molecule 
     
