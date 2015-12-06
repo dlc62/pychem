@@ -245,7 +245,6 @@ n_sets = len(sets)
 #iterates over the list of sets
 for i in xrange(n_sets):
     molecule = (Molecule(input,coords,remove_punctuation(sets[i])))
-    print molecule.NOrbitals   
 
     for state in molecule.States:
         alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)

@@ -8,9 +8,8 @@ BasisSets = ['STO3G']
 UseMOM = True 
 MOM_Type = "mutable"
 SCFGuess = "core"
-Excitations = [[-1,1]] # HOMO -> LUMO (last of occ -> first of unocc), only for single electron excitations from reference
+Excitations = [[-1,1]] # HOMO -> LUMO (last of occ -> first of unocc), only for single electron excitations from UseDIIS = True 
 UseDIIS = True 
-#Excitations = 'Single' # Approximates CIS (single electron transition energies)
 #Excitations = 'Double' # Approximate CID matrix elements -> need to define Method for this
 # Molecule
 Charge = 1 
@@ -26,3 +25,6 @@ Multiplicity = 1
 #Coords = [['He', 2.0, 0.0, 0.0, 0.0]]
 Coords = [['He', 2.0, 0.0, 0.0, 0.0],['H', 1.0, 0.0, 0.0, 0.774]]
 #Coords = [['Li', 3., 0.,0.,0.]]
+
+OutFile = 'out.txt'
+SCFPrint = 2

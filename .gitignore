@@ -1,5 +1,6 @@
 *.pyc
 *.out
+*.txt
 .DS_Store
 *.swp
 input.py

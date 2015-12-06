@@ -411,8 +411,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
                         density, fock, alpha_MOs, beta_MOs, dE, energy, DIIS.error)
 
-    print '                       End                          '
-    print '----------------------------------------------------'
+    system.out.finalPrint()
     return alpha_MOs, beta_MOs
 
 

@@ -27,30 +27,57 @@ class PrintSettings:
             self.MOMPrint = input.MOMPrint 
         except:
             self.MOMPrint = 0
+        try:
+            self.outFile = input.OutFile 
+        except:
+            self.outFile = ''
         
+    def finalPrint(self):
+        outString =  '                       End                          ' + '\n'
+        outString += '----------------------------------------------------' + '\n'
+        self.outPrint(outString)
+        if self.outFile != '':
+            self.newFile.close()
+
+    def outPrint(self,string):
+        if self.outFile == '':
+            print string 
+        else:
+            try:
+                self.newFile.write(string)
+            except:
+                print "Cannot write to file: printing output to terminal"
+                print string
+                self.outFile = ''
 
 # Currnely these functions just replicate the existing behaviour at the default 
 # input values, will need to find an elegant way of customising output in 
 # the absence of a switch/case construct 
 
     def PrintInitial(self,nuclearRepulsion, coreFock, densities):
+        if self.outFile != '':
+            self.newFile = open(self.outFile, 'a')
+
         if self.minimalPrint != True:
-                print '****************************************************'
-                print ' Initialization '
-                print '****************************************************'
-                print 'Nuclear repulsion energy', nuclearRepulsion
-                print 'Core Fock matrix'
-                print coreFock
+            outString = ""
+            outString += '****************************************************' + '\n'
+            outString +=  ' Initialization ' + '\n'
+            outString += '****************************************************' + '\n'
+            outString += 'Nuclear repulsion energy ' + str(nuclearRepulsion) + '\n'
+            outString +=  'Core Fock matrix' + '\n'
+            outString +=  str(coreFock) + '\n'
 
-                print 'Guess alpha density matrix'
-                print densities.alpha 
-                if numpy.all(densities.alpha != densities.beta):
-                    print 'Guess beta density matrix'
-                    print densities.beta 
+            outString +=  'Guess alpha density matrix' + '\n'
+            outString +=  str(densities.alpha)  + '\n'
+            if numpy.all(densities.alpha != densities.beta):
+                outString +=  'Guess beta density matrix' + '\n'
+                outString +=  str(densities.beta)  + '\n'
 
-                print '****************************************************'
-                print ' Hartree-Fock iterations '
-                print '****************************************************'
+            outString +=  '****************************************************' + '\n'
+            outString +=  ' Hartree-Fock iterations ' + '\n'
+            outString +=  '****************************************************' + '\n'
+
+            self.outPrint(outString)
 
     def PrintMOM(self):
         return 0
@@ -65,35 +92,38 @@ class PrintSettings:
         #testing to see if the alpha and beta orbital energies are the same
         equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
         restricted = reduce( (lambda x,y: x and y), equalites, True)
-
-        print "Cycle: " , cycles 
-        print "Total  Energy: " , energy 
-        print "Change in energy: " , dE
+        
+        outString = ''
+        outString += "Cycle: " + str(cycles) + '\n'
+        outString += "Total  Energy: " + str(energy) + '\n'
+        outString += "Change in energy: " + str(dE) + '\n'
         if DIIS_error != 0:                 #stops this from printing when DIIS is dissabled 
-            print "DIIS Error: " , DIIS_error
+            outString += "DIIS Error: " + str(DIIS_error) + '\n'
 
         if self.SCFPrint > 0:
-            print "Alpha Orbial Energies"
-            print alpha_energies
+            outString += "Alpha Orbial Energies" + '\n'
+            outString += str(alpha_energies) + '\n'
             #Find a better way to do this comparison
             if restricted == False:  
-                print "Beta Orbital Energies"
-                print beta_energies
+                outString += "Beta Orbital Energies" + '\n'
+                outString += str(beta_energies) + '\n'
 
         if self.SCFPrint > 1:
-            print "Alpha MOs"
-            print alpha_MOs
+            outString += "Alpha MOs" + '\n'
+            outString += str(alpha_MOs) + '\n'
             if restricted == False: 
-                print "Beta MOs"
-                print beta_MOs 
+                outString += "Beta MOs" + '\n'
+                outString += str(beta_MOs) + '\n'
 
         if self.SCFPrint > 2:
-            print "Alpha Density Matrix"
-            print density.alpha
-            print focks.alpha
+            outString += "Alpha Density Matrix" + '\n'
+            outString += str(density.alpha) + '\n'
+            outString += str(focks.alpha) + '\n'
             if restricted == False: 
-                print "Beta Density Matrix"
-                print beta_density_matrix 
-                print "Beta Fock Matrix"
-                print focks.beta 
-        print '----------------------------------------------------'
+                outString += "Beta Density Matrix" + '\n'
+                outString += str(beta_density_matrix) + '\n'
+                outString += "Beta Fock Matrix" + '\n'
+                outString += str(focks.beta) + '\n'
+        outString += '----------------------------------------------------' + '\n'
+
+        self.outPrint(outString)
