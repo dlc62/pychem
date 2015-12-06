@@ -3,6 +3,7 @@ import Init
 import constants as c
 import copy
 import numpy 
+import Output
 from numpy import dot 
 from scipy.linalg import sqrtm
 numpy.set_printoptions(precision = 5, linewidth = 100)  #Makes the arrays print nicely in the output 
@@ -23,13 +24,10 @@ class DIIS_system:
         self.max_cond = max_condition
         self.max_space = max_space
 
-    def getDIISError(self, Print = False):
+    def getDIISError(self):
         max_alpha = abs(numpy.amax(self.alphaResiduals[-1]))
         max_beta = abs(numpy.amax(self.betaResiduals[-1]))
         self.error = max([max_alpha, max_beta])
-        if Print == True:
-            print "DIIS Error"
-            print self.error 
 
     def getResidual(self, overlap, density, fock):
         residual  = overlap.dot(density).dot(fock) - fock.dot(density).dot(overlap)
@@ -116,14 +114,12 @@ class DIIS_system:
         self.updateDIIS(focks, densities, overlap_matrix)
         if len(self.residuals) > 1:
             self.makeDIISMatrix()
-            print "DIIS Matrix"
-            print self.matrix
             while numpy.linalg.cond(self.matrix) > self.max_cond:
                 self.reduceSpace()
             #making the new fock matrices 
             focks.alpha = self.makeFock(self.oldAlphaFocks)
             focks.beta = self.makeFock(self.oldBetaFocks)
-            self.getDIISError(Print = True)
+            self.getDIISError()
             #replcing the information from the old fock matrices with that 
             #from the extrapolated matrices 
             self.storeExtrapolated(focks, densities, overlap_matrix)
@@ -336,20 +332,12 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     if molecule.NOrbitals < system.DIIS_Size:
         system.DIIS_Size = molecule.NOrbitals
     DIIS = DIIS_system(c.DIIS_MAX_CONDITION, system.DIIS_Size)
-    print molecule 
     
     #setting up the values that are constant througout the calculation
     nuclear_repulsion_energy = integrals.nuclear_repulsion(molecule)
     template_matrix =  makeTemplateMatrix(molecule.NOrbitals)    
     fock.core, overlap_matrix, shell_pairs = makeCoreMatrices(template_matrix, molecule) 
     fock.resetFocks()
-
-#    print '****************************************************'
-#    print ' Initialization '
-#    print '****************************************************'
-#    print 'Nuclear repulsion energy', nuclear_repulsion_energy
-#    print 'Core Fock matrix'
-#    print core_fock_matrix
 
     s,U = numpy.linalg.eigh(overlap_matrix)
     sp = [element**-0.5e0 for element in s]
@@ -370,19 +358,12 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         beta_MOs = copy.deepcopy(template_matrix)
         
     energy = calculate_energy(fock, density)
-    dE = energy 
+    dE = energy
     if system.UseDIIS != True:
         DIIS.error = 0     #set to zero so the convergence criterta is met when not using DIIS
 
-#    print 'Guess alpha density matrix'
-#    print alpha_density_matrix
-#    print '****************************************************'
-#    print ' Hartree-Fock iterations '
-#    print '****************************************************'
+    system.out.PrintInitial(nuclear_repulsion_energy, fock.core, density)
 
-    print "energy Figures"
-    print abs(dE)
-    print c.energy_convergence
     while ((abs(dE)) > c.energy_convergence):
         num_iterations += 1 
         fock.makeFockMatrices(density, shell_pairs, template_matrix) 
@@ -427,29 +408,9 @@ def do(system, molecule,state, alpha_reference, beta_reference):
 #        print "MOs Post Sorting"
 #        print alpha_MOs
   
-        print "Cycle: " , num_iterations
-        print 'Total energy'
-        print energy + nuclear_repulsion_energy
-#Will need to get the exchange matrices out of the makeFockMatrix function  
-#        print 'Coulomb matrix'
-#        print coulomb_matrix
-#        print 'Alpha exchange matrix'
-#        print alpha_exchange_matrix
-#        print 'Alpha Fock matrix'
-#        print fock.alpha
-        print 'Alpha orbital energies'
-        print alpha_orbital_energies
-        print 'Alpha MO coefficients'
-        print alpha_MOs
-        print 'Alpha density matrix'
-        print density.alpha
-        print "Beta MO coeficents"
-        print beta_MOs
-#        print "Beta Density Matrix"
-#        print beta_density_matrix
-        print "Beta orbital energies"
-        print beta_orbital_energies
-        print '----------------------------------------------------'
+        system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
+                        density, fock, alpha_MOs, beta_MOs, dE, energy, DIIS.error)
+
     print '                       End                          '
     print '----------------------------------------------------'
     return alpha_MOs, beta_MOs

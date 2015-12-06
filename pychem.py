@@ -3,6 +3,7 @@
 import sys
 import input
 import basis
+import Output
 import constants as c
 import hartree_fock
 import Basis_Fitting 
@@ -91,6 +92,7 @@ class System:
             self.MOM_Type = input.MOM_Type
         except: 
             self.MOM_Type = "mutable"
+        self.out = Output.PrintSettings() 
 
 class Molecule:
     def __init__(self,input,coords,basis_set):
