@@ -432,12 +432,13 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         old_energy = energy
         energy = calculate_energy(fock, density)
         dE = energy - old_energy
+        total_energy = energy + nuclear_repulsion_energy
               
         if dE < c.energy_convergence and system.out.SCFPrint < system.out.SCFFinalPrint:
             system.out.SCFPrint = system.out.SCFFinalPrint 
 
         system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
-                        density, fock, alpha_MOs, beta_MOs, dE, energy, DIIS.error)
+                        density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS.error)
 
     system.out.finalPrint()
     return alpha_MOs, beta_MOs
