@@ -431,21 +431,11 @@ def do(system, molecule,state, alpha_reference, beta_reference):
        
         old_energy = energy
         energy = calculate_energy(fock, density)
-        print "Energy"
-        print energy
         dE = energy - old_energy
               
-#        print "Overlap Matrix"
-#        print alpha_O
-#        print "Overlap vector"
-#        print alpha_p
-##        print "Orbital Energies Post Sorting"
-##        print alpha_orbital_energies
-#        print "MOs Pre Sorting" 
-#        print old_alpha_MOs 
-#        print "MOs Post Sorting"
-#        print alpha_MOs
-  
+        if dE < c.energy_convergence and system.out.SCFPrint < system.out.SCFFinalPrint:
+            system.out.SCFPrint = system.out.SCFFinalPrint 
+
         system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
                         density, fock, alpha_MOs, beta_MOs, dE, energy, DIIS.error)
 

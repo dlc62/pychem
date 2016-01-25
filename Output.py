@@ -117,13 +117,14 @@ class PrintSettings:
 
         if self.SCFPrint > 2:
             outString += "Alpha Density Matrix" + '\n'
-            outString += str(density.alpha) + '\n'
+            outString += str(densities.alpha) + '\n'
+            outString += "Alpha Fock Matrix" + '\n'
             outString += str(focks.alpha) + '\n'
             if restricted == False: 
                 outString += "Beta Density Matrix" + '\n'
                 outString += str(beta_density_matrix) + '\n'
                 outString += "Beta Fock Matrix" + '\n'
                 outString += str(focks.beta) + '\n'
-        outString += '----------------------------------------------------' + '\n'
+        outString += '----------------------------------------------------'
 
         self.outPrint(outString)

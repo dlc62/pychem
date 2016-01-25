@@ -65,6 +65,10 @@ class System:
               self.BasisFit = True
 ############ DIIS Settings #############
         try:
+           self.UseMOM = input.UseMOM
+        except:
+            self.UseMOM = False 
+        try:
             self.UseDIIS = input.UseDIIS 
         except:
             self.UseDIIS = True 
