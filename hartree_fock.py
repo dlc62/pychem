@@ -8,12 +8,13 @@ from numpy import dot
 from scipy.linalg import sqrtm
 numpy.set_printoptions(precision = 5, linewidth = 100)  #Makes the arrays print nicely in the output 
 
-#the MOM and excited state functions haven't made it to the version  
+
+
 
 ########################### DIIS Object ############################
 
 class DIIS_system:
-    def __init__(self, max_condition,max_space):
+    def __init__(self, max_condition,max_space, DIIS_Type):
         self.oldAlphaFocks = []
         self.oldBetaFocks = []
         self.matrix = None  
@@ -21,6 +22,7 @@ class DIIS_system:
         self.alphaResiduals = [] 
         self.betaResiduals = []
         self.residuals = []       #total residuals
+        self.DIIS_Type = DIIS_Type  
         self.max_cond = max_condition
         self.max_space = max_space
 
@@ -34,7 +36,6 @@ class DIIS_system:
        # transformed_residual = numpy.transpose(Xt).dot(residual).dot(X)
         return residual
 
-    #possible make this a global function
     def innerProd(self, matA,matB):
     #takes two matrices and returns the trace of the product 
         product = matA.dot(numpy.transpose(matB))
@@ -43,38 +44,46 @@ class DIIS_system:
     def makeDIISMatrix(self):
         #generating the first DIIS matrix 
         if self.matrix == None:
-            self.matrix = numpy.zeros((3,3))   #assuming DIIS starts one two error vectors have been found  
+            self.matrix = numpy.zeros((3,3))   #assuming DIIS starts once two error vectors have been found  
             for i in xrange(len(self.residuals)):
                 for j in xrange(len(self.residuals)):
                     self.matrix[i,j] = self.innerProd(self.residuals[i], self.residuals[j])
-            self.matrix[0:2,2] = -1.
-            self.matrix[2,0:2] = -1.
+            # setting up the parts of the DIIS matrix particular to C1 and C2 DIIS 
+            if self.DIIS_Type == "C1":
+                self.matrix[0:2,2] = -1.
+                self.matrix[2,0:2] = -1.
+            else:
+                self.matrix = self.matrix[0:-1,0:-1]
         #extending an old DIIS matrix 
         else:
             size = len(self.matrix)
-            #updating the old DIIS_Matrix with the new exrapolated fock matrix 
-            #from the prvious DIIS step
-            new_vector = numpy.zeros(size-1)
-            for i in xrange(len(new_vector)):
-                new_vector[i] += self.innerProd(self.residuals[-2], self.residuals[i])
-            self.matrix[size-2,0:size-1] = new_vector
-            self.matrix[0:size-1,size-2] = numpy.transpose(new_vector)
+            # updating the old DIIS_Matrix with the extrapolated fock matrix 
+            # from the prvious DIIS step
+            update_vector= numpy.zeros(size-1)
+            for i in xrange(len(update_vector)):
+                update_vector[i] += self.innerProd(self.residuals[-2], self.residuals[i])
+            self.matrix[size-2,0:size-1] = update_vector
+            self.matrix[0:size-1,size-2] = numpy.transpose(update_vector)
 
             #making the new row of the matrix 
-            new_matrix = numpy.zeros((size+1,size+1))
-            new_matrix[0:size,0:size] = self.matrix
-            new_vector = numpy.zeros(size)
-            for i in xrange(size):
+            new_matrix = numpy.zeros((size+1,size+1))   
+            new_matrix[0:size,0:size] = self.matrix     
+            # upsize by one to account for the fact that the whole of the DIIS matrix 
+            # is built from the error vectors in C2 DIIS 
+            size = size if self.DIIS_Type == 'C1' else size + 1 
+            new_vector = numpy.zeros(size)             
+            for i in xrange(size):                     
                 new_vector[i] = self.innerProd(self.residuals[-1], self.residuals[i])
-            new_matrix[size-1,0:size] = new_vector
+            new_matrix[size-1,0:size] = new_vector      
             new_matrix[0:size,size-1] = numpy.transpose(new_vector)
-            new_matrix[size, 0:size] = -1.
-            new_matrix[0:size, size] = -1.
+            if self.DIIS_Type == "C1":
+                new_matrix[size, 0:size] = -1.              
+                new_matrix[0:size, size] = -1.             
             self.matrix = new_matrix
 
     def reduceSpace(self):
-    #reduces the size of the fock space by one 
-    #removes the oldest element
+    # reduces the size of the fock space by one 
+    # removing the oldest element
         self.matrix = numpy.delete(self.matrix,0,0)
         self.matrix = numpy.delete(self.matrix,0,1)
         self.oldAlphaFocks.pop(0) 
@@ -83,15 +92,35 @@ class DIIS_system:
         self.betaResiduals.pop(0)
         self.residuals.pop(0)
     
-    def makeFock(self,focks):
+    def makeFock(self,focks, residuals):
         new_fock = numpy.zeros(numpy.shape(focks[0]))
         size = len(self.matrix)
         DIIS_vector = numpy.append(numpy.zeros((size-1,1)),[-1.]) 
-        coeffs = numpy.linalg.solve(self.matrix,DIIS_vector)
-        for i in xrange(size-1):   #size-1 exculded the Lagrange multiplyer
+        if self.DIIS_Type == "C1":
+            coeffs = numpy.linalg.solve(self.matrix,DIIS_vector)
+            size -= 1      # excluding the Lagrange multiplyer 
+        else:
+            coeffs = self.make_C2_Coeffs(self.matrix, residuals) 
+        #summing over residual matrices 
+        for i in xrange(size):   
             new_fock += focks[i] * coeffs[i]
         return new_fock
     
+    def make_C2_Coeffs(self, matrix, residuals):
+        (_, vects) = numpy.linalg.eig(matrix)
+        min_error = 1e6     # string with a arbitraily large value 
+        # estimating the error associated with each possible set of coefficents 
+        # and keeping track of the vector with the least associated error 
+        for vector in numpy.transpose(vects):
+            vector = vector / sum(vector) # normalizing the vector so the sum of its elements equals 1 
+            current_error = 0
+            for i in range(len(vector)):
+                current_error += numpy.linalg.norm(vector[i] * residuals[i])
+            if current_error < min_error:
+                min_error = current_error 
+                best_vect = vector 
+        return(best_vect)
+
     def updateDIIS(self, fock, densities, overlap_matrix):
     #generates takes fock matrices and generates a new set of residuals 
     #plus monitors the size of the DIIS space
@@ -102,7 +131,11 @@ class DIIS_system:
         self.residuals.append(self.alphaResiduals[-1] + self.betaResiduals[-1]) 
         self.oldAlphaFocks.append(fock.alpha)
         self.oldBetaFocks.append(fock.beta)
-
+    
+    # replaces the fock matrix from the previous Roothaan-Hall step
+    # with the extrapolated matrix
+    # How does the fact that the Fock and density matrices no longer 
+    # correspond affect things?
     def storeExtrapolated(self, focks, densities, overlap_matrix):
         self.oldAlphaFocks[-1] = copy.deepcopy(focks.alpha)
         self.oldBetaFocks[-1] = copy.deepcopy(focks.beta)
@@ -117,8 +150,8 @@ class DIIS_system:
             while numpy.linalg.cond(self.matrix) > self.max_cond:
                 self.reduceSpace()
             #making the new fock matrices 
-            focks.alpha = self.makeFock(self.oldAlphaFocks)
-            focks.beta = self.makeFock(self.oldBetaFocks)
+            focks.alpha = self.makeFock(self.oldAlphaFocks, self.alphaResiduals)
+            focks.beta = self.makeFock(self.oldBetaFocks, self.betaResiduals)
             self.getDIISError()
             #replcing the information from the old fock matrices with that 
             #from the extrapolated matrices 
@@ -331,7 +364,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     fock = Fock_matrix() 
     if molecule.NOrbitals < system.DIIS_Size:
         system.DIIS_Size = molecule.NOrbitals
-    DIIS = DIIS_system(c.DIIS_MAX_CONDITION, system.DIIS_Size)
+    DIIS = DIIS_system(c.DIIS_MAX_CONDITION, system.DIIS_Size, system.DIIS_Type)
     
     #setting up the values that are constant througout the calculation
     nuclear_repulsion_energy = integrals.nuclear_repulsion(molecule)
@@ -367,7 +400,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     while ((abs(dE)) > c.energy_convergence):
         num_iterations += 1 
         fock.makeFockMatrices(density, shell_pairs, template_matrix) 
-       
+
+       #Contrained UHF for open shell molecules
         if molecule.Multiplicity != 1:
            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, focks)
 
@@ -375,6 +409,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         if system.UseDIIS == True and num_iterations > 1: 
            fock = DIIS.DoDIIS(fock, density, overlap_matrix)
 
+       #using the MOs from the previous iteration as the reference orbitals 
+       #unless spcifyed in the input file
         if system.MOM_Type != "fixed":
             alpha_reference = copy.deepcopy(alpha_MOs)
             beta_reference = copy.deepcopy(beta_MOs)
@@ -395,6 +431,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
        
         old_energy = energy
         energy = calculate_energy(fock, density)
+        print "Energy"
+        print energy
         dE = energy - old_energy
               
 #        print "Overlap Matrix"

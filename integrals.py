@@ -16,6 +16,7 @@ from scipy.misc import factorial
 # ================================================================================================ #
 
 class SetRR1:
+   #generates all the integrals to evaluate
     def __init__(self,l1,l2):
        HRR = [[l1,l2]]; VRR = []
        HRR_terms = []; VRR_terms = []
@@ -42,18 +43,22 @@ class SetRR1:
 
 class ShellQuartet:
     def __init__(self,centreA,centreB,centreC,centreD,primA,primB,primC,primD):
+        #the exponent and contraction coefficent respectivly
        [self.alpha,self.cA] = primA
        [self.beta,self.cB] = primB
        [self.gamma,self.cC] = primC
        [self.delta,self.cD] = primD
+       #nuclear corrdinates
        self.rA = centreA.Coords
        self.rB = centreB.Coords
        self.rC = centreC.Coords
        self.rD = centreD.Coords
+       #angular momentum
        self.lA = centreA.Cgtf.AngularMomentum
        self.lB = centreB.Cgtf.AngularMomentum
        self.lC = centreC.Cgtf.AngularMomentum
        self.lD = centreD.Cgtf.AngularMomentum
+       #constatans needed for integral evaluation 
        self.zeta = self.alpha+self.beta
        self.eta = self.gamma+self.delta
        self.Gab = exp(-self.alpha*self.beta/self.zeta*distance(self.rA,self.rB))
@@ -74,31 +79,36 @@ class ReIndex:
        self.i1 = 0 ; self.i2 = 1 ; self.i3 = 2 ; self.i4 = 3
        self.l1 = sq.lA; self.l2 = sq.lB; self.l3 = sq.lC; self.l4 = sq.lD
        self.r1 = sq.rA; self.r2 = sq.rB; self.r3 = sq.rC; self.r4 = sq.rD
+       #putting the larger angular momentum in the bra on the right
        if sq.lB > sq.lA:
           self.i1,self.i2 = self.i2,self.i1
           self.l1,self.l2 = self.l2,self.l1
           self.r1,self.r2 = self.r2,self.r1
+       #same for the ket 
        if sq.lD > sq.lC:
           self.i3,self.i4 = self.i4,self.i3
           self.l3,self.l4 = self.l4,self.l3
           self.r3,self.r4 = self.r4,self.r3
+       #putting the largest total angular momentum in the bra 
        if (self.l3+self.l4) > (self.l1+self.l2):
-          # swap bra & ket
           self.i1,self.i2,self.i3,self.i4 = self.i3,self.i4,self.i1,self.i2
           self.l1,self.l2,self.l3,self.l4 = self.l3,self.l4,self.l1,self.l2
           self.r1,self.r2,self.r3,self.r4 = self.r3,self.r4,self.r1,self.r2
           self.P = sq.Pcd; self.Q = sq.Pab; self.z = sq.eta; self.e = sq.zeta
        else:
+           # ?? Why is this in an else block ?? 
           self.P = sq.Pab; self.Q = sq.Pcd; self.z = sq.zeta; self.e = sq.eta 
        self.ltot = self.l1 + self.l2 + self.l3 + self.l4
      
 class SetRR:
-    # Generate all HRR & VRR two-electron integral classes to be calculated
+    # Generate all the reduced integral classes to be calculated for a single starting ERI
     def __init__(self,bk):
+      #HRR contains the angular momentum numbers 
        HRR = [[bk.l1,bk.l2,bk.l3,bk.l4]]; VRR = []
        HRR_bra_terms = []; HRR_ket_terms = [];
        VRR_bra_terms = []; VRR_ket_terms = [];
        index = 0
+      #reducing the classes to (a0|b0) using the HRR
        while index < len(HRR):
           if HRR[index][1] != 0:
              generate_HRR_terms(HRR,index,0,1)
@@ -107,9 +117,12 @@ class SetRR:
              generate_HRR_terms(HRR,index,2,3)
              HRR_ket_terms.append(HRR[index])
           else:
+            #if integral is of form (a0|c0) it falls through to the the VRR list 
+            #HRR doesn't grow longer so index can become greater than len(HRR)
              VRR.append([HRR[index],0])
           index += 1
        index = 0
+      #applying the VRR
        while index < len(VRR):
           if VRR[index][0][0] != 0:
              generate_VRR_terms(VRR,index,0,2)
@@ -124,6 +137,8 @@ class SetRR:
        self.vrr_ket = list(reversed(VRR_ket_terms))
 
 def generate_HRR_terms(HRR,index,i0,i1,kinetic=False):
+  # HRR[index] => t0, t1 
+  # (a(b+1)|cd) => ((a+1)b|cd),(ab|cd)
    t1 = HRR[index][:]
    t1[i1] -= 1
    t0 = t1[:]
@@ -135,9 +150,14 @@ def generate_HRR_terms(HRR,index,i0,i1,kinetic=False):
       terms.append(t2)
    for term in terms:
       if term not in HRR:
+        #add the new terms to the list produced via the HRR
          HRR.append(term)
 
 def generate_VRR_terms(VRR,index,i0,i2):
+  #VRR[index] => t0^m, t0^(m+1), t1^2, t1^(m+1), t2^(m+1)
+  #((a+1)0|c0) => (a0|c0)    ^m,    (a0|c0)^(m+1),
+  #               ((a-1)0|c0)^m,    ((a-1)0|c0)^(m+1),
+  #                                 (a0|(c-1)0)^(m+1)
    t0 = VRR[index][0][:]; m0 = VRR[index][1]; m1 = m0+1 
    t0[i0] -= 1
    t1 = t0[:]
@@ -145,6 +165,7 @@ def generate_VRR_terms(VRR,index,i0,i2):
    t2 = t0[:]
    t2[i2] -= 1
    terms = []
+  #ifs throw out integrals with less than zero angular momentum. 
    if t0[i0] > -1:
       terms.append([t0,m0])
       terms.append([t0,m1])
@@ -162,8 +183,10 @@ def generate_VRR_terms(VRR,index,i0,i2):
 # ================================================================================================ #
 def nuclear_repulsion(molecule):
     nuclear_repulsion_energy = 0.0e0
+    #i and j from enumerate are the atom indices
     for (i,atom1) in enumerate(molecule.Atoms):
        for (j,atom2) in enumerate(molecule.Atoms):
+         #evaluating nuclear repulsion using Coloumb's Law  
           if j < i:
              r = sqrt(distance(atom1.Coordinates,atom2.Coordinates))
              Z1 = atom1.NuclearCharge
@@ -194,6 +217,8 @@ def one_electron(molecule,shell_pair):
     if lB > lA:
        Swap = True
     if Swap:
+   # making the higher angular momentum function A
+   # and finding all the integrals to evaluate
        i1 = 1; i2 = 0; r1 = rB; r2 = rA; l1 = lB; l2 = lA; order = SetRR1(lB,lA)
     else:
        i1 = 0; i2 = 1; r1 = rA; r2 = rB; l1 = lA; l2 = lB; order = SetRR1(lA,lB)
@@ -212,6 +237,7 @@ def one_electron(molecule,shell_pair):
           nuclear_auxiliary = [{} for i in range(0,ltot+1)]
           nuclear = [copy.deepcopy(nuclear_auxiliary) for atom in molecule.Atoms]
           lkey = (0,0,0,0,0,0) 
+         #overlap nad kinetic integrals for s functions  
           overlap[lkey] = (pi/zeta)**1.5e0*Gab
           kinetic[lkey] = xi*(3-2*xi*Rsq)*overlap[lkey]
           for (iatom,atom) in enumerate(molecule.Atoms):
@@ -219,6 +245,7 @@ def one_electron(molecule,shell_pair):
              Z = atom.NuclearCharge
              U = zeta*distance(Pab,Rc)
              F = F_aux(ltot,U)
+            # nuclear integral for s functions  
              for m in range(0,ltot+1):
                 nuclear[iatom][m][lkey] = -2*(zeta/pi)**0.5*overlap[lkey]*Z*F[m]
        # -------------------------------------------------------------------------------------- #
@@ -229,6 +256,7 @@ def one_electron(molecule,shell_pair):
              z1 = beta; z2 = alpha
           index1 = 0
           for [term,m] in order.vrr:
+            #all VRR terms needed for that integral    
              l1 = term[index1];
              lpair = [[],[]]
              lpair[i2] = c.lQuanta[0][0][:]

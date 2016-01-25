@@ -16,10 +16,11 @@ def dirrectSum(A,B):
         new_matrix[len(B):, len(B):] = B
     return new_matrix
 
-def make_SAD_Guess(molecule,basis):
+def sadGuess(molecule,basis):
     density_matrix = []
     for atom in molecule.Atoms:
-        density_matrix = dirrectSum(fock_matrix, SADget[basis][atom.Label]) 
+        density_matrix = dirrectSum(density_matrix, SADget[basis][atom.Label]) 
+    density_matrix *= 0.5
     return HF.Density_matrix(density_matrix, deepcopy(density_matrix)) 
 
 def readGuess(alpha_ref, beta_ref, state, molecule):
@@ -37,9 +38,3 @@ def coreGuess(core_fock, X, Xt, molecule):
     alpha_density = HF.make_density_matrix(template_matrix, MOs, molecule.NAlphaElectrons)
     beta_density = deepcopy(alpha_density)
     return MOs, deepcopy(MOs), HF.Density_matrix(alpha_density, beta_density) 
-
-def sadGuess(molecule, basis):
-    total_density = make_SAD_Guess(molecule, basis)
-    alpha_density = 0.5 * total_density
-    beta_density = deepcopy(alpha_density)
-    return HF.Density_matrix(alpha_density, beta_density) 

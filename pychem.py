@@ -63,14 +63,7 @@ class System:
               self.BasisFit = False
            else:
               self.BasisFit = True
-        try:
-           self.UseMOM = input.UseMOM
-        except:
-           try:
-              input.Excitations
-              UseMOM = True
-           except:
-              UseMOM = False 
+############ DIIS Settings #############
         try:
             self.UseDIIS = input.UseDIIS 
         except:
@@ -80,15 +73,32 @@ class System:
         except:
             self.DIIS_Size = 15
         try:
+            self.DIIS_Type = input.DIIS_Type 
+        except:
+            self.DIIS_Type = "C1"
+
+############ Initial Guess Settings ##########
+        try:
             #will need to add code to check if the data is avalible for SAD guess
             # for the givej molecule and basis
             self.SCFGuess = input.SCFGuess.lower() 
         except: 
             self.SCFGuess = 'core'
+
+############ MOM Settings 
         try:
-            #at this point the code just defaults to using the previous orbials as 
-            #the reference at each iteration, will need to change the initialzation
-            #to check for the 'fixed' keyword to used fixed reference orbitals
+            self.UseMOM = input.UseMOM
+        except:
+            self.UseMOM = False 
+        try:
+            input.Excitations
+            UseMOM = True
+        except:
+            UseMOM = False 
+        try:
+            # at this point the code just defaults to using the previous orbials as 
+            # the reference at each iteration, will need to change the initialzation
+            # to check for the 'fixed' keyword to used fixed reference orbitals
             self.MOM_Type = input.MOM_Type
         except: 
             self.MOM_Type = "mutable"
