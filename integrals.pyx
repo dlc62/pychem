@@ -2,7 +2,6 @@
 
 import sys
 from math import pi
-from math import sqrt
 from math import exp
 import constants as c
 import copy
@@ -10,6 +9,12 @@ import itertools
 from scipy.special import gamma
 from scipy.special import gammainc
 from scipy.misc import factorial
+
+cdef extern from "math.h":
+    double tgamma(double)
+
+cdef extern from "math.h":
+    double sqrt(double)
 
 # ================================================================================================ #
 #  STRUCTURES REQUIRED FOR ONE-ELECTRON INTEGRAL EVALUATION                                        #
@@ -552,10 +557,11 @@ def F_aux(m,U):
 #       F[index] = (exp(-U)+2*U*F[index+1])/mm2 
     return F
 
-def normalize(exponent,lv):
+def normalize(double exponent,lv):
+    cdef double lx, ly, lz, coeffs 
     [lx,ly,lz] = lv
-    coeff = (2.0e0*exponent)**((float(lx+ly+lz)+1.5e0)/2.0e0)/ \
-            sqrt(gamma(lx+0.5e0)*gamma(ly+0.5e0)*gamma(lz+0.5e0))
+    coeff = (2.0e0*exponent)**((lx+ly+lz+1.5e0)/2.0e0)/ \
+            sqrt(tgamma(lx+0.5e0)*tgamma(ly+0.5e0)*tgamma(lz+0.5e0))
     return coeff
 
 def get(integral_dict,key):

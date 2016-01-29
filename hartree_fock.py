@@ -8,9 +8,6 @@ from numpy import dot
 from scipy.linalg import sqrtm
 numpy.set_printoptions(precision = 5, linewidth = 100)  #Makes the arrays print nicely in the output 
 
-
-
-
 ########################### DIIS Object ############################
 
 class DIIS_system:

@@ -9,6 +9,7 @@ import hartree_fock
 import Basis_Fitting 
 from copy import deepcopy
 import numpy
+import cProfile 
 
 
 def single_excitations(occupyed, unoccupyed):
@@ -261,7 +262,8 @@ for i in xrange(n_sets):
     molecule = (Molecule(input,coords,remove_punctuation(sets[i])))
 
     for state in molecule.States:
-        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)
+        #alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)
+        alpha_MOs, beta_MOs = cProfile.run('hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)') # For profiling 
         system.DIIS = False 
         if i < n_sets - 1:       #does not preform the basis fitting on the final loop
             alpha_reference = Basis_Fitting.Basis_Fit(molecule, alpha_MOs,sets[i+1])
@@ -283,17 +285,6 @@ for i in xrange(n_sets):
 #    MOs = hartree_fock.do(system,molecule,state,reference_orbitals)
 #    reference_orbitals = Basis_Fitting.Basis_Fit(molecule )
     
-#comment out these lines out to just do the setup
-#    for state in molecule.States:                #Will in general need to store the MOs and reference orbitals for differenct states
-#       MOs = hartree_fock.do(system,molecule,state,reference_orbitals)    
-#       reference_orbitals = Basis_Fitting.Basis_Fit(molecule, MOs,'STO3G' )
-   
-# do loop over electronic states
-# and in future also loop over geometry optimization steps
-#    energy,MOs = hartree_fock.do(system,molecule,state,reference_orbitals)
-#    energy,gradient,hessian,MOs = hartree_fock.do(system,molecule,state,reference_orbitals)
-#   do RHF or CUHF calculation
-
 # Check data structures are set up correctly
 #print system.Method
 #print molecule.Charge
@@ -303,6 +294,3 @@ for i in xrange(n_sets):
 #        print cgtf.AngularMomentum
 #        for [exponent,coefficient] in cgtf.Primitives:
 #            print exponent,coefficient
-
-#import getDensity 
-#getDensity.Write("SAD_orbitals", system, molecule, alpha_MOs, beta_MOs)  

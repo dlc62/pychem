@@ -1,4 +1,4 @@
-# Object for handeling printing output from code can be easily extended to include 
+
 # need new functionally and removed the need of having hartree_fock.py inclding 
 # literal strings for printing 
 import input
@@ -20,45 +20,47 @@ class PrintSettings:
         except:
             self.DIISPrint = 0 
         try: 
-            self.minimalPrint = input.minimalPrint 
+            self.MinimalPrint = input.minimalPrint 
         except:
-            self.minimalPrint = False
+            self.MinimalPrint = False
         try:
             self.MOMPrint = input.MOMPrint 
         except:
             self.MOMPrint = 0
         try:
-            self.outFile = input.OutFile 
+            self.OutFile = input.OutFile 
         except:
-            self.outFile = ''
+            self.OutFile = ''
         
     def finalPrint(self):
         outString =  '                       End                          ' + '\n'
         outString += '----------------------------------------------------' + '\n'
         self.outPrint(outString)
-        if self.outFile != '':
+        if self.OutFile != '':
             self.newFile.close()
 
     def outPrint(self,string):
-        if self.outFile == '':
+        if self.OutFile == '':
             print string 
         else:
             try:
                 self.newFile.write(string)
+                self.newFile.write('\n')
             except:
                 print "Cannot write to file: printing output to terminal"
                 print string
-                self.outFile = ''
+                self.OutFile = ''
 
 # Currnely these functions just replicate the existing behaviour at the default 
 # input values, will need to find an elegant way of customising output in 
 # the absence of a switch/case construct 
 
     def PrintInitial(self,nuclearRepulsion, coreFock, densities):
-        if self.outFile != '':
-            self.newFile = open(self.outFile, 'a')
+        if self.OutFile != '':
+            print "Calculation Running"
+            self.newFile = open(self.OutFile, 'a')
 
-        if self.minimalPrint != True:
+        if self.MinimalPrint != True:
             outString = ""
             outString += '****************************************************' + '\n'
             outString +=  ' Initialization ' + '\n'
@@ -90,9 +92,10 @@ class PrintSettings:
                    focks, alpha_MOs, beta_MOs, dE, energy, DIIS_error):
     
         #testing to see if the alpha and beta orbital energies are the same
-        equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
-        restricted = reduce( (lambda x,y: x and y), equalites, True)
-        
+        #equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
+        #restricted = reduce( (lambda x,y: x and y), equalites, True)
+        restricted = numpy.all(alpha_energies == beta_energies)
+
         outString = ''
         outString += "Cycle: " + str(cycles) + '\n'
         outString += "Total  Energy: " + str(energy) + '\n'
