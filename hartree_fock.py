@@ -349,11 +349,11 @@ def constrainedUHF(overlap_matrix, density, molecule, fock):
            beta_fock_matrix = numpy.ndarray.tolist(constrained_beta_fock_matrix)
    return alpha_fock_matrix, beta_fock_matrix 
 
-###################################################################
+#=================================================================#
 #                                                                 #
 #                        Main Function                            #
 #                                                                 #
-###################################################################
+#=================================================================#
 
 def do(system, molecule,state, alpha_reference, beta_reference):
     num_iterations = 0
@@ -431,8 +431,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         dE = energy - old_energy
         total_energy = energy + nuclear_repulsion_energy
               
-        if dE < c.energy_convergence and system.out.SCFPrint < system.out.SCFFinalPrint:
-            system.out.SCFPrint = system.out.SCFFinalPrint 
+#        if abs(dE) < c.energy_convergence and system.out.SCFPrint < system.out.SCFFinalPrint:
+#            system.out.SCFPrint = system.out.SCFFinalPrint 
 
         system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
                         density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS.error)

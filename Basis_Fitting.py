@@ -11,8 +11,6 @@ def Get_Overlap(prim1, prim2, l):
     integral = (1 / gamma)**(3./2) * (1/(2*gamma)**l) * norm * prim1[1] * prim2[1]
     return integral 
     
-
-
 def Basis_Fit(molecule, MOs, new_basis):
     new_coeffs = []
     for state in xrange(len(MOs+1)):
@@ -59,7 +57,6 @@ def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis):
                     
     return atom_coeffs 
        
-
 def Basis_Fit_Ang(atom, old_set, MOs, cgto_count, new_ang_set):    #Take all the MO coefficents for the state
     
     #Getting the set of function of the right l from the new basis 
@@ -98,31 +95,3 @@ def Basis_Fit_Ang(atom, old_set, MOs, cgto_count, new_ang_set):    #Take all the
     new_MOs = numpy.linalg.solve(S,T)
     return numpy.ndarray.tolist(new_MOs)     
     
-def Do_DIIS(residuals,old_MOs, MOs, NElectrons):
-    new_MOs = copy.deepcopy(MOs)
-    NVectors = len(residuals)
-    DIIS_Vector = numpy.array([[0.0]] * NVectors + [[-1.]])
-    
-    DIIS_template = numpy.zeros((NVectors+1, NVectors+1))
-    DIIS_template[-1,:] = -1.
-    DIIS_template[:,-1] = -1.
-    DIIS_template[-1,-1] = 0.
-    
-    #itterating over the occupyed orbitals
-    for orb in xrange(NElectrons):
-        DIIS_Matrix = copy.deepcopy(DIIS_template)
-        new_MOs[:,orb] = numpy.zeros(numpy.shape(new_MOs[:,orb]))
-        for i in xrange(NVectors):
-            for j in xrange(NVectors):
-                DIIS_Matrix[i,j] = residuals[i][:,orb].dot(residuals[j][:,orb])
-        coeffs = numpy.linalg.solve(DIIS_Matrix,DIIS_Vector)
-        for i in xrange(NVectors):
-            new_MOs[:,orb] += coeffs[i] * old_MOs[i][:,orb]
-    
-    return new_MOs
-
-
-
-
-            
-            

@@ -1,8 +1,8 @@
-
 # need new functionally and removed the need of having hartree_fock.py inclding 
 # literal strings for printing 
 import input
 import numpy
+import constants as c 
 
 #may need to import input for this to work 
 class PrintSettings:
@@ -10,11 +10,11 @@ class PrintSettings:
         try:
             self.SCFPrint = input.SCFPrint 
         except:
-            self.SCFPrint = 1 
+            self.SCFPrint = 0 
         try:
             self.SCFFinalPrint = input.SCFFinalPrint
         except: 
-            self.SCFFinalPrint = 2
+            self.SCFFinalPrint = 1
         try:
             self.DIISPrint = input.DIISPrint 
         except:
@@ -77,7 +77,7 @@ class PrintSettings:
 
             outString +=  '****************************************************' + '\n'
             outString +=  ' Hartree-Fock iterations ' + '\n'
-            outString +=  '****************************************************' + '\n'
+            outString +=  '****************************************************'
 
             self.outPrint(outString)
 
@@ -91,6 +91,10 @@ class PrintSettings:
     def PrintLoop(self, cycles, alpha_energies, beta_energies, densities,
                    focks, alpha_MOs, beta_MOs, dE, energy, DIIS_error):
     
+        if abs(dE) < c.energy_convergence:
+            printLength = self.SCFFinalPrint 
+        else:
+            printLength = self.SCFPrint 
         #testing to see if the alpha and beta orbital energies are the same
         #equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
         #restricted = reduce( (lambda x,y: x and y), equalites, True)
@@ -103,7 +107,7 @@ class PrintSettings:
         if DIIS_error != 0:                 #stops this from printing when DIIS is dissabled 
             outString += "DIIS Error: " + str(DIIS_error) + '\n'
 
-        if self.SCFPrint > 0:
+        if printLength > 0:
             outString += "Alpha Orbial Energies" + '\n'
             outString += str(alpha_energies) + '\n'
             #Find a better way to do this comparison
@@ -111,21 +115,21 @@ class PrintSettings:
                 outString += "Beta Orbital Energies" + '\n'
                 outString += str(beta_energies) + '\n'
 
-        if self.SCFPrint > 1:
+        if printLength > 1:
             outString += "Alpha MOs" + '\n'
             outString += str(alpha_MOs) + '\n'
             if restricted == False: 
                 outString += "Beta MOs" + '\n'
                 outString += str(beta_MOs) + '\n'
 
-        if self.SCFPrint > 2:
+        if printLength > 2:
             outString += "Alpha Density Matrix" + '\n'
             outString += str(densities.alpha) + '\n'
             outString += "Alpha Fock Matrix" + '\n'
             outString += str(focks.alpha) + '\n'
             if restricted == False: 
                 outString += "Beta Density Matrix" + '\n'
-                outString += str(beta_density_matrix) + '\n'
+                outString += str(densities.alpha) + '\n'
                 outString += "Beta Fock Matrix" + '\n'
                 outString += str(focks.beta) + '\n'
         outString += '----------------------------------------------------'

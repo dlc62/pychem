@@ -109,6 +109,15 @@ class System:
             self.MOM_Type = "mutable"
         self.out = Output.PrintSettings() 
 
+#---------------------------------------------------#
+#                  Molecule Class                   #
+#---------------------------------------------------#
+
+# Possibly edit molecule class
+#    - Make it easy to get coords out 
+#    - Store a list of basis functions 
+#    - Write 
+
 class Molecule:
     def __init__(self,input,coords,basis_set):
         try:
@@ -168,7 +177,8 @@ class Molecule:
 ###################  Excitations ####################
 
 #   !!!!!!!!!!! Need to make this block more general for unrestricted calculations !!!!!!!!!!!
-       
+        
+        # Creating Ground State 
         self.States = [ElectronicState(alpha_occupancy,beta_occupancy)]
         try:
             excitations = input.Excitations
@@ -239,58 +249,64 @@ class ElectronicState:
         self.Hessian = hessian
         self.MolecularOrbitals = MOs
 
-#----------------------------------------------------------------
-#                       THE MAIN PROGRAM
-#---------------------------------------------------------------
-
 def remove_punctuation(basis_set):
     basis_set = basis_set.replace('*','s').replace('-','').replace('(','').replace(')','').replace(',','').upper()
     return basis_set
 
+def Basis_Loop(molecule, state, coords, alpha_MOs, beta_MOs, sets):
+    mol = deepcopy(molecule)
+    for basis in sets[1:]:
+        alpha_MOs = Basis_Fitting.Basis_Fit(mol, alpha_MOs, basis)
+        beta_MOs = Basis_Fitting.Basis_Fit(mol, beta_MOs, basis)
+        print "Fitted Basis"
+        print alpha_MOs
+        mol = Molecule(input, coords, basis)      #rewrite this to do an in place update
+        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_MOs, beta_MOs)
+    return alpha_MOs, beta_MOs 
 
+
+#----------------------------------------------------------------#
+#                        THE MAIN PROGRAM                        #
+#----------------------------------------------------------------# 
 
 system = System(input)
 coords = input.Coords
 molecules = []
 alpha_reference  = [[None]]     #this initiation avoids comparing an array to a single value latter in the code
 beta_reference = [[None]]
-sets = input.BasisSets
+sets = map(remove_punctuation,input.BasisSets)
 n_sets = len(sets)
 
-#iterates over the list of sets
-for i in xrange(n_sets):
-    molecule = (Molecule(input,coords,remove_punctuation(sets[i])))
+# Do ground state calculation in the starting basis 
+molecule = Molecule(input, coords, sets[0])
+base_alpha_MOs, base_beta_MOs = hartree_fock.do(system,molecule,molecule.States[0],alpha_reference, beta_reference)
 
-    for state in molecule.States:
-        #alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)
-        alpha_MOs, beta_MOs = cProfile.run('hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)') # For profiling 
-        system.DIIS = False 
-        if i < n_sets - 1:       #does not preform the basis fitting on the final loop
-            alpha_reference = Basis_Fitting.Basis_Fit(molecule, alpha_MOs,sets[i+1])
-            beta_reference = Basis_Fitting.Basis_Fit(molecule, beta_MOs,sets[i+1])
-        else:
-            alpha_reference = alpha_MOs 
-            beta_reference = beta_MOs
-            
-            
+# If only no excited states are entered calculate the ground state in largest basis 
+if len(molecule.States) == 1:
+     alpha_MOs, beta_MOs = Basis_Loop(molecule, molecule.States[0],coords, base_alpha_MOs, base_beta_MOs, sets)
+# otherwise just calculate the excited states in the larger basis 
+else:
+    for state in molecule.States[1:]:
+        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,base_alpha_MOs,base_beta_MOs)
+        alpha_MOs, beta_MOs = Basis_Loop(molecule,coords, state,  alpha_MOs, beta_MOs, sets)
 
 
+#new_basis = Basis_Fitting.Basis_Fit(molecule, base_alpha_MOs, sets[1])
+#print "New Basis"
+#print new_basis 
 
-#for basis_set in input.BasisSets:    
-#    molecule = (Molecule(input,coords,remove_punctuation(basis_set)))
-#    for atom in molecule.Atoms:
-#        for cgtf in atom.Basis:
-#            print cgtf.Primitives
-#        sys.exit()
-#    MOs = hartree_fock.do(system,molecule,state,reference_orbitals)
-#    reference_orbitals = Basis_Fitting.Basis_Fit(molecule )
-    
-# Check data structures are set up correctly
-#print system.Method
-#print molecule.Charge
-#for atom in molecule.Atoms:
-#    print atom.Label
-#    for cgtf in atom.Basis:
-#        print cgtf.AngularMomentum
-#        for [exponent,coefficient] in cgtf.Primitives:
-#            print exponent,coefficient
+# repeating the ground state to allow basis fitting over the ground 
+# state if no excitations are given 
+#if len(molecule.States) == 1 and n_sets > 1:
+#    molecule.States.append(molecule.States[0])
+#            
+## Do excited state calcuations in higher basis 
+#for state in molecule[0].States[1:]:
+#    # excited state calculation in the starting basis 
+#    alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,base_alpha_MOs, base_beta_MOs)
+#    for i in range(1,n_sets):
+#        molecule = molecules[i-1]
+#        alpha_reference = Basis_Fitting.Basis_Fit(molecules[i], alpha_MOs, sets[i])
+#        beta_reference = Basis_Fitting.Basis_Fit(molecules[i], beta_MOs, sets[i])
+#        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)
+#    
