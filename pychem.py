@@ -253,15 +253,13 @@ def remove_punctuation(basis_set):
     basis_set = basis_set.replace('*','s').replace('-','').replace('(','').replace(')','').replace(',','').upper()
     return basis_set
 
-def Basis_Loop(molecule, state, coords, alpha_MOs, beta_MOs, sets):
-    mol = deepcopy(molecule)
+def Basis_Loop(new_mol, state, coords, alpha_MOs, beta_MOs, sets):
     for basis in sets[1:]:
-        alpha_MOs = Basis_Fitting.Basis_Fit(mol, alpha_MOs, basis)
-        beta_MOs = Basis_Fitting.Basis_Fit(mol, beta_MOs, basis)
-        print "Fitted Basis"
-        print alpha_MOs
-        mol = Molecule(input, coords, basis)      #rewrite this to do an in place update
-        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_MOs, beta_MOs)
+        old_mol = deepcopy(new_mol)
+        new_mol = Molecule(input, coords, basis)
+        alpha_MOs = Basis_Fitting.Basis_Fit(old_mol, alpha_MOs, basis)
+        beta_MOs = Basis_Fitting.Basis_Fit(old_mol, beta_MOs, basis)
+        alpha_MOs, beta_MOs = hartree_fock.do(system,new_mol,state,alpha_MOs, beta_MOs)
     return alpha_MOs, beta_MOs 
 
 
@@ -283,17 +281,14 @@ base_alpha_MOs, base_beta_MOs = hartree_fock.do(system,molecule,molecule.States[
 
 # If only no excited states are entered calculate the ground state in largest basis 
 if len(molecule.States) == 1:
-     alpha_MOs, beta_MOs = Basis_Loop(molecule, molecule.States[0],coords, base_alpha_MOs, base_beta_MOs, sets)
+     alpha_MOs, beta_MOs = Basis_Loop(molecule, molecule.States[0], coords, base_alpha_MOs, base_beta_MOs, sets)
 # otherwise just calculate the excited states in the larger basis 
 else:
     for state in molecule.States[1:]:
         alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,base_alpha_MOs,base_beta_MOs)
-        alpha_MOs, beta_MOs = Basis_Loop(molecule,coords, state,  alpha_MOs, beta_MOs, sets)
+        alpha_MOs, beta_MOs = Basis_Loop(molecule, state, coords, alpha_MOs, beta_MOs, sets)
 
 
-#new_basis = Basis_Fitting.Basis_Fit(molecule, base_alpha_MOs, sets[1])
-#print "New Basis"
-#print new_basis 
 
 # repeating the ground state to allow basis fitting over the ground 
 # state if no excitations are given 

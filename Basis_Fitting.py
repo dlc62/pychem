@@ -12,16 +12,20 @@ def Get_Overlap(prim1, prim2, l):
     return integral 
     
 def Basis_Fit(molecule, MOs, new_basis):
-    new_coeffs = []
-    for state in xrange(len(MOs+1)):
-        state_MOs = numpy.ndarray.tolist(MOs[:,state])      #pulling out the MO coefficents associated with a single state 
-        coeffs_state = []                                   #single column in the eventual MO matrix
+    #iterating over each MO in the old basis 
+    for MO in xrange(len(MOs)):
+        old_coeffs = numpy.ndarray.tolist(MOs[:,MO])      # pulling out the MO coefficents associated with a single state 
+        new_MO = []                                       # single column in the eventual MO matrix
         cgto_count = 0 
         for atom in molecule.Atoms:
-            coeffs = Basis_Fit_Atom(atom, state_MOs, cgto_count, new_basis)    
-            coeffs_state += coeffs
+            coeffs = Basis_Fit_Atom(atom, old_coeffs, cgto_count, new_basis)    
+            new_MO += coeffs
             cgto_count += atom.NFunctions
-        new_coeffs.append(coeffs_state)
+        #initializing matrix to store the coeffs one its size is known
+        if MO == 0:
+            size = len(new_MO)
+            new_coeffs = [[0.0]*size]*size
+        new_coeffs[MO] = new_MO
     return numpy.transpose(numpy.array(new_coeffs))    
     
     
