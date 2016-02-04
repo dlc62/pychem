@@ -66,10 +66,6 @@ class System:
               self.BasisFit = True
 ############ DIIS Settings #############
         try:
-           self.UseMOM = input.UseMOM
-        except:
-            self.UseMOM = False 
-        try:
             self.UseDIIS = input.UseDIIS 
         except:
             self.UseDIIS = True 
@@ -94,12 +90,11 @@ class System:
         try:
             self.UseMOM = input.UseMOM
         except:
-            self.UseMOM = False 
-        try:
-            input.Excitations
-            UseMOM = True
-        except:
-            UseMOM = False 
+            try:
+                input.Excitations
+                self.UseMOM = True
+            except:
+                self.UseMOM = False 
         try:
             # at this point the code just defaults to using the previous orbials as 
             # the reference at each iteration, will need to change the initialzation
@@ -120,6 +115,7 @@ class System:
 
 class Molecule:
     def __init__(self,input,coords,basis_set):
+        self.Basis = basis_set
         try:
            self.Charge = input.Charge
         except:
@@ -249,6 +245,8 @@ class ElectronicState:
         self.Hessian = hessian
         self.MolecularOrbitals = MOs
 
+#-------------- Utility Functions --------------# 
+
 def remove_punctuation(basis_set):
     basis_set = basis_set.replace('*','s').replace('-','').replace('(','').replace(')','').replace(',','').upper()
     return basis_set
@@ -262,6 +260,23 @@ def Basis_Loop(new_mol, state, coords, alpha_MOs, beta_MOs, sets):
         alpha_MOs, beta_MOs = hartree_fock.do(system,new_mol,state,alpha_MOs, beta_MOs)
     return alpha_MOs, beta_MOs 
 
+def Excite(matrix,occupancy, NElectrons):
+# This function permutes the an array give an list describing the
+# orbital occupancy 
+# Note this does not change its argument matrix  
+    new_matrix = deepcopy(matrix)
+    frm = []                        #list to contain the indexes orbitatals to be excited from
+    to = []                         #list to contain the indexes of the orbitals to be excited to
+    for i in range(NElectrons):
+        if occupancy[i] == 0:
+            frm.append(i)
+    for i in range(NElectrons,len(occupancy)):
+        if occupancy[i] == 1:
+            to.append(i)
+    for i in range(len(to)):
+        new_matrix[:,[frm[i],to[i]]] = new_matrix[:,[to[i],frm[i]]]
+    
+    return new_matrix
 
 #----------------------------------------------------------------#
 #                        THE MAIN PROGRAM                        #
@@ -285,23 +300,11 @@ if len(molecule.States) == 1:
 # otherwise just calculate the excited states in the larger basis 
 else:
     for state in molecule.States[1:]:
-        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,base_alpha_MOs,base_beta_MOs)
+        # Generate the starting excited state MOs from the minimal basis virtual orbitals 
+        alpha_MOs = Excite(base_alpha_MOs, state.AlphaOccupancy, molecule.NAlphaElectrons)
+        beta_MOs = Excite(base_beta_MOs, state.BetaOccupancy, molecule.NBetaElectrons)
+        # Do an excited state calculation in the minimal basis 
+        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_MOs,beta_MOs)
+        # Do basis fitting and excited state calculations in the larger bases 
         alpha_MOs, beta_MOs = Basis_Loop(molecule, state, coords, alpha_MOs, beta_MOs, sets)
 
-
-
-# repeating the ground state to allow basis fitting over the ground 
-# state if no excitations are given 
-#if len(molecule.States) == 1 and n_sets > 1:
-#    molecule.States.append(molecule.States[0])
-#            
-## Do excited state calcuations in higher basis 
-#for state in molecule[0].States[1:]:
-#    # excited state calculation in the starting basis 
-#    alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,base_alpha_MOs, base_beta_MOs)
-#    for i in range(1,n_sets):
-#        molecule = molecules[i-1]
-#        alpha_reference = Basis_Fitting.Basis_Fit(molecules[i], alpha_MOs, sets[i])
-#        beta_reference = Basis_Fitting.Basis_Fit(molecules[i], beta_MOs, sets[i])
-#        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_reference, beta_reference)
-#    

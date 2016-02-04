@@ -170,7 +170,7 @@ def maximumOverlapMethod(reference, new_MOs, energies, NElectrons, overlap_matri
             P_vector[i] = sum(MO_overlap[:,i])
     
     sorted_MOs, sorted_energies = Sort_MOs(new_MOs, energies, numpy.abs(P_vector)) 
-    return sorted_MOs, sorted_energies 
+    return sorted_MOs, sorted_energies, P_vector
 
 def Sort_MOs(MOs, energies,p):
 #sorts MOs and energies in decending order 
@@ -180,24 +180,6 @@ def Sort_MOs(MOs, energies,p):
     new_MOs = numpy.array([line[1] for line in temp])
     new_energies = [line[2] for line in temp]
     return numpy.transpose(new_MOs), new_energies
-
-
-def Excite(matrix,occupancy, NElectrons):
-#This function permutes the an array give an list describing the
-#orbital occupancy 
-    new_matrix = copy.deepcopy(matrix)
-    frm = []                        #list to contain the indexes orbitatals to be excited from
-    to = []                         #list to contain the indexes of the orbitals to be excited to
-    for i in range(NElectrons):
-        if occupancy[i] == 0:
-            frm.append(i)
-    for i in range(NElectrons,len(occupancy)):
-        if occupancy[i] == 1:
-            to.append(i)
-    for i in range(len(to)):
-        new_matrix[:,[frm[i],to[i]]] = new_matrix[:,[to[i],frm[i]]]
-    
-    return new_matrix
 
 ########################### Basic HF Functions ############################
 
@@ -377,9 +359,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     #Generating the initial density matrices 
     #Note there are no reference orbitals in the first caclulation 
     if isFirstCalc == False:
-        alpha_MOs, beta_MOs, density = Init.readGuess(alpha_reference, beta_reference, state, molecule)
-        alpha_reference = copy.deepcopy(alpha_MOs)
-        beta_reference = copy.deepcopy(beta_MOs)
+        alpha_MOs, beta_MOs, density = Init.readGuess(alpha_reference, beta_reference, molecule)
     elif system.SCFGuess == 'core':
         alpha_MOs, beta_MOs, density = Init.coreGuess(fock.core, X, Xt, molecule)
     elif system.SCFGuess == 'sad':
@@ -393,8 +373,12 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         DIIS.error = 0     #set to zero so the convergence criterta is met when not using DIIS
 
     system.out.PrintInitial(nuclear_repulsion_energy, fock.core, density)
+    converged = False
+    #-------------------------------------------#
+    #             Begin Iterations              #
+    #-------------------------------------------#
 
-    while ((abs(dE)) > c.energy_convergence):
+    while abs(dE) > c.energy_convergence:
         num_iterations += 1 
         fock.makeFockMatrices(density, shell_pairs, template_matrix) 
 
@@ -411,16 +395,18 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         if system.MOM_Type != "fixed":
             alpha_reference = copy.deepcopy(alpha_MOs)
             beta_reference = copy.deepcopy(beta_MOs)
+
         
         alpha_MOs, alpha_orbital_energies = make_MOs(X,Xt,fock.alpha)
         beta_MOs, beta_orbital_energies = make_MOs(X,Xt,fock.beta)
 
        #Maximum Overlap Method 
         if system.UseMOM == True and isFirstCalc == False: 
-            alpha_MOs, alpha_orbital_energies = maximumOverlapMethod(alpha_reference, alpha_MOs, alpha_orbital_energies,
-                                                                    molecule.NAlphaElectrons, overlap_matrix)
-            beta_MOs, beta_orbital_energies = maximumOverlapMethod(beta_reference, beta_MOs, beta_orbital_energies,
-                                                                    molecule.NBetaElectrons, overlap_matrix)
+            alpha_MOs, alpha_orbital_energies, alpha_overlaps = maximumOverlapMethod(alpha_reference,
+                    alpha_MOs, alpha_orbital_energies,molecule.NAlphaElectrons, overlap_matrix)
+            beta_MOs, beta_orbital_energies,beta_overlaps = maximumOverlapMethod(beta_reference,
+                    beta_MOs, beta_orbital_energies,molecule.NBetaElectrons, overlap_matrix)
+            system.out.PrintMOM(alpha_overlaps, beta_overlaps) 
 
         density.alpha = make_density_matrix(density.alpha,alpha_MOs,molecule.NAlphaElectrons)
         density.beta = make_density_matrix(density.beta,beta_MOs,molecule.NBetaElectrons)
@@ -430,13 +416,18 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         energy = calculate_energy(fock, density)
         dE = energy - old_energy
         total_energy = energy + nuclear_repulsion_energy
-              
+   
 #        if abs(dE) < c.energy_convergence and system.out.SCFPrint < system.out.SCFFinalPrint:
 #            system.out.SCFPrint = system.out.SCFFinalPrint 
 
         system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
-                        density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS.error)
+            density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS.error)
 
+        if num_iterations > 25:
+            print "HF method not converging"
+            break
+
+    print molecule.Basis  
     system.out.finalPrint()
     return alpha_MOs, beta_MOs
 

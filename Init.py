@@ -23,11 +23,13 @@ def sadGuess(molecule,basis):
     density_matrix *= 0.5
     return HF.Density_matrix(density_matrix, deepcopy(density_matrix)) 
 
-def readGuess(alpha_ref, beta_ref, state, molecule):
+def readGuess(alpha_ref, beta_ref, molecule):
     alpha_density = HF.makeTemplateMatrix(molecule.NOrbitals) 
     beta_density = HF.makeTemplateMatrix(molecule.NOrbitals) 
-    alpha_MOs = HF.Excite(alpha_ref, state.AlphaOccupancy, molecule.NAlphaElectrons)
-    beta_MOs = HF.Excite(beta_ref, state.BetaOccupancy, molecule.NBetaElectrons)
+    alpha_MOs = deepcopy(alpha_ref)
+    beta_MOs = deepcopy(beta_ref)
+    #alpha_MOs = HF.Excite(alpha_ref, state.AlphaOccupancy, molecule.NAlphaElectrons)
+    #beta_MOs = HF.Excite(beta_ref, state.BetaOccupancy, molecule.NBetaElectrons)
     alpha_density = HF.make_density_matrix(alpha_density, alpha_MOs, molecule.NAlphaElectrons)
     beta_density = HF.make_density_matrix(beta_density, beta_MOs, molecule.NBetaElectrons)
     return alpha_MOs, beta_MOs, HF.Density_matrix(alpha_density, beta_density) 

@@ -20,7 +20,7 @@ def Basis_Fit(molecule, MOs, new_basis):
         for atom in molecule.Atoms:
             coeffs = Basis_Fit_Atom(atom, old_coeffs, cgto_count, new_basis)    
             new_MO += coeffs
-            cgto_count += atom.NFunctions
+            cgto_count += atom.NFunctions                 # keeps track of the index to fit next 
         #initializing matrix to store the coeffs one its size is known
         if MO == 0:
             size = len(new_MO)

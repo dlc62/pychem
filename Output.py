@@ -81,11 +81,17 @@ class PrintSettings:
 
             self.outPrint(outString)
 
-    def PrintMOM(self):
-        return 0
-    
-    def PrintDIIS(self): 
-        return 0  
+    def PrintMOM(self, alpha_overlaps, beta_overlaps):
+       if self.MOMPrint > 0:
+            outString = "Alpha Overlap Vector" + '\n'
+            outString += str(alpha_overlaps) + '\n' 
+            outString += "Beta Overlap Vector" + '\n'
+            outString += str(beta_overlaps)
+            self.outPrint(outString)
+
+    def PrintDIIS(self, DIIS):
+
+          
 
     #Possibly need to allow this to print the coloumb and exhange matrices 
     def PrintLoop(self, cycles, alpha_energies, beta_energies, densities,
@@ -108,7 +114,7 @@ class PrintSettings:
             outString += "DIIS Error: " + str(DIIS_error) + '\n'
 
         if printLength > 0:
-            outString += "Alpha Orbial Energies" + '\n'
+            outString += "Alpha Orbital Energies" + '\n'
             outString += str(alpha_energies) + '\n'
             #Find a better way to do this comparison
             if restricted == False:  
