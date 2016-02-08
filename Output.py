@@ -90,8 +90,7 @@ class PrintSettings:
             self.outPrint(outString)
 
     def PrintDIIS(self, DIIS):
-
-          
+        return 0
 
     #Possibly need to allow this to print the coloumb and exhange matrices 
     def PrintLoop(self, cycles, alpha_energies, beta_energies, densities,

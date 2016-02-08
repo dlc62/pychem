@@ -77,6 +77,10 @@ class System:
             self.DIIS_Type = input.DIIS_Type 
         except:
             self.DIIS_Type = "C1"
+        try:
+            self.SeperateVectors = input.SeperateVectors 
+        except:
+            self.SeperateVectors = False 
 
 ############ Initial Guess Settings ##########
         try:
