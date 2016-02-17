@@ -81,6 +81,10 @@ class System:
             self.SeperateVectors = input.SeperateVectors 
         except:
             self.SeperateVectors = False 
+        try:
+            self.DIIS_start = input.DIIS_Start 
+        except:
+            self.DIIS_start =1
 
 ############ Initial Guess Settings ##########
         try:
