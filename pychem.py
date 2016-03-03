@@ -119,7 +119,6 @@ class System:
 # Possibly edit molecule class
 #    - Make it easy to get coords out 
 #    - Store a list of basis functions 
-#    - Write 
 
 class Molecule:
     def __init__(self,input,coords,basis_set):
@@ -223,9 +222,8 @@ class Atom:
         self.Basis = []
         self.NFunctions = 0
         self.MaxAng = 0
-        basis_data = basis.get[basis_set]
-        atom_basis_data = basis_data[self.Label]
-        for function in atom_basis_data:
+        basis_data = basis.get[basis_set][self.Label]
+        for function in basis_data:
             self.Basis.append(ContractedGaussian(function))
             self.NFunctions += 2*function[0] + 1
             if function[0] > self.MaxAng:

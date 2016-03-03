@@ -6,10 +6,7 @@ import numpy
 import Output
 from numpy import dot 
 from scipy.linalg import sqrtm
-numpy.set_printoptions(precision = 5, linewidth = 100)  #Makes the arrays print nicely in the output 
-
-def cond(matrix):
-    return numpy.linalg.cond(matrix)
+numpy.set_printoptions(precision = 5, linewidth = 300)  #Makes the arrays print nicely in the output 
 
 ########################### DIIS Object ###########################
 
@@ -29,6 +26,13 @@ class DIIS_System:
         residual  = overlap.dot(density).dot(fock) - fock.dot(density).dot(overlap)
         residual = Xt.dot(residual).dot(X)
         return residual 
+
+    def eigConditionNumber(self):
+        # Finds the eigenvalue condition number of the matrix 
+        u, _ = numpy.linalg.eig(self.matrix)
+        u = [abs(elem) for elem in u]
+        condition = max(u) / min(u)
+        return condition
 
     def innerProd(self, matA,matB):
     #takes two matrices and returns the trace of the product 
@@ -63,14 +67,14 @@ class DIIS_System:
     def reduceSpace(self):
     # Removes the oldest vector from the DIIS space 
     # look at comming up with a more intelligent way of chosing which vector to remove 
-        rel_cond = numpy.linalg.cond(self.matrix) * self.matrix.max()
-        print cond(self.matrix)
-        while len(self.residuals) > self.max_space: # or rel_cond > self.max_cond: 
+        #rel_cond = numpy.linalg.cond(self.matrix) * self.matrix.max()
+        condition = self.eigConditionNumber()
+        while len(self.residuals) > self.max_space or condition > self.max_cond:  
             self.matrix = numpy.delete(self.matrix,0,0)
             self.matrix = numpy.delete(self.matrix,0,1)
             self.residuals.pop(0)
             self.oldFocks.pop(0)
-            rel_cond = numpy.linalg.cond(self.matrix) * self.matrix.max()
+            condition = self.eigConditionNumber()
 
     def getC1Coeffs(self, matrix):
         DIIS_vector = numpy.zeros([len(matrix),1])
@@ -78,6 +82,12 @@ class DIIS_System:
         coeffs = numpy.linalg.solve(matrix, DIIS_vector)
         return coeffs[:-1]    # not returning the lagrange multiplier 
 
+    def estimateError(self, coeffs, residuals):
+        error_vect = sum([coeffs[i] * residuals[i] for i in range(len(residuals))])
+        error = error_vect.max()
+        return error
+
+# C2 Currently not working 
     def getC2Coeffs(self, matrix, residuals):
         _, vects = numpy.linalg.eig(matrix)
         min_error = float("Inf")     
@@ -85,27 +95,28 @@ class DIIS_System:
         for vect in vects:
             vect /= sum(vect)         # renormalization 
             if abs(max(vect)) < 100:  # exluding vectors with large non-linearities 
-                error = numpy.zeros(numpy.shape(vect))
-                for res in residuals:
-                    error += numpy.dot(res, vect)
+                error = numpy.zeros(numpy.shape(residuals[0]))
+                for i,res in enumerate(residuals):
+                    error += vect[i] * res  
                 error_val = numpy.linalg.norm(error)
                 if error_val < min_error:
                     best_vect = vect
                     min_error = error_val
         return best_vect
 
-    def makeFockMatrix(self):
+    def getCoeffs(self):
         if self.DIIS_type == 'C1':
             coeffs = self.getC1Coeffs(self.matrix)
-        else:
+        elif self.DIIS_type == 'C2':
             coeffs = self.getC2Coeffs(self.matrix, self.residuals)
-        print "DIIS Vector"
-        print coeffs 
+        return coeffs
+
+    def makeFockMatrix(self, coeffs):
         new_fock = numpy.zeros(numpy.shape(self.residuals[0]))
         for i in xrange(len(coeffs)):
             new_fock += coeffs[i] * self.oldFocks[i] 
         return new_fock
-    
+   
     def updateDIIS(self, newFock, overlap, density,X, Xt):
     # includes the new extrapolated Fock vector in the DIIS space
         self.residuals[-1] = self.getResidual(overlap, density, newFock, X, Xt)
@@ -116,15 +127,15 @@ class DIIS_System:
     def DoDIIS(self, fock, density, overlap, X, Xt):
         self.oldFocks.append(copy.deepcopy(fock))
         self.residuals.append(self.getResidual(overlap, density, fock, X, Xt))
-        self.error = self.residuals[-1].max()
-        # start DIIS once two residual matrics are found 
+        # start DIIS once two residuals are found 
         if len(self.residuals) > 1:
             self.matrix = self.makeMatrix()
             self.reduceSpace()
-            print "DIIS Matrix"
-            print self.matrix 
-            fock = self.makeFockMatrix() 
-            self.updateDIIS(fock, overlap, density, X, Xt)
+            coeffs = self.getCoeffs()
+            self.error = self.estimateError(coeffs, self.residuals)
+            if self.error < 0.002:
+                fock = self.makeFockMatrix(coeffs) 
+                self.updateDIIS(fock, overlap, density, X, Xt)
         return fock
 
 ########################## MOM and Excited State Functions  ########################### 
@@ -222,8 +233,8 @@ class Shell:
     def __init__(self,coords,cgtf,index,index_vec):
        self.Coords = coords
        self.Cgtf = cgtf
-       self.Index = index
-       self.Ivec = index_vec
+       self.Index = indexi    # Index for the CGTO in atom.Basis 
+       self.Ivec = index_vec  # Indexs of the angular momentum functions in a list of all angular momentum functions on the atom
     
 def make_MOs(X,Xt,fock_matrix):        
     transformed_fock_matrix = numpy.dot(Xt,numpy.dot(fock_matrix,X))    #orthoginalizing the fock matrix             
@@ -265,7 +276,7 @@ def makeCoreMatrices(template_matrix, molecule):
     for atom_a in molecule.Atoms:
        for cgtf_a in atom_a.Basis:
           ia += 1
-          ia_vec = [(ia_count + i) for i in range(0,cgtf_a.NAngMom)]   #vector contaning the indices of the orbitals 
+          ia_vec = [(ia_count + i) for i in range(0,cgtf_a.NAngMom)]   #vector contaning the indices each angular momentum function on the atom  
           ia_count += cgtf_a.NAngMom                                   #total number of orbitals
           ib_count = 0
           ib = -1
@@ -345,18 +356,17 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     dE = energy
 
     system.out.PrintInitial(nuclear_repulsion_energy, fock.core, density)
-    converged = False
     #-------------------------------------------#
     #             Begin Iterations              #
     #-------------------------------------------#
-
+    converged = False
     while abs(dE) > c.energy_convergence:
         num_iterations += 1 
         fock.makeFockMatrices(density, shell_pairs, template_matrix) 
 
        #Contrained UHF for open shell molecules
         if molecule.Multiplicity != 1:
-           fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, focks)
+           fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, fock)
 
        #preforming DIIS 
         if system.UseDIIS == True and num_iterations > system.DIIS_start: 
@@ -401,7 +411,6 @@ def do(system, molecule,state, alpha_reference, beta_reference):
             print "HF method not converging"
             break
 
-    print molecule.Basis  
     system.out.finalPrint()
     return alpha_MOs, beta_MOs
 

@@ -109,7 +109,7 @@ class PrintSettings:
         outString += "Cycle: " + str(cycles) + '\n'
         outString += "Total  Energy: " + str(energy) + '\n'
         outString += "Change in energy: " + str(dE) + '\n'
-        if DIIS_error != 0:                 #stops this from printing when DIIS is dissabled 
+        if DIIS_error != 1:                 #stops this from printing when DIIS is dissabled 
             outString += "DIIS Error: " + str(DIIS_error) + '\n'
 
         if printLength > 0:
