@@ -149,7 +149,7 @@ def generate_HRR_terms(HRR,index,i0,i1,kinetic=False):
   # HRR[index] => t0, t1 
   # (a(b+1)|cd) => ((a+1)b|cd),(ab|cd)
    t1 = HRR[index][:]     # pick a term to reduce  
-   t1[i1] -= 1            # make one new term by incrememnting and index  
+   t1[i1] -= 1            
    t0 = t1[:]             
    t0[i0] += 1            # make a second new term by decrementing another  
    terms = [t0,t1]
@@ -262,15 +262,15 @@ def one_electron(molecule,shell_pair):
        #                                       VRR step                                         #
        # -------------------------------------------------------------------------------------- #
           z1 = alpha; z2 = beta
-          if Swap:
+          if Swap:                           # put the highest angular momentum function the the bra
              z1 = beta; z2 = alpha
           index1 = 0
-          for [term,m] in order.vrr:
+          for [term,m] in order.vrr:         # steping over integrals starting with the (s||s) terms  
             #all VRR terms needed for that integral    
              l1 = term[index1];
              lpair = [[],[]]
              lpair[i2] = c.lQuanta[0][0][:]
-             for qm in c.lQuanta[l1]:        # qm are angular momentum quantum numbers for each Cartesian component of a given angular momentum, l1
+             for qm in c.lQuanta[l1]:        # qm are angular momentum numbers (m) for each Cartesian component of a given angular momentum, 
                 lpair[i1] = qm[:]
                 lkey = make_key(lpair)
                 for j in range(0,3):         # choose Cartesian component index to decrement 

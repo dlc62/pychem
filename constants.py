@@ -30,4 +30,4 @@ integral_threshold = -1.e-10
 energy_convergence = 1.e-5
 density_convergence = 1.e-6
 DIIS_convergence = 1.e-5
-DIIS_MAX_CONDITION = 1e6 
+DIIS_MAX_CONDITION = 1e6

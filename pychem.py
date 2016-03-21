@@ -12,19 +12,24 @@ import numpy
 import cProfile 
 
 
-def single_excitations(occupyed, unoccupyed):
-    """Takes the strings of ground state occupyed and unoccupyed orbitals for a single
-    spin and generates all possible single excitations between them"""
-    excitations = []
-    for i in range(-len(occupyed),0):
-        for j in range(0,len(unoccupyed)):
-            occupy = deepcopy(occupyed)
-            unoccupy = deepcopy(unoccupyed)
-            occupy[i] = 0
-            unoccupy[j] = 1
-            excitations.append(occupy+unoccupy)            
-            
+def single_excitations(n_electrons, n_orbitals):
+    """Takes the number of electrons of a particular spin and the number 
+    of orbitals and returns the list of pairs corresponding to all single 
+    excitations"""
+    excitations = [] 
+    n_virtual_orbitals = n_orbitals - n_electrons 
+    for i in range(1,n_electrons+1):
+        for j in range(1,n_virtual_orbitals+1):
+            excitations.append([-i,j])
     return excitations
+
+def make_length_equal(list1, list2, place_holder = []):
+    diff = len(list1) - len(list2)
+    extra = [place_holder for i in range(abs(diff))]
+    if diff > 0:
+        list2 += extra 
+    elif diff < 0:
+        list1 += extra 
 
 
 #----------------------------------------------------------------
@@ -64,6 +69,10 @@ class System:
               self.BasisFit = False
            else:
               self.BasisFit = True
+        try: 
+            self.max_iterations = input.Max_Iterations
+        except:
+            self.max_iterations = 25
 ############ DIIS Settings #############
         try:
             self.UseDIIS = input.UseDIIS 
@@ -75,12 +84,11 @@ class System:
             self.DIIS_Size = 15
         try:
             self.DIIS_Type = input.DIIS_Type 
+            if self.DIIS_Type not in ["C2", "C1"]:
+                print("DIIS type must be C2 or C1 using C1 by default")
+                sys.exit()
         except:
             self.DIIS_Type = "C1"
-        try:
-            self.SeperateVectors = input.SeperateVectors 
-        except:
-            self.SeperateVectors = False 
         try:
             self.DIIS_start = input.DIIS_Start 
         except:
@@ -102,7 +110,11 @@ class System:
                 input.Excitations
                 self.UseMOM = True
             except:
-                self.UseMOM = False 
+                try:
+                    input.Alpha_Excitations
+                    self.UseMOM = True
+                except:
+                    self.UseMOM = False 
         try:
             # at this point the code just defaults to using the previous orbials as 
             # the reference at each iteration, will need to change the initialzation
@@ -121,6 +133,48 @@ class System:
 #    - Store a list of basis functions 
 
 class Molecule:
+
+    def do_excitation(self, n_electrons, ground_occ, excitation):
+        occupyed = deepcopy(ground_occ)
+        if excitation != []:
+            occupyed[n_electrons+excitation[0]] = 0
+            occupyed[n_electrons + excitation[1] - 1] = 1
+        return occupyed 
+
+    def make_excitations(self, ground, alpha_excitations, beta_excitations):
+        self.States = [ground]
+        alpha_ground = ground.AlphaOccupancy
+        beta_ground = ground.BetaOccupancy
+        num_orbitals = len(alpha_ground)
+        
+        
+        if alpha_excitations == beta_excitations == [[]]:
+            # immeditatly returns if no excitations were specifyed 
+            return self.States
+        elif alpha_excitations == 'Single':
+            alpha_excitations = single_excitations(self.NAlphaElectrons, num_orbitals)
+        elif alpha_excitations == 'Double':
+            alpha_singles = single_excitations(self.NAlphaElectrons, num_orbtials)
+            beta_singles = single_excitations(self.NBetaElectrons, num_orbitals)
+            for excite1 in alpha_singles:
+                for excite2 in beta_singles:
+                    pass
+        # else manual specification of orbitals 
+
+        make_length_equal(alpha_excitations, beta_excitations)
+        # Common loop to make the excitations for all cases 
+        for i in range(len(alpha_excitations)):
+            try:
+                assert type(alpha_excitations[i]) is list
+                assert type(beta_excitations[i]) is list
+            except AssertionError:
+                print("Each excitation must be a pair of two integers")
+                sys.exit()
+            alpha_occupied = self.do_excitation(self.NAlphaElectrons, alpha_ground, alpha_excitations[i])
+            beta_occupied = self.do_excitation(self.NBetaElectrons, beta_ground, beta_excitations[i])
+            self.States += [(ElectronicState(alpha_occupied, beta_occupied))]
+        return self.States 
+
     def __init__(self,input,coords,basis_set):
         self.Basis = basis_set
         try:
@@ -179,36 +233,28 @@ class Molecule:
 
 ###################  Excitations ####################
 
-#   !!!!!!!!!!! Need to make this block more general for unrestricted calculations !!!!!!!!!!!
-        
-        # Creating Ground State 
-        self.States = [ElectronicState(alpha_occupancy,beta_occupancy)]
+        alpha_excitations = [[]]
+        beta_excitations = [[]]
         try:
-            excitations = input.Excitations
+            alpha_excitations = input.Alpha_Excitations 
+            beta_excitations = input.Beta_Excitations 
+        except AttributeError:
             try:
-                assert type(excitations) is list
-                try:
-                    for excitation in excitations:
-                        assert type(excitation) is list 
-                        occupyed = deepcopy(alpha_occupancy)
-                        occupyed[n_alpha+excitation[0]] = 0
-                        occupyed[n_alpha + excitation[1] - 1] = 1
-                        self.States += [(ElectronicState(occupyed, beta_occupancy))]
-                except AssertionError:
-                    print 'Incorrect manual specification of single excitations'
-                    print 'Require list of pairs of excitations, each pair is a list of 2 elements'
-                    sys.exit() 
-            except AssertionError:                         #If no list of excitations is provided
-                if excitations == 'Single':
-                    alpha_occupied = alpha_occupied
-                elif excitations == 'Double':
-                    # generate all strings corresponding to allowed double excitations
-                    alpha_occupied = alpha_occupied
-                else:
-                    print 'Inappropriate value supplied for Excitations keyword'
-                    sys.exit()
-        except:
-            pass
+                alpha_excitations = input.Excitations
+            except:
+                pass
+        # Cecking that excitations were given in the correct format 
+        try:
+            alpha_is_list = type(alpha_excitations) is list 
+            alpha_is_keyword = alpha_excitations in ['Single', 'Double']
+            assert alpha_is_list or alpha_is_keyword 
+            assert type(beta_excitations) is list 
+        except AssertionError:
+            print("""Excitations must be specified as a list of excitations each containing two elements 
+            or using the keywords 'Single' or 'Double'""")
+            sys.exit()
+        ground = ElectronicState(alpha_occupancy,beta_occupancy)
+        self.States = self.make_excitations(ground, alpha_excitations, beta_excitations)
 
 ################# End Excitations ##################
 

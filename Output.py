@@ -51,9 +51,6 @@ class PrintSettings:
                 print string
                 self.OutFile = ''
 
-# Currnely these functions just replicate the existing behaviour at the default 
-# input values, will need to find an elegant way of customising output in 
-# the absence of a switch/case construct 
 
     def PrintInitial(self,nuclearRepulsion, coreFock, densities):
         if self.OutFile != '':
@@ -96,7 +93,7 @@ class PrintSettings:
     def PrintLoop(self, cycles, alpha_energies, beta_energies, densities,
                    focks, alpha_MOs, beta_MOs, dE, energy, DIIS_error):
     
-        if abs(dE) < c.energy_convergence:
+        if abs(dE) < c.energy_convergence and self.SCFFinalPrint > self.SCFPrint:
             printLength = self.SCFFinalPrint 
         else:
             printLength = self.SCFPrint 
