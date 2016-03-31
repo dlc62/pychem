@@ -179,21 +179,27 @@ class Density_matrix:
         self.total = alpha_matrix + beta_matrix
 
 class Fock_matrix:
-    def __init__(self):
+    def __init__(self, n_basis_functions, direct_HF):
         self.core = []
         self.alpha = []
         self.beta = []
+        # Alocating space of two electrons integrals if doing indirrect Hartree-Fock
+        if not direct_HF:
+            self.coulomb_integrals = numpy.zeros((n_basis_functions,n_basis_functions,n_basis_functions,n_basis_functions))
+            self.exchange_integrals = numpy.zeros((n_basis_functions,n_basis_functions,n_basis_functions,n_basis_functions))
+
 
     def resetFocks(self):
     #sets the alpha and beta fock matrcies as the core
         self.alpha = copy.deepcopy(self.core)
         self.beta = copy.deepcopy(self.core)
 
-    def makeFockMatrices(self, densities, shell_pairs,template_matrix):
+    def makeFockMatrices(self, densities, shell_pairs, template_matrix, direct_HF, num_iterations):
            self.resetFocks()
            coulomb_matrix = copy.deepcopy(template_matrix)
            alpha_exchange_matrix = copy.deepcopy(template_matrix)
            beta_exchange_matrix = copy.deepcopy(template_matrix)
+           """ !!!!!!!! Check if the old dendity matrices are being used !!!!!!! """
 #           old_alpha_density_matrix = copy.deepcopy(alpha_density_matrix)
 #           old_beta_density_matrix = copy.deepcopy(beta_density_matrix)
 #           screen = numpy.zeroes((shell_pair1.Centre1.Cgtf.NAngMom,\
@@ -207,24 +213,43 @@ class Fock_matrix:
               for shell_pair2 in shell_pairs:
                  ic_vec = shell_pair2.Centre1.Ivec
                  id_vec = shell_pair2.Centre2.Ivec
-#                 for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
-#                    for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
-#                       for l in range(0,shell_pair2.Centre1.Cgtf.NAngMom):
-#                          for s in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
-#                             screen[m,n,l,s] = overlap_matrix[ia_vec[m]][ib_vec[n]]*overlap_matrix[ic_vec[l]][id_vec[s]]
-                 coulomb,exchange = integrals.two_electron(shell_pair1,shell_pair2)
+
+                # Calculate integrals if direct HF or first iteration
+                 if direct_HF is True or num_iterations is 1:
+                    coulomb,exchange = integrals.two_electron(shell_pair1,shell_pair2)
+                # If indirect and not first iteration pass references to the stored two electron integrals
+
                  for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
                     for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
                        for l in range(0,shell_pair2.Centre1.Cgtf.NAngMom):
                           for s in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
-                             coulomb_matrix[ia_vec[m]][ib_vec[n]] += densities.total[ic_vec[l]][id_vec[s]]*coulomb[m][n][l][s]
-                             alpha_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.alpha[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
-                             beta_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.beta[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
+
+                            # Save the integrals on the first pass of an indirect HF job
+                             if direct_HF is False and num_iterations is 1:
+                                self.coulomb_integrals[ia_vec[m],ib_vec[n],ic_vec[l],id_vec[s]] = coulomb[m][n][l][s]
+                                self.exchange_integrals[ia_vec[m],id_vec[s],ic_vec[l],ib_vec[n]] = exchange[m][s][l][n]
+                            # On subsequent passes just use reference to the two electron integrals
+                             else:
+                                coulomb = self.coulomb_integrals
+                                exchange = self.exchange_integrals
+
+                             if direct_HF is False:
+                                coulomb_matrix[ia_vec[m]][ib_vec[n]] += densities.total[ic_vec[l]][id_vec[s]]* \
+                                                                        self.coulomb_integrals[ia_vec[m],ib_vec[n],ic_vec[l],id_vec[s]]
+                                alpha_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.alpha[ic_vec[l]][id_vec[s]]* \
+                                                                                self.exchange_integrals[ia_vec[m],id_vec[s],ic_vec[l],ib_vec[n]]
+                                beta_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.beta[ic_vec[l]][id_vec[s]]* \
+                                                                               self.exchange_integrals[ia_vec[m],id_vec[s],ic_vec[l],ib_vec[n]]
+                             else:
+                                 coulomb_matrix[ia_vec[m]][ib_vec[n]] += densities.total[ic_vec[l]][id_vec[s]]*coulomb[m][n][l][s]
+                                 alpha_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.alpha[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
+                                 beta_exchange_matrix[ia_vec[m]][ib_vec[n]] += -densities.beta[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
+
+             # Form the fock matrices themselves
               for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
                  for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
                     self.alpha[ia_vec[m]][ib_vec[n]] += (coulomb_matrix[ia_vec[m]][ib_vec[n]] + alpha_exchange_matrix[ia_vec[m]][ib_vec[n]])
                     self.beta[ia_vec[m]][ib_vec[n]] += (coulomb_matrix[ia_vec[m]][ib_vec[n]] + beta_exchange_matrix[ia_vec[m]][ib_vec[n]])
-
 
 class ShellPair:
     def __init__(self,coords_a,cgtf_a,ia,ia_vec,coords_b,cgtf_b,ib,ib_vec):
@@ -354,10 +379,7 @@ def constrainedUHF(overlap_matrix, density, molecule, fock):
 def do(system, molecule,state, alpha_reference, beta_reference):
     num_iterations = 0
     isFirstCalc = (alpha_reference[0][0] == None)
-    fock = Fock_matrix()
-    # Restricting the size of the DIIS subspace to prevent linear dependence
-    #if molecule.NOrbitals < system.DIIS_Size:
-    #    system.DIIS_Size = molecule.NOrbitals
+    fock = Fock_matrix(molecule.NOrbitals, system.Direct)
     alphaDIIS = DIIS_System(c.DIIS_MAX_CONDITION, system)
     betaDIIS = copy.deepcopy(alphaDIIS)
 
@@ -396,7 +418,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     #-------------------------------------------#
     while c.energy_convergence < abs(dE):
         num_iterations += 1
-        fock.makeFockMatrices(density, shell_pairs, template_matrix)
+        fock.makeFockMatrices(density, shell_pairs, template_matrix, system.Direct, num_iterations)
 
        #Contrained UHF for open shell molecules
         #if molecule.Multiplicity != 1:
