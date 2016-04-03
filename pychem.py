@@ -76,7 +76,11 @@ class System:
         try:
             self.Direct = input.Direct
         except:
-            self.Direct = True 
+            self.Direct = True
+        try:
+            self.Reference = input.Reference.upper()
+        except:
+            self.Reference = "UHF"
 ############ DIIS Settings #############
         try:
             self.UseDIIS = input.UseDIIS

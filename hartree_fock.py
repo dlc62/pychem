@@ -324,51 +324,27 @@ def makeCoreMatrices(template_matrix, molecule):
                       overlap_matrix[ia_vec[i]][ib_vec[j]] = overlap[i][j]
     return core_fock_matrix, overlap_matrix, shell_pairs
 
-def constrainedUHF2(overlap_matrix, density, molecule, fock):
-    Na = (molecule.Multiplicity-1)/2;   Nc = molecule.NAlphaElectrons - Na; # dimensions of the the core and active spaces
-    orthog_matrix = sqrtm(overlap_matrix)
-    P = (density.alpha + density.beta) / 2
-    P_orth = orthog_matrix.dot(P).dot(orthog_matrix)             # othoginalizing the charge density matrix
-    NO_occs, NO_coeffs = numpy.linalg.eig(P_orth)
-    # sort NOs in decending order of occupation number
-    temp = [[NO_coeffs[i], NO_occs[i]] for i in range(len(NO_coeffs))]
-    temp = sorted(temp, key = lambda orbital: orbital[1], reverse = True)
-    NO_coeffs = numpy.array([pair[0] for pair in temp])
-    delta_fock = (fock.alpha - fock.beta) / 2
-    delta_fock_NO = (NO_coeffs.T).dot(delta_fock).dot(NO_coeffs) # transforming delta_fock into the NO basis
-    lambda_fock = delta_fock_NO
-    # rewrite this using array slices rather than a loop
-    for i in range(0, Nc):
-        for j in range(Nc+Na, len(lambda_fock)):
-            lambda_fock[i][j] *= -1
-            lambda_fock[j][i] *= -1
-    lambda_fock = NO_coeffs.dot(lambda_fock).dot(numpy.transpose(NO_coeffs)) # transforming back to AO basis
-    return fock.alpha + lambda_fock, fock.beta - lambda_fock
-
-def constrainedUHF(overlap_matrix, density, molecule, fock):
-    Na = (molecule.Multiplicity-1)/2; Nc = molecule.NAlphaElectrons - Na   # dimensions of the core and active spaces
+def constrainedUHF(overlap_matrix, density, molecule, fock, MOs):
     S = sqrtm(overlap_matrix)
-    S_inv = numpy.linalg.inv(S)
-    half_charge_density = (density.alpha + density.beta) / 2
-    orthog_P = (S.T).dot(half_charge_density).dot(S)
-    occs, NO_coeffs = numpy.linalg.eig(orthog_P)
-    P_NO = NO_coeffs.T.dot(S.T).dot(half_charge_density).dot(S).dot(NO_coeffs)
-    # Think about left and right inverses
-    # define the core, active and valence spaces in the NO basis
-    pairs = [pair for pair in enumerate(occs)]                          # Creating a list of the occupancies along with their orbital indices
-    pairs = sorted(pairs, key = lambda pair: pair[1], reverse = True)   # Sorting by increasing occupancy number
-    core = [pair[0] for pair in pairs[0:Nc]]                            # Getting the indices for the core and valence NOs
+    half_density_matrix = S.dot(density.total / 2).dot(S)
+    NO_vals, NO_vecs = numpy.linalg.eig(half_density_matrix)
 
-    valence = [pair[0] for pair in pairs[Na:]]
+    #Sort in order of decending occupancy
+    idx = NO_vals.argsort()[::-1]           # note the [::-1] reverses the idex array
+    sorted_NO_values = NO_vals[idx]
+    sorted_NO_vecs = NO_vecs[:,idx]
+
     delta = (fock.alpha - fock.beta) / 2
-
-    for i in core:
-        for j in valence:
-            delta_NO[i,j] *= -1
-            delta_NO[j,i] *= -1
+    delta = sorted_NO_vecs.T.dot(delta)                # Transforming delta into the NO basis
+    lambda_matrix = numpy.zeros(numpy.shape(delta))
+    for i in range(molecule.NBetaElectrons):
+        for j in range(molecule.NAlphaElectrons, molecule.NOrbitals):
+            lambda_matrix[i,j] = -delta[i,j]
+            lambda_matrix[j,i] = -delta[j,i]
+    lambda_matrix = numpy.dot(sorted_NO_vecs, lambda_matrix)  # Transforming lambda back to the AO basis
     new_alpha = fock.alpha + lambda_matrix
     new_beta = fock.beta - lambda_matrix
-    return new_alpha, new_beta
+    return new_alpha, new_beta, sorted_NO_vecs
 
 #=================================================================#
 #                                                                 #
@@ -420,10 +396,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         num_iterations += 1
         fock.makeFockMatrices(density, shell_pairs, template_matrix, system.Direct, num_iterations)
 
-       #Contrained UHF for open shell molecules
-        #if molecule.Multiplicity != 1:
-            #fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, fock)
-            #fock.alpha, fock.beta = constrainedUHF2(overlap_matrix, density, molecule, fock)
+        if system.Reference == "CUHF":
+            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, fock, alpha_MOs + beta_MOs)
 
        #performing DIIS
         if system.UseDIIS == True:
@@ -449,7 +423,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
 
         density.alpha = make_density_matrix(density.alpha,alpha_MOs,molecule.NAlphaElectrons)
         density.beta = make_density_matrix(density.beta,beta_MOs,molecule.NBetaElectrons)
-        density.total = numpy.ndarray.tolist(numpy.add(density.alpha,density.beta))
+        density.total = numpy.add(density.alpha,density.beta)
 
         old_energy = energy
         energy = calculate_energy(fock, density)
@@ -466,6 +440,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
             print "SCF method not converging"
             break
     system.out.finalPrint()
+
     return alpha_MOs, beta_MOs
 
 ####################################################
