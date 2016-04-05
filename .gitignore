@@ -3,3 +3,5 @@
 *.txt
 .DS_Store
 *.swp
+outfiles
+basis.py

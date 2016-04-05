@@ -88,7 +88,7 @@ class DIIS_System:
 
     def getC2Coeffs(self, matrix, residuals):
         _, vects = numpy.linalg.eig(matrix)    # rewrite this to use the value calculated in finding the conition number
-        min_error = float("Inf")
+        min_error = float("Inf")               # Arbitrary large number
         best_vect = None
         for vect in vects:
             vect /= sum(vect)         # renormalization
@@ -183,10 +183,6 @@ class Fock_matrix:
         self.core = []
         self.alpha = []
         self.beta = []
-        # Alocating space of two electrons integrals if doing indirrect Hartree-Fock
-        if not direct_HF:
-            self.coulomb_integrals = numpy.zeros((n_basis_functions,n_basis_functions,n_basis_functions,n_basis_functions))
-            self.exchange_integrals = numpy.zeros((n_basis_functions,n_basis_functions,n_basis_functions,n_basis_functions))
 
     def resetFocks(self):
     #sets the alpha and beta fock matrcies as the core
@@ -216,7 +212,6 @@ class Fock_matrix:
                 # Calculate integrals if direct HF or first iteration
                  if direct_HF is True or num_iterations is 1:
                     coulomb,exchange = integrals.two_electron(shell_pair1,shell_pair2)
-                # If indirect and not first iteration pass references to the stored two electron integrals
 
                  for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
                     for n in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
@@ -229,9 +224,10 @@ class Fock_matrix:
                                 self.exchange_integrals[ia_vec[m],id_vec[s],ic_vec[l],ib_vec[n]] = exchange[m][s][l][n]
                             # On subsequent passes just use reference to the two electron integrals
                              else:
-                                coulomb = self.coulomb_integrals
-                                exchange = self.exchange_integrals
+                                coulomb = coulomb
+                                exchange = exchange
 
+                            # Acctually constructing the Fock matrices
                              if direct_HF is False:
                                 coulomb_matrix[ia_vec[m]][ib_vec[n]] += densities.total[ic_vec[l]][id_vec[s]]* \
                                                                         self.coulomb_integrals[ia_vec[m],ib_vec[n],ic_vec[l],id_vec[s]]

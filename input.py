@@ -18,7 +18,7 @@ Coords = [['Li',3,0.,0.,0.]]
 minimalPrint = True
 SCFFinalPrint = 2
 #SCFPrint = 3
-Direct = False
+Direct = True
 Reference = "UHF"
 
 UseDIIS = False
