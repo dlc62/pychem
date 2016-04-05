@@ -1,7 +1,7 @@
 BasisSets = ['STO3G']
 Multiplicity = 2
 Charge = 0
-#Excitations = [[-1,1]]
+Excitations = [[-1,1]]
 #Coords = [['Li',3,0,0,0],['H',1,0,0,1.599427]]
 #Coords = [['He',2,0,0,0],['H',1,0,0,0.772]]
 Coords = [['Li',3,0.,0.,0.]]
@@ -19,7 +19,7 @@ minimalPrint = True
 SCFFinalPrint = 2
 #SCFPrint = 3
 Direct = False
-Reference = "CUHF"
+Reference = "UHF"
 
 UseDIIS = False
 DIIS_Type = 'C1'

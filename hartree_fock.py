@@ -188,7 +188,6 @@ class Fock_matrix:
             self.coulomb_integrals = numpy.zeros((n_basis_functions,n_basis_functions,n_basis_functions,n_basis_functions))
             self.exchange_integrals = numpy.zeros((n_basis_functions,n_basis_functions,n_basis_functions,n_basis_functions))
 
-
     def resetFocks(self):
     #sets the alpha and beta fock matrcies as the core
         self.alpha = copy.deepcopy(self.core)
@@ -324,10 +323,10 @@ def makeCoreMatrices(template_matrix, molecule):
                       overlap_matrix[ia_vec[i]][ib_vec[j]] = overlap[i][j]
     return core_fock_matrix, overlap_matrix, shell_pairs
 
-def constrainedUHF(overlap_matrix, density, molecule, fock, MOs):
+def constrainedUHF(overlap_matrix, density, molecule, fock):
     S = sqrtm(overlap_matrix)
     half_density_matrix = S.dot(density.total / 2).dot(S)
-    NO_vals, NO_vecs = numpy.linalg.eig(half_density_matrix)
+    NO_vals, NO_vecs = numpy.linalg.eigh(half_density_matrix)
 
     #Sort in order of decending occupancy
     idx = NO_vals.argsort()[::-1]           # note the [::-1] reverses the idex array
@@ -344,7 +343,7 @@ def constrainedUHF(overlap_matrix, density, molecule, fock, MOs):
     lambda_matrix = numpy.dot(sorted_NO_vecs, lambda_matrix)  # Transforming lambda back to the AO basis
     new_alpha = fock.alpha + lambda_matrix
     new_beta = fock.beta - lambda_matrix
-    return new_alpha, new_beta, sorted_NO_vecs
+    return new_alpha, new_beta
 
 #=================================================================#
 #                                                                 #
@@ -370,7 +369,6 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     sp = [element**-0.5e0 for element in s]
     X = numpy.dot(U,numpy.identity(len(sp))*(sp))
     Xt = numpy.transpose(X)
-    a = numpy.zeros((len(U),len(U)))
 
     #Generating the initial density matrices
     #Note there are no reference orbitals in the first caclulation
@@ -397,7 +395,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         fock.makeFockMatrices(density, shell_pairs, template_matrix, system.Direct, num_iterations)
 
         if system.Reference == "CUHF":
-            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, fock, alpha_MOs + beta_MOs)
+            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, fock)
 
        #performing DIIS
         if system.UseDIIS == True:
@@ -437,7 +435,7 @@ def do(system, molecule,state, alpha_reference, beta_reference):
             density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS_error)
 
         if num_iterations >= system.max_iterations:
-            print "SCF method not converging"
+            print("SCF not converging")
             break
     system.out.finalPrint()
 
