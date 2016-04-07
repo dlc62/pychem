@@ -183,6 +183,10 @@ class Fock_matrix:
         self.core = []
         self.alpha = []
         self.beta = []
+        # Allocating space for the two electron integrals if doing indirrect HF
+        if direct_HF is False:
+            self.coulomb_integrals = numpy.zeros((n_basis_functions,) * 4)
+            self.exchange_integrals = numpy.zeros((n_basis_functions,) * 4)
 
     def resetFocks(self):
     #sets the alpha and beta fock matrcies as the core
@@ -194,7 +198,6 @@ class Fock_matrix:
            coulomb_matrix = copy.deepcopy(template_matrix)
            alpha_exchange_matrix = copy.deepcopy(template_matrix)
            beta_exchange_matrix = copy.deepcopy(template_matrix)
-           """ !!!!!!!! Check if the old dendity matrices are being used !!!!!!! """
 #           old_alpha_density_matrix = copy.deepcopy(alpha_density_matrix)
 #           old_beta_density_matrix = copy.deepcopy(beta_density_matrix)
 #           screen = numpy.zeroes((shell_pair1.Centre1.Cgtf.NAngMom,\
@@ -220,12 +223,12 @@ class Fock_matrix:
 
                             # Save the integrals on the first pass of an indirect HF job
                              if direct_HF is False and num_iterations is 1:
-                                self.coulomb_integrals[ia_vec[m],ib_vec[n],ic_vec[l],id_vec[s]] = coulomb[m][n][l][s]
-                                self.exchange_integrals[ia_vec[m],id_vec[s],ic_vec[l],ib_vec[n]] = exchange[m][s][l][n]
-                            # On subsequent passes just use reference to the two electron integrals
-                             else:
-                                coulomb = coulomb
-                                exchange = exchange
+                                self.coulomb_integrals[ia_vec[m]][ib_vec[n]][ic_vec[l]][id_vec[s]] = coulomb[m][n][l][s]
+                                self.exchange_integrals[ia_vec[m]][id_vec[s]][ic_vec[l]][ib_vec[n]] = exchange[m][s][l][n]
+
+
+                                #self.coulomb_integrals[ia_vec[m],ib_vec[n],ic_vec[l],id_vec[s]] = coulomb[m][n][l][s]
+                                #self.exchange_integrals[ia_vec[m],id_vec[s],ic_vec[l],ib_vec[n]] = exchange[m][s][l][n]
 
                             # Acctually constructing the Fock matrices
                              if direct_HF is False:
