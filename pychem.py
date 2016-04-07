@@ -109,6 +109,12 @@ class System:
             self.SCFGuess = input.SCFGuess.lower()
         except:
             self.SCFGuess = 'core'
+        if self.SCFGuess == "read":
+            try:
+                self.MO_file_read = input.MO_File_Read
+            except:
+                print("Specify a file for the input MOs")
+                sys.exit()
 
 ############ MOM Settings
         try:
@@ -367,3 +373,7 @@ else:
         alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_MOs,beta_MOs)
         # Do basis fitting and excited state calculations in the larger bases
         alpha_MOs, beta_MOs = Basis_Loop(molecule, state, coords, alpha_MOs, beta_MOs, sets)
+
+# If an output file is sepcifyed store the final MOs for use in future calulations
+if system.out.MO_file_write is not None:
+    system.out.Print_MOs_to_file(alpha_MOs, beta_MOs)

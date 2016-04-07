@@ -1,37 +1,41 @@
-# need new functionally and removed the need of having hartree_fock.py inclding 
-# literal strings for printing 
+# need new functionally and removed the need of having hartree_fock.py inclding
+# literal strings for printing
 import input
 import numpy
-import constants as c 
+import constants as c
 
-#may need to import input for this to work 
+#may need to import input for this to work
 class PrintSettings:
     def __init__(self):
         try:
-            self.SCFPrint = input.SCFPrint 
+            self.SCFPrint = input.SCFPrint
         except:
-            self.SCFPrint = 0 
+            self.SCFPrint = 0
         try:
             self.SCFFinalPrint = input.SCFFinalPrint
-        except: 
+        except:
             self.SCFFinalPrint = 1
         try:
-            self.DIISPrint = input.DIISPrint 
+            self.DIISPrint = input.DIISPrint
         except:
-            self.DIISPrint = 0 
-        try: 
-            self.MinimalPrint = input.minimalPrint 
+            self.DIISPrint = 0
+        try:
+            self.MinimalPrint = input.minimalPrint
         except:
             self.MinimalPrint = False
         try:
-            self.MOMPrint = input.MOMPrint 
+            self.MOMPrint = input.MOMPrint
         except:
             self.MOMPrint = 0
         try:
-            self.OutFile = input.OutFile 
+            self.OutFile = input.OutFile
         except:
             self.OutFile = ''
-        
+        try:
+            self.MO_file_write = input.MO_File_Write
+        except:
+            self.MO_file_write = None
+
     def finalPrint(self):
         outString =  '                       End                          ' + '\n'
         outString += '----------------------------------------------------' + '\n'
@@ -41,7 +45,7 @@ class PrintSettings:
 
     def outPrint(self,string):
         if self.OutFile == '':
-            print string 
+            print string
         else:
             try:
                 self.newFile.write(string)
@@ -81,7 +85,7 @@ class PrintSettings:
     def PrintMOM(self, alpha_overlaps, beta_overlaps):
        if self.MOMPrint > 0:
             outString = "Alpha Overlap Vector" + '\n'
-            outString += str(alpha_overlaps) + '\n' 
+            outString += str(alpha_overlaps) + '\n'
             outString += "Beta Overlap Vector" + '\n'
             outString += str(beta_overlaps)
             self.outPrint(outString)
@@ -89,14 +93,14 @@ class PrintSettings:
     def PrintDIIS(self, DIIS):
         return 0
 
-    #Possibly need to allow this to print the coloumb and exhange matrices 
+    #Possibly need to allow this to print the coloumb and exhange matrices
     def PrintLoop(self, cycles, alpha_energies, beta_energies, densities,
                    focks, alpha_MOs, beta_MOs, dE, energy, DIIS_error):
-    
+
         if abs(dE) < c.energy_convergence and self.SCFFinalPrint > self.SCFPrint:
-            printLength = self.SCFFinalPrint 
+            printLength = self.SCFFinalPrint
         else:
-            printLength = self.SCFPrint 
+            printLength = self.SCFPrint
         #testing to see if the alpha and beta orbital energies are the same
         #equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
         #restricted = reduce( (lambda x,y: x and y), equalites, True)
@@ -106,21 +110,21 @@ class PrintSettings:
         outString += "Cycle: " + str(cycles) + '\n'
         outString += "Total  Energy: " + str(energy) + '\n'
         outString += "Change in energy: " + str(dE) + '\n'
-        if DIIS_error != 1:                 #stops this from printing when DIIS is dissabled 
+        if DIIS_error != 1:                 #stops this from printing when DIIS is dissabled
             outString += "DIIS Error: " + str(DIIS_error) + '\n'
 
         if printLength > 0:
             outString += "Alpha Orbital Energies" + '\n'
             outString += str(alpha_energies) + '\n'
             #Find a better way to do this comparison
-            if restricted == False:  
+            if restricted == False:
                 outString += "Beta Orbital Energies" + '\n'
                 outString += str(beta_energies) + '\n'
 
         if printLength > 1:
             outString += "Alpha MOs" + '\n'
             outString += str(alpha_MOs) + '\n'
-            if restricted == False: 
+            if restricted == False:
                 outString += "Beta MOs" + '\n'
                 outString += str(beta_MOs) + '\n'
 
@@ -129,7 +133,7 @@ class PrintSettings:
             outString += str(densities.alpha) + '\n'
             outString += "Alpha Fock Matrix" + '\n'
             outString += str(focks.alpha) + '\n'
-            if restricted == False: 
+            if restricted == False:
                 outString += "Beta Density Matrix" + '\n'
                 outString += str(densities.alpha) + '\n'
                 outString += "Beta Fock Matrix" + '\n'
@@ -137,3 +141,16 @@ class PrintSettings:
         outString += '----------------------------------------------------'
 
         self.outPrint(outString)
+
+    def Print_MOs_to_file(self, alpha_MOs, beta_MOs):
+        """ Takes the alpha and beta MO coefficents and the prints them to a file to
+        retrive latter, currently does not produce easily human readable files """
+        file_obj = open(self.MO_file_write, 'w')
+        # First line is the alpha MO coeffs and the second line the beta coeffs
+        # Are most easily read by converting via a list then to a numpy array
+        alpha_string = str(alpha_MOs.tolist())
+        beta_string = str(beta_MOs.tolist())
+        file_obj.write(alpha_string)
+        file_obj.write('\n')
+        file_obj.write(beta_string)
+        file_obj.close()

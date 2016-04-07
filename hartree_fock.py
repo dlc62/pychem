@@ -326,6 +326,10 @@ def constrainedUHF(overlap_matrix, density, molecule, fock):
     S = sqrtm(overlap_matrix)
     half_density_matrix = S.dot(density.total / 2).dot(S)
     NO_vals, NO_vecs = numpy.linalg.eigh(half_density_matrix)
+    #print("Natural Orbitals")
+    #print(NO_vecs)
+    #print("Occupation Numbers")
+    #print(NO_vals)
 
     #Sort in order of decending occupancy
     idx = NO_vals.argsort()[::-1]           # note the [::-1] reverses the idex array
@@ -371,10 +375,13 @@ def do(system, molecule,state, alpha_reference, beta_reference):
 
     #Generating the initial density matrices
     #Note there are no reference orbitals in the first caclulation
-    if isFirstCalc == False:
+    if isFirstCalc is False:
         alpha_reference = Excite(alpha_reference, state.AlphaOccupancy, molecule.NAlphaElectrons)
         beta_reference = Excite(beta_reference, state.BetaOccupancy, molecule.NBetaElectrons)
         alpha_MOs, beta_MOs, density = Init.readGuess(alpha_reference, beta_reference, molecule)
+    elif system.SCFGuess == "read":
+        print("Reading MOs")
+        alpha_MOs, beta_MOs, density = Init.readFromFile(system.MO_file_read, molecule, template_matrix)
     elif system.SCFGuess == 'core':
         alpha_MOs, beta_MOs, density = Init.coreGuess(fock.core, X, Xt, molecule)
     elif system.SCFGuess == 'sad':
