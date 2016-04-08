@@ -323,6 +323,8 @@ def makeCoreMatrices(template_matrix, molecule):
     return core_fock_matrix, overlap_matrix, shell_pairs
 
 def constrainedUHF(overlap_matrix, density, molecule, fock):
+    Na = molecule.Multiplicity / 2 - 1    # Dimension of active space
+    Nc = molecule.NElectrons - Na         # Dimension of core space
     S = sqrtm(overlap_matrix)
     half_density_matrix = S.dot(density.total / 2).dot(S)
     NO_vals, NO_vecs = numpy.linalg.eigh(half_density_matrix)
@@ -332,18 +334,18 @@ def constrainedUHF(overlap_matrix, density, molecule, fock):
     #print(NO_vals)
 
     #Sort in order of decending occupancy
-    idx = NO_vals.argsort()[::-1]           # note the [::-1] reverses the idex array
-    sorted_NO_values = NO_vals[idx]
-    sorted_NO_vecs = NO_vecs[:,idx]
+    idx = NO_vals.argsort()[::-1]           # note the [::-1] reverses the index array
+    core_space = idx[:Nc]                         # Indices of the core NOs
+    valence_space = idx[(Nc + Na):]               # Indices of the valence NOs
 
     delta = (fock.alpha - fock.beta) / 2
-    delta = sorted_NO_vecs.T.dot(delta)                # Transforming delta into the NO basis
+    delta = NO_vecs.T.dot(delta)                # Transforming delta into the NO basis
     lambda_matrix = numpy.zeros(numpy.shape(delta))
-    for i in range(molecule.NBetaElectrons):
-        for j in range(molecule.NAlphaElectrons, molecule.NOrbitals):
+    for i in core_space:
+        for j in valence_space:
             lambda_matrix[i,j] = -delta[i,j]
             lambda_matrix[j,i] = -delta[j,i]
-    lambda_matrix = numpy.dot(sorted_NO_vecs, lambda_matrix)  # Transforming lambda back to the AO basis
+    lambda_matrix = numpy.dot(NO_vecs, lambda_matrix)  # Transforming lambda back to the AO basis
     new_alpha = fock.alpha + lambda_matrix
     new_beta = fock.beta - lambda_matrix
     return new_alpha, new_beta
@@ -380,7 +382,6 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         beta_reference = Excite(beta_reference, state.BetaOccupancy, molecule.NBetaElectrons)
         alpha_MOs, beta_MOs, density = Init.readGuess(alpha_reference, beta_reference, molecule)
     elif system.SCFGuess == "read":
-        print("Reading MOs")
         alpha_MOs, beta_MOs, density = Init.readFromFile(system.MO_file_read, molecule, template_matrix)
     elif system.SCFGuess == 'core':
         alpha_MOs, beta_MOs, density = Init.coreGuess(fock.core, X, Xt, molecule)

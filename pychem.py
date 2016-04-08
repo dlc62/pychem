@@ -82,10 +82,13 @@ class System:
         except:
             self.Reference = "UHF"
 ############ DIIS Settings #############
-        try:
-            self.UseDIIS = input.UseDIIS
-        except:
-            self.UseDIIS = True
+        if self.Reference == "CUHF":
+            self.UseDIIS = False
+        else:
+            try:
+                self.UseDIIS = input.UseDIIS
+            except:
+                self.UseDIIS = True
         try:
             self.DIIS_Size = input.DIIS_Size
         except:
