@@ -16,9 +16,9 @@ class DIIS_System:
         self.matrix = None
         self.residuals = []
         self.error = 1
-        self.DIIS_type = system.DIIS_Type
+        self.DIIS_type = system.DIISType
         self.max_cond = max_condition
-        self.max_space = system.DIIS_Size
+        self.max_space = system.DIISSize
 
     def getResidual(self, overlap, density, fock, X, Xt):
         residual  = overlap.dot(density).dot(fock) - fock.dot(density).dot(overlap)
@@ -185,8 +185,8 @@ class Fock_matrix:
         self.beta = []
         # Allocating space for the two electron integrals if doing indirrect HF
         if direct_HF is False:
-            self.coulomb_integrals = numpy.zeros((n_basis_functions,) * 4)
-            self.exchange_integrals = numpy.zeros((n_basis_functions,) * 4)
+            self.coulomb_integrals = numpy.zeros((n_basis_functions,) * 4)      # Allocating memeory for the 4-tensors needed
+            self.exchange_integrals = numpy.zeros((n_basis_functions,) * 4)     # to store the integrals
 
     def resetFocks(self):
     #sets the alpha and beta fock matrcies as the core
@@ -328,24 +328,30 @@ def constrainedUHF(overlap_matrix, density, molecule, fock):
     S = sqrtm(overlap_matrix)
     half_density_matrix = S.dot(density.total / 2).dot(S)
     NO_vals, NO_vecs = numpy.linalg.eigh(half_density_matrix)
-    #print("Natural Orbitals")
-    #print(NO_vecs)
-    #print("Occupation Numbers")
-    #print(NO_vals)
+#    print("Natural Orbitals")
+#    print(NO_vecs)
+#    print("Occupation Numbers")
+#    print(NO_vals)
 
     #Sort in order of decending occupancy
     idx = NO_vals.argsort()[::-1]           # note the [::-1] reverses the index array
-    core_space = idx[:Nc]                         # Indices of the core NOs
-    valence_space = idx[(Nc + Na):]               # Indices of the valence NOs
+    #core_space = idx[:Nc]                         # Indices of the core NOs
+    #valence_space = idx[(Nc + Na):]               # Indices of the valence NOs
+    sorted_NO_values = NO_vals[idx]
+    sorted_NO_vecs = NO_vecs[:,idx]
+    # try permuting the idices in the same way the orbitals
+    # were permuted by the MOM
 
     delta = (fock.alpha - fock.beta) / 2
-    delta = NO_vecs.T.dot(delta)                # Transforming delta into the NO basis
+    delta = sorted_NO_vecs.T.dot(delta)                # Transforming delta into the NO basis
     lambda_matrix = numpy.zeros(numpy.shape(delta))
-    for i in core_space:
-        for j in valence_space:
+    for i in xrange(molecule.NBetaElectrons):
+        for j in xrange(molecule.NAlphaElectrons):
             lambda_matrix[i,j] = -delta[i,j]
             lambda_matrix[j,i] = -delta[j,i]
-    lambda_matrix = numpy.dot(NO_vecs, lambda_matrix)  # Transforming lambda back to the AO basis
+    lambda_matrix = numpy.dot(sorted_NO_vecs, lambda_matrix)  # Transforming lambda back to the AO basis
+    print("Lambda Matrix")
+    print(lambda_matrix)
     new_alpha = fock.alpha + lambda_matrix
     new_beta = fock.beta - lambda_matrix
     return new_alpha, new_beta
@@ -381,11 +387,11 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         alpha_reference = Excite(alpha_reference, state.AlphaOccupancy, molecule.NAlphaElectrons)
         beta_reference = Excite(beta_reference, state.BetaOccupancy, molecule.NBetaElectrons)
         alpha_MOs, beta_MOs, density = Init.readGuess(alpha_reference, beta_reference, molecule)
-    elif system.SCFGuess == "read":
-        alpha_MOs, beta_MOs, density = Init.readFromFile(system.MO_file_read, molecule, template_matrix)
-    elif system.SCFGuess == 'core':
+    elif system.SCFGuess == "READ":
+        alpha_MOs, beta_MOs, density = Init.readFromFile(system.MOFileRead, molecule, template_matrix)
+    elif system.SCFGuess == "CORE":
         alpha_MOs, beta_MOs, density = Init.coreGuess(fock.core, X, Xt, molecule)
-    elif system.SCFGuess == 'sad':
+    elif system.SCFGuess == "SAD":
         density = Init.sadGuess(molecule, system.BasisSets[0])
         alpha_MOs = copy.deepcopy(template_matrix)
         beta_MOs = copy.deepcopy(template_matrix)
@@ -441,7 +447,8 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
             density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS_error)
 
-        if num_iterations >= system.max_iterations:
+        if num_iterations >= system.MaxIterations:
+
             print("SCF not converging")
             break
     system.out.finalPrint()

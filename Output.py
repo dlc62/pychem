@@ -16,15 +16,15 @@ class PrintSettings:
         except:
             self.SCFFinalPrint = 1
         try:
-            self.DIISPrint = input.DIISPrint
+            self.DIISPrint = input.DIIS_Print
         except:
             self.DIISPrint = 0
         try:
-            self.MinimalPrint = input.minimalPrint
+            self.MinimalPrint = input.MinimalPrint
         except:
             self.MinimalPrint = False
         try:
-            self.MOMPrint = input.MOMPrint
+            self.MOMPrint = input.MOM_Print
         except:
             self.MOMPrint = 0
         try:
@@ -32,9 +32,9 @@ class PrintSettings:
         except:
             self.OutFile = ''
         try:
-            self.MO_file_write = input.MO_File_Write
+            self.MOFileWrite = input.MOFileWrite
         except:
-            self.MO_file_write = None
+            self.MOFileWrite = None
 
     def finalPrint(self):
         outString =  '                       End                          ' + '\n'
@@ -145,7 +145,7 @@ class PrintSettings:
     def Print_MOs_to_file(self, alpha_MOs, beta_MOs):
         """ Takes the alpha and beta MO coefficents and the prints them to a file to
         retrive latter, currently does not produce easily human readable files """
-        file_obj = open(self.MO_file_write, 'w')
+        file_obj = open(self.MOFileWrite, 'w')
         # First line is the alpha MO coeffs and the second line the beta coeffs
         # Are most easily read by converting via a list then to a numpy array
         alpha_string = str(alpha_MOs.tolist())

@@ -36,6 +36,9 @@ def make_length_equal(list1, list2, place_holder = []):
 # Set up data structures as python classes
 # Convention: class variables are capitalized, instances not
 #----------------------------------------------------------------
+# System specifies the values for a single calculation
+# This will be written so that multiple system instances can be produced
+# allowing for more flexible series os of calculations
 
 class System:
     def __init__(self,input):
@@ -70,9 +73,9 @@ class System:
            else:
               self.BasisFit = True
         try:
-            self.max_iterations = input.Max_Iterations
+            self.MaxIterations = input.MaxIterations
         except:
-            self.max_iterations = 25
+            self.MaxIterations = 25
         try:
             self.Direct = input.Direct
         except:
@@ -90,31 +93,33 @@ class System:
             except:
                 self.UseDIIS = True
         try:
-            self.DIIS_Size = input.DIIS_Size
+            self.DIISSize = input.DIIS_Size
         except:
-            self.DIIS_Size = 15
+            self.DIISSize = 15
         try:
-            self.DIIS_Type = input.DIIS_Type
+            self.DIISType = input.DIIS_Type
             if self.DIIS_Type not in ["C2", "C1"]:
                 print("DIIS type must be C2 or C1 using C1 by default")
                 sys.exit()
         except:
-            self.DIIS_Type = "C1"
+            self.DIISType = "C1"
         try:
-            self.DIIS_start = input.DIIS_Start
+            self.DIISstart = input.DIIS_Start
         except:
-            self.DIIS_start =1
+            self.DIISstart = 1
 
 ############ Initial Guess Settings ##########
         try:
             #will need to add code to check if the data is avalible for SAD guess
             # for the givej molecule and basis
-            self.SCFGuess = input.SCFGuess.lower()
+            self.SCFGuess = input.SCFGuess.upper()
+            assert(self.SCFGuess in ["READ", "CORE", "SAD"])
         except:
-            self.SCFGuess = 'core'
-        if self.SCFGuess == "read":
+            print("Could not read SCF guess, defualting to core guess")
+            self.SCFGuess = "CORE"
+        if self.SCFGuess == "READ":
             try:
-                self.MO_file_read = input.MO_File_Read
+                self.MOFileRead = input.MOFileRead
             except:
                 print("Specify a file for the input MOs")
                 sys.exit()
@@ -136,9 +141,9 @@ class System:
             # at this point the code just defaults to using the previous orbials as
             # the reference at each iteration, will need to change the initialzation
             # to check for the 'fixed' keyword to used fixed reference orbitals
-            self.MOM_Type = input.MOM_Type
+            self.MOM_Type = input.MOM_Type.upper()
         except:
-            self.MOM_Type = "mutable"
+            self.MOM_Type = "MUTABLE"
         self.out = Output.PrintSettings()
 
 #---------------------------------------------------#
@@ -354,7 +359,7 @@ def Excite(matrix,occupancy, NElectrons):
 system = System(input)
 coords = input.Coords
 molecules = []
-alpha_reference  = [[None]]     #this initiation avoids comparing an array to a single value latter in the code
+alpha_reference  = [[None]]     #this initiation ensures there is always a value at [0][0] to compare against
 beta_reference = [[None]]
 sets = map(remove_punctuation,input.BasisSets)
 n_sets = len(sets)
@@ -378,5 +383,5 @@ else:
         alpha_MOs, beta_MOs = Basis_Loop(molecule, state, coords, alpha_MOs, beta_MOs, sets)
 
 # If an output file is sepcifyed store the final MOs for use in future calulations
-if system.out.MO_file_write is not None:
+if system.out.MOFileWrite is not None:
     system.out.Print_MOs_to_file(alpha_MOs, beta_MOs)
