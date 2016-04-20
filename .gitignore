@@ -1,4 +1,5 @@
 *.pyc
+*.pyo
 *.out
 *.txt
 .DS_Store

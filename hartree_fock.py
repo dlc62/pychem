@@ -4,6 +4,7 @@ import constants as c
 import copy
 import numpy
 import Output
+import scipy
 from numpy import dot
 from scipy.linalg import sqrtm
 numpy.set_printoptions(precision = 5, linewidth = 300)  #Makes the arrays print nicely in the output
@@ -322,36 +323,28 @@ def makeCoreMatrices(template_matrix, molecule):
                       overlap_matrix[ia_vec[i]][ib_vec[j]] = overlap[i][j]
     return core_fock_matrix, overlap_matrix, shell_pairs
 
-def constrainedUHF(overlap_matrix, density, molecule, fock):
-    Na = molecule.Multiplicity / 2    # Dimension of active space
-    Nc = molecule.NAlphaElectrons - Na         # Dimension of core space
-    S = sqrtm(overlap_matrix)
+def constrainedUHF(overlap_matrix, density, fock, molecule, S):
+    Na = molecule.Multiplicity / 2                              # Dimension of active space
+    Nc = molecule.NAlphaElectrons - Na                          # Dimension of core space
+
     half_density_matrix = S.dot(density.total / 2).dot(S)
-    NO_vals, NO_vecs = numpy.linalg.eigh(half_density_matrix)
+    NO_vals, NO_vects = numpy.linalg.eigh(half_density_matrix)  # See J. Chem. Phys. 88, 4926
+    NO_coeffs = numpy.linalg.inv(S).dot(NO_vects)               # for details on finding the NO coefficents
+    back_trans = numpy.linalg.inv(NO_coeffs)
 
     #Sort in order of decending occupancy
-    idx = NO_vals.argsort()[::-1]           # note the [::-1] reverses the index array
-    core_space = idx[:Nc]                         # Indices of the core NOs
-    valence_space = idx[(Nc + Na):]               # Indices of the valence NOs
-    sorted_NO_vecs = NO_vecs[:,idx]
+    idx = NO_vals.argsort()[::-1]                    # Note the [::-1] reverses the index array
+    core_space = idx[:Nc]                            # Indices of the core NOs
+    valence_space = idx[(Nc + Na):]                  # Indices of the valence NOs
 
     delta = (fock.alpha - fock.beta) / 2
-    delta = delta.dot(NO_vecs)                # Transforming delta into the NO basis
-    print("Delta Matrix")
-    print(delta)
+    delta = NO_coeffs.T.dot(delta).dot(NO_coeffs)    # Transforming delta into the NO basis
     lambda_matrix = numpy.zeros(numpy.shape(delta))
     for i in core_space:
         for j in valence_space:
             lambda_matrix[i,j] = -delta[i,j]
             lambda_matrix[j,i] = -delta[j,i]
-    lambda_matrix = numpy.dot(lambda_matrix, NO_vects.T)  # Transforming lambda back to the AO basis
-
-    try:
-        assert numpy.allclose(lambda_matrix, lambda_matrix.T)
-    except:
-        print("Lambda Matrix Not Hermitian")
-        import sys
-        sys.exit()
+    lambda_matrix = back_trans.T.dot(lambda_matrix).dot(back_trans)  # Transforming lambda back to the AO basis
 
     new_alpha = fock.alpha + lambda_matrix
     new_beta = fock.beta - lambda_matrix
@@ -409,7 +402,9 @@ def do(system, molecule,state, alpha_reference, beta_reference):
         fock.makeFockMatrices(density, shell_pairs, template_matrix, system.Direct, num_iterations)
 
         if system.Reference == "CUHF":
-            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, molecule, fock)
+            if num_iterations == 1:
+                S = sqrtm(overlap_matrix)
+            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, fock, molecule, S)
 
        #performing DIIS
         if system.UseDIIS == True:

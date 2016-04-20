@@ -27,7 +27,7 @@ lQuanta = {0:[[0,0,0]],
               [2,0,3],[2,2,1],[2,1,2],[1,4,0],[1,0,4],[1,3,1],[1,1,3],
               [1,2,2],[0,5,0],[0,4,1],[0,3,2],[0,2,3],[0,1,4],[0,0,5]]}
 integral_threshold = -1.e-10
-energy_convergence = 1.e-5
+energy_convergence = 1.e-8
 density_convergence = 1.e-6
 DIIS_convergence = 1.e-5
 DIIS_MAX_CONDITION = 1e6
