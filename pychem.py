@@ -358,30 +358,35 @@ def Excite(matrix,occupancy, NElectrons):
 
 system = System(input)
 coords = input.Coords
-molecules = []
-alpha_reference  = [[None]]     #this initiation ensures there is always a value at [0][0] to compare against
-beta_reference = [[None]]
+alpha_MO_list = []
+beta_MO_list = []
 sets = map(remove_punctuation,input.BasisSets)
-n_sets = len(sets)
 
-# Do ground state calculation in the starting basis
+# do ground state calculation in the starting basis
 molecule = Molecule(input, coords, sets[0])
-base_alpha_MOs, base_beta_MOs = hartree_fock.do(system,molecule,molecule.States[0],alpha_reference, beta_reference)
+base_alpha_MOs, base_beta_MOs = hartree_fock.do(system, molecule)
+alpha_MO_list.append(base_alpha_MOs)
+beta_MO_list.append(base_beta_MOs)
 
-# If only no excited states are entered calculate the ground state in largest basis
-if len(molecule.States) == 1:
-     alpha_MOs, beta_MOs = Basis_Loop(molecule, molecule.States[0], coords, base_alpha_MOs, base_beta_MOs, sets)
-# otherwise just calculate the excited states in the larger basis
-else:
-    for state in molecule.States[1:]:
-        # Generate the starting excited state MOs from the minimal basis virtual orbitals
-        alpha_MOs = Excite(base_alpha_MOs, state.AlphaOccupancy, molecule.NAlphaElectrons)
-        beta_MOs = Excite(base_beta_MOs, state.BetaOccupancy, molecule.NBetaElectrons)
-        # Do an excited state calculation in the minimal basis
-        alpha_MOs, beta_MOs = hartree_fock.do(system,molecule,state,alpha_MOs,beta_MOs)
-        # Do basis fitting and excited state calculations in the larger bases
-        alpha_MOs, beta_MOs = Basis_Loop(molecule, state, coords, alpha_MOs, beta_MOs, sets)
+#Generate starting orbitals for each of the exicted states and do first calculation
+for i, state in enumerate(molecule.States[1:], start = 1):
+    alpha_MO_list.append(Excite(base_alpha_MOs, state.AlphaOccupancy, molecule.NAlphaElectrons))
+    beta_MO_list.append(Excite(base_beta_MOs, state.BetaOccupancy, molecule.NBetaElectrons))
+    alpha_MOs, beta_MOs = hartree_fock.do(system, molecule, alpha_MO_list, beta_MO_list, i)
+    alpha_MO_list.append(alpha_MOs)
+    beta_MO_list.append(beta_MOs)
 
-# If an output file is sepcifyed store the final MOs for use in future calulations
-if system.out.MOFileWrite is not None:
-    system.out.Print_MOs_to_file(alpha_MOs, beta_MOs)
+# Possibly could also keep a list of the energies of each state and throw an
+# error if they are not ordered at the end.
+for basis_set in sets[1:]:
+    # Iterate over list and preform basis fitting on each state
+    for i in range(len(alpha_MO_list)):
+        alpha_MO_list[i] = Basis_Fitting.Basis_Fit(molecule, alpha_MO_list[i], basis_set)
+        beta_MO_list[i] = Basis_Fitting.Basis_Fit(molecule, beta_MO_list[i], basis_set)
+
+    # Iterate over the list of states doing calculations while enforcing orthoginality
+    molecule = Molecule(input, coords, basis_set)
+    for i in range(len(alpha_MO_list)):
+        alpha_MOs, beta_MOs = hartree_fock.do(system, molecule, alpha_MO_list, beta_MO_list, i)
+        alpha_MO_list[i] = alpha_MOs
+        beta_MO_list[i] = beta_MOs

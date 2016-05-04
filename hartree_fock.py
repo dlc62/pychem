@@ -356,12 +356,15 @@ def constrainedUHF(overlap_matrix, density, fock, molecule, S):
 #                                                                 #
 #=================================================================#
 
-def do(system, molecule,state, alpha_reference, beta_reference):
+def do(system, molecule, alpha_MO_list = [[None]], beta_MO_list = [[None]], index = 0):
     num_iterations = 0
-    isFirstCalc = (alpha_reference[0][0] == None)
+    alpha_reference = alpha_MO_list[index]
+    beta_reference = beta_MO_list[index]
+    isFirstCalc = (alpha_MO_list[0][0] == None)
     fock = Fock_matrix(molecule.NOrbitals, system.Direct)
     alphaDIIS = DIIS_System(c.DIIS_MAX_CONDITION, system)
     betaDIIS = copy.deepcopy(alphaDIIS)
+
 
     #setting up the values that are constant througout the calculation
     nuclear_repulsion_energy = integrals.nuclear_repulsion(molecule)
@@ -378,8 +381,9 @@ def do(system, molecule,state, alpha_reference, beta_reference):
     #Generating the initial density matrices
     #Note there are no reference orbitals in the first caclulation
     if isFirstCalc is False:
-        alpha_reference = Excite(alpha_reference, state.AlphaOccupancy, molecule.NAlphaElectrons)
-        beta_reference = Excite(beta_reference, state.BetaOccupancy, molecule.NBetaElectrons)
+        # Assumming that excitaions are carried out in pychem
+        #alpha_reference = Excite(alpha_reference, state.AlphaOccupancy, molecule.NAlphaElectrons)
+        #beta_reference = Excite(beta_reference, state.BetaOccupancy, molecule.NBetaElectrons)
         alpha_MOs, beta_MOs, density = Init.readGuess(alpha_reference, beta_reference, molecule)
     elif system.SCFGuess == "READ":
         alpha_MOs, beta_MOs, density = Init.readFromFile(system.MOFileRead, molecule, template_matrix)
