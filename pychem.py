@@ -373,8 +373,8 @@ for i, state in enumerate(molecule.States[1:], start = 1):
     alpha_MO_list.append(Excite(base_alpha_MOs, state.AlphaOccupancy, molecule.NAlphaElectrons))
     beta_MO_list.append(Excite(base_beta_MOs, state.BetaOccupancy, molecule.NBetaElectrons))
     alpha_MOs, beta_MOs = hartree_fock.do(system, molecule, alpha_MO_list, beta_MO_list, i)
-    alpha_MO_list.append(alpha_MOs)
-    beta_MO_list.append(beta_MOs)
+    alpha_MO_list[-1] = alpha_MOs
+    beta_MO_list[-1] = beta_MOs
 
 # Possibly could also keep a list of the energies of each state and throw an
 # error if they are not ordered at the end.
