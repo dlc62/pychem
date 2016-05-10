@@ -130,46 +130,41 @@ class DIIS_System:
 
 ########################## MOM and Excited State Functions  ###########################
 
-def maximumOverlapMethod(reference, new_MOs, energies, NElectrons, overlap_matrix):
+def maximumOverlapMethod(new_MOs, MO_list, index, energies, NElectrons, overlap_matrix):
+    """Returns the MO array and MO energy list with the colomns in decending
+    order of their overlap with the reference state"""
+
+    state_overlaps = numpy.zeros(len(new_MOs))
+    for i, state in enumerate(MO_list):
+        if i is index:
+            p_vector = make_p_vector(new_MOs, state, NElectrons, overlap_matrix)
+        else:
+            state_overlaps += make_p_vector(new_MOs, state, NElectrons, overlap_matrix)
+    state_overlaps /= (len(new_MOs) - 1)
+    p_vector -= state_overlaps
+
+    sorted_MOs, sorted_energies = Sort_MOs(new_MOs, energies, p_vector)
+    return sorted_MOs, sorted_energies
+
+def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
+    C_dagger = numpy.transpose(other_MOs[:,range(NElectrons)])
+    MO_overlap = C_dagger.dot(overlap_matrix.dot(new_MOs))
+
+    # Get the overlap with the reference orbitals
     P_vector = numpy.zeros(len(new_MOs))
-    dagger = numpy.transpose(reference[:,range(NElectrons)])
-    MO_overlap = dagger.dot(overlap_matrix.dot(new_MOs))
+    for i in xrange(len(new_MOs)):
+        P_vector[i] = sum(MO_overlap[:,i])
 
-    #sum the overlap of the individual AOs
-    if len(numpy.shape(MO_overlap)) == 1:
-        P_vector = MO_overlap
-    else:
-        for i in xrange(len(new_MOs)):
-            P_vector[i] = sum(MO_overlap[:,i])
-
-    sorted_MOs, sorted_energies = Sort_MOs(new_MOs, energies, numpy.abs(P_vector))
-    return sorted_MOs, sorted_energies, P_vector
+    return numpy.abs(P_vector)
 
 def Sort_MOs(MOs, energies, p):
-#sorts MOs and energies in decending order
-#based on a vector p (the overlap vector)
+    """Sorts MOs and energies in decending order
+    based on a vector p (the overlap vector)"""
     temp = [[p[i],MOs[:,i],energies[i]] for i in range(len(p))]
     temp = sorted(temp, key = lambda pair: pair[0], reverse = True)     #sorts the elements on the basis of the p values (temp[0])
     new_MOs = numpy.array([line[1] for line in temp])
     new_energies = [line[2] for line in temp]
     return numpy.transpose(new_MOs), new_energies
-
-def Excite(matrix, occupancy, NElectrons):
-    new_matrix = copy.deepcopy(matrix)
-    frm = []; to = []
-    # bulding a lists of the coloumns to interchange
-    for i in range(NElectrons):
-        if occupancy == 0:
-            frm.append(i)
-    for i in range(NElectrons, len(occupancy)):
-        if occupancy == 1:
-            to.append(i)
-    # interchanging the columns
-    for i in range(len(to)):
-        temp = copy.deepcopy(new_matrix[:,to[i]])
-        new_matrix[:,to[i]] = new_matrix[:,frm[i]]
-        new_matrix[:,frm[i]] = temp
-    return new_matrix
 
 ########################### Basic HF Functions ############################
 
@@ -411,25 +406,25 @@ def do(system, molecule, alpha_MO_list = [[None]], beta_MO_list = [[None]], inde
             fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, fock, molecule, S)
 
        #performing DIIS
-        if system.UseDIIS == True:
+        if  system.UseDIIS == True:
            fock.alpha = alphaDIIS.DoDIIS(fock.alpha, density.alpha, overlap_matrix, X, Xt, energy)
            fock.beta = betaDIIS.DoDIIS(fock.beta, density.beta, overlap_matrix, X, Xt, energy)
         DIIS_error = max(alphaDIIS.error, betaDIIS.error)
 
        #using the MOs from the previous iteration as the reference orbitals
        #unless spcifyed in the input file
-        if system.MOM_Type != "fixed":
-            alpha_reference = copy.deepcopy(alpha_MOs)
-            beta_reference = copy.deepcopy(beta_MOs)
+        if system.MOM_Type != "FIXED":
+            alpha_MO_list[index] = copy.deepcopy(alpha_MOs)
+            beta_MO_list[index] = copy.deepcopy(beta_MOs)
         alpha_MOs, alpha_orbital_energies = make_MOs(X,Xt,fock.alpha)
         beta_MOs, beta_orbital_energies = make_MOs(X,Xt,fock.beta)
 
        #Maximum Overlap Method
         if system.UseMOM == True and isFirstCalc == False:
-            alpha_MOs, alpha_orbital_energies, alpha_overlaps = maximumOverlapMethod(alpha_reference,
-                    alpha_MOs, alpha_orbital_energies,molecule.NAlphaElectrons, overlap_matrix)
-            beta_MOs, beta_orbital_energies,beta_overlaps = maximumOverlapMethod(beta_reference,
-                    beta_MOs, beta_orbital_energies,molecule.NBetaElectrons, overlap_matrix)
+            alpha_MOs, alpha_orbital_energies = maximumOverlapMethod(alpha_MOs, alpha_MO_list,
+                           index, alpha_orbital_energies,molecule.NAlphaElectrons, overlap_matrix)
+            beta_MOs, beta_orbital_energies = maximumOverlapMethod(beta_MOs, beta_MO_list,
+                           index, beta_orbital_energies,molecule.NBetaElectrons, overlap_matrix)
             #system.out.PrintMOM(alpha_overlaps, beta_overlaps)
 
         density.alpha = make_density_matrix(density.alpha,alpha_MOs,molecule.NAlphaElectrons)
@@ -448,7 +443,6 @@ def do(system, molecule, alpha_MO_list = [[None]], beta_MO_list = [[None]], inde
             density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS_error)
 
         if num_iterations >= system.MaxIterations:
-
             print("SCF not converging")
             break
     system.out.finalPrint()
