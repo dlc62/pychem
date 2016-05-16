@@ -95,7 +95,7 @@ class PrintSettings:
 
     #Possibly need to allow this to print the coloumb and exhange matrices
     def PrintLoop(self, cycles, alpha_energies, beta_energies, densities,
-                   focks, alpha_MOs, beta_MOs, dE, energy, DIIS_error):
+                   focks, alpha_MOs, beta_MOs, dE, energy, DIIS_error, spin):
 
         if abs(dE) < c.energy_convergence and self.SCFFinalPrint > self.SCFPrint:
             printLength = self.SCFFinalPrint
@@ -138,7 +138,12 @@ class PrintSettings:
                 outString += str(densities.alpha) + '\n'
                 outString += "Beta Fock Matrix" + '\n'
                 outString += str(focks.beta) + '\n'
+
+        if abs(dE) < c.energy_convergence and spin is not None:
+            outString += "<S^2> = %.2f\n" % spin
+
         outString += '----------------------------------------------------'
+
 
         self.outPrint(outString)
 

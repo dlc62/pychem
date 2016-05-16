@@ -21,6 +21,20 @@ class DIIS_System:
         self.max_cond = max_condition
         self.max_space = system.DIISSize
 
+    def DoDIIS(self, fock, density, overlap, X, Xt, energy):
+        residual = self.getResidual(overlap, density, fock, X, Xt)
+        self.error = residual.max()
+        threshold = -0.1 * energy
+        if self.error < threshold:   # Start DIIS
+            self.residuals.append(copy.deepcopy(residual))
+            self.oldFocks.append(copy.deepcopy(fock))
+            if len(self.residuals) > 1:
+                self.matrix = self.makeMatrix()
+                self.reduceSpace(energy)
+                coeffs = self.getCoeffs()
+                fock = self.makeFockMatrix(coeffs)
+        return fock
+
     def getResidual(self, overlap, density, fock, X, Xt):
         residual  = overlap.dot(density).dot(fock) - fock.dot(density).dot(overlap)
         residual = Xt.dot(residual).dot(X)
@@ -113,20 +127,6 @@ class DIIS_System:
         for i in xrange(len(coeffs)):
             new_fock += coeffs[i] * self.oldFocks[i]
         return new_fock
-
-    def DoDIIS(self, fock, density, overlap, X, Xt, energy):
-        residual = self.getResidual(overlap, density, fock, X, Xt)
-        self.error = residual.max()
-        threshold = -0.1 * energy
-        if self.error < threshold:   # Start DIIS
-            self.residuals.append(copy.deepcopy(residual))
-            self.oldFocks.append(copy.deepcopy(fock))
-            if len(self.residuals) > 1:
-                self.matrix = self.makeMatrix()
-                self.reduceSpace(energy)
-                coeffs = self.getCoeffs()
-                fock = self.makeFockMatrix(coeffs)
-        return fock
 
 ########################## MOM and Excited State Functions  ###########################
 
@@ -318,6 +318,17 @@ def makeCoreMatrices(template_matrix, molecule):
                       overlap_matrix[ia_vec[i]][ib_vec[j]] = overlap[i][j]
     return core_fock_matrix, overlap_matrix, shell_pairs
 
+def calculate_spin(molecule, occs):
+    # Using formula from J. Chem. Phys. 88, 4926
+    N = molecule.NElectrons
+    Nab = molecule.NAlphaElectrons * molecule.NBetaElectrons
+    # Multiply this term  by two rather than a half to account
+    # for that fac t that CUHF halves the occupation numbers
+    occs_term = 2 * sum([x ** 2 for x in occs])
+
+    spin = N*(N+4)/4. - Nab - occs_term
+    return spin
+
 def constrainedUHF(overlap_matrix, density, fock, molecule, S):
     Na = molecule.Multiplicity / 2                              # Dimension of active space
     Nc = molecule.NAlphaElectrons - Na                          # Dimension of core space
@@ -326,6 +337,9 @@ def constrainedUHF(overlap_matrix, density, fock, molecule, S):
     NO_vals, NO_vects = numpy.linalg.eigh(half_density_matrix)  # See J. Chem. Phys. 88, 4926
     NO_coeffs = numpy.linalg.inv(S).dot(NO_vects)               # for details on finding the NO coefficents
     back_trans = numpy.linalg.inv(NO_coeffs)
+
+    # Calculate the expectation value of the spin operator
+    spin = calculate_spin(molecule, NO_vals)
 
     #Sort in order of decending occupancy
     idx = NO_vals.argsort()[::-1]                    # Note the [::-1] reverses the index array
@@ -343,7 +357,7 @@ def constrainedUHF(overlap_matrix, density, fock, molecule, S):
 
     new_alpha = fock.alpha + lambda_matrix
     new_beta = fock.beta - lambda_matrix
-    return new_alpha, new_beta
+    return new_alpha, new_beta, spin
 
 #=================================================================#
 #                                                                 #
@@ -353,6 +367,7 @@ def constrainedUHF(overlap_matrix, density, fock, molecule, S):
 
 def do(system, molecule, alpha_MO_list = [[None]], beta_MO_list = [[None]], index = 0):
     num_iterations = 0
+    spin = None
     alpha_reference = alpha_MO_list[index]
     beta_reference = beta_MO_list[index]
     isFirstCalc = (alpha_MO_list[0][0] == None)
@@ -403,7 +418,7 @@ def do(system, molecule, alpha_MO_list = [[None]], beta_MO_list = [[None]], inde
         if system.Reference == "CUHF":
             if num_iterations == 1:
                 S = sqrtm(overlap_matrix)
-            fock.alpha, fock.beta = constrainedUHF(overlap_matrix, density, fock, molecule, S)
+            fock.alpha, fock.beta, spin = constrainedUHF(overlap_matrix, density, fock, molecule, S)
 
        #performing DIIS
         if  system.UseDIIS == True:
@@ -440,12 +455,15 @@ def do(system, molecule, alpha_MO_list = [[None]], beta_MO_list = [[None]], inde
 #            system.out.SCFPrint = system.out.SCFFinalPrint
 
         system.out.PrintLoop(num_iterations, alpha_orbital_energies, beta_orbital_energies,
-            density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS_error)
+            density, fock, alpha_MOs, beta_MOs, dE, total_energy, DIIS_error, spin)
+
 
         if num_iterations >= system.MaxIterations:
             print("SCF not converging")
             break
     system.out.finalPrint()
+
+
 
     return alpha_MOs, beta_MOs
 
