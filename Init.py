@@ -3,10 +3,9 @@
 import numpy
 from copy import deepcopy
 import hartree_fock as HF
-from SAD_orbitals import SADget
-
 
 def dirrectSum(A,B):
+    # Matrix dirrect sume required for the SAD guess
     if A == []:
         new_matrix = numpy.array(B)
     else:
@@ -17,6 +16,7 @@ def dirrectSum(A,B):
     return new_matrix
 
 def sadGuess(molecule,basis):
+    from SAD_orbitals import SADget
     density_matrix = []
     for atom in molecule.Atoms:
         density_matrix = dirrectSum(density_matrix, SADget[basis][atom.Label])
@@ -51,6 +51,7 @@ def readFromFile(filename, molecule, template_matrix):
     file_obj.close()
 
     # Converting the strings to numpy arrays
+    # Note literal_eval is safe against code injection
     alpha_MOs = numpy.array(literal_eval(alpha_line))
     beta_MOs = numpy.array(literal_eval(beta_line))
 

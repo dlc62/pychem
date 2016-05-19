@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import sys
-import input
 import basis
 import Output
 import constants as c
@@ -9,8 +8,25 @@ import hartree_fock
 import Basis_Fitting
 from copy import deepcopy
 import numpy
-import cProfile
+import ast
+import ConfigParser
 
+# Function for reading data from the config file
+# Implimented as a closure to make things less messy
+def make_config_reader(calc_num, parser):
+
+    section = "calc%i" % calc_num
+
+    if not parser.has_section(section):
+        return False
+
+    def config(var_name):
+        var = parser.get(section, var_name)
+        var = ast.literal_eval(var)
+        if isinstance(var, str):
+            var = var.upper()
+        return var
+    return config
 
 def single_excitations(n_electrons, n_orbitals):
     """Takes the number of electrons of a particular spin and the number
@@ -40,48 +56,50 @@ def make_length_equal(list1, list2, place_holder = []):
 # This will be written so that multiple system instances can be produced
 # allowing for more flexible series os of calculations
 
+
+# Try to tidy up the magic strings in this
 class System:
-    def __init__(self,input):
+    def __init__(self, config):
         try:
-           self.Method = input.Method.upper()
+           self.Method = config("Method")
         except:
            self.Method = 'HF'
         try:
-           self.JobType = input.JobType.upper()
+           self.JobType = config("JobType")
         except:
            self.JobType = 'ENERGY'
         try:
-           self.BasisSets = input.BasisSets
+           self.BasisSets = config("BasisSets")
         except:
            print 'Error: must provide BasisSets list'
            sys.exit()
         try:
-           assert type(input.BasisSets) is list
+           assert type(self.BasisSets) is list
         except AssertionError:
            print 'Error: basis sets must be specified as strings in a list'
            sys.exit()
         try:
-           assert len(input.BasisSets) > 0
+           assert len(self.BasisSets) > 0
         except AssertionError:
            print 'Error: must specify at least one basis set'
            sys.exit()
         try:
-           self.BasisFit = input.BasisFit
+           self.BasisFit = config("BasisFit")
         except:
-           if len(input.BasisSets) == 1:
+           if len(self.BasisSets) == 1:
               self.BasisFit = False
            else:
               self.BasisFit = True
         try:
-            self.MaxIterations = input.MaxIterations
+            self.MaxIterations = config("MaxIterations")
         except:
             self.MaxIterations = 25
         try:
-            self.Direct = input.Direct
+            self.Direct = config("Direct")
         except:
             self.Direct = True
         try:
-            self.Reference = input.Reference.upper()
+            self.Reference = config("Reference")
         except:
             self.Reference = "UHF"
 ############ DIIS Settings #############
@@ -89,22 +107,22 @@ class System:
             self.UseDIIS = False
         else:
             try:
-                self.UseDIIS = input.UseDIIS
+                self.UseDIIS = config("UseDIIS")
             except:
                 self.UseDIIS = True
         try:
-            self.DIISSize = input.DIIS_Size
+            self.DIISSize = config("DIISSize")
         except:
             self.DIISSize = 15
         try:
-            self.DIISType = input.DIIS_Type
+            self.DIISType = config("DIISType")
             if self.DIIS_Type not in ["C2", "C1"]:
                 print("DIIS type must be C2 or C1 using C1 by default")
                 sys.exit()
         except:
             self.DIISType = "C1"
         try:
-            self.DIISstart = input.DIIS_Start
+            self.DIISstart = config("DIIS_Start")
         except:
             self.DIISstart = 1
 
@@ -112,28 +130,28 @@ class System:
         try:
             #will need to add code to check if the data is avalible for SAD guess
             # for the givej molecule and basis
-            self.SCFGuess = input.SCFGuess.upper()
+            self.SCFGuess = config("SCFGuess")
             assert(self.SCFGuess in ["READ", "CORE", "SAD"])
         except:
             print("Could not read SCF guess, defualting to core guess")
             self.SCFGuess = "CORE"
         if self.SCFGuess == "READ":
             try:
-                self.MOFileRead = input.MOFileRead
+                self.MOFileRead = config("MOFileRead")
             except:
                 print("Specify a file for the input MOs")
                 sys.exit()
 
 ############ MOM Settings
         try:
-            self.UseMOM = input.UseMOM
+            self.UseMOM = config("UseMOM")
         except:
             try:
-                input.Excitations
+                config("Excitations")
                 self.UseMOM = True
             except:
                 try:
-                    input.Alpha_Excitations
+                    config("Alpha_Excitations")
                     self.UseMOM = True
                 except:
                     self.UseMOM = False
@@ -141,10 +159,10 @@ class System:
             # at this point the code just defaults to using the previous orbials as
             # the reference at each iteration, will need to change the initialzation
             # to check for the 'fixed' keyword to used fixed reference orbitals
-            self.MOM_Type = input.MOM_Type.upper()
+            self.MOM_Type = config("MOM_Type")
         except:
             self.MOM_Type = "MUTABLE"
-        self.out = Output.PrintSettings()
+        self.out = Output.PrintSettings(config)
 
 #---------------------------------------------------#
 #                  Molecule Class                   #
@@ -197,15 +215,15 @@ class Molecule:
             self.States += [(ElectronicState(alpha_occupied, beta_occupied))]
         return self.States
 
-    def __init__(self,input,coords,basis_set):
+    def __init__(self, config, coords, basis_set):
         self.Basis = basis_set
         try:
-           self.Charge = input.Charge
+           self.Charge = config("Charge")
         except:
            print 'Error: must specify molecule charge using Charge ='
            sys.exit()
         try:
-           self.Multiplicity = input.Multiplicity
+           self.Multiplicity = config("Multiplicity")
         except:
            print 'Error: must specify molecule multiplicity using Multiplicity ='
            sys.exit()
@@ -258,12 +276,12 @@ class Molecule:
         alpha_excitations = [[]]
         beta_excitations = [[]]
         try:
-            alpha_excitations = input.Alpha_Excitations
-            beta_excitations = input.Beta_Excitations
-        except AttributeError:
+            alpha_excitations = config("Alpha_Excitations")
+            beta_excitations = config("Beta_Excitations")
+        except ConfigParser.NoOptionError:
             try:
-                alpha_excitations = input.Excitations
-            except:
+                alpha_excitations = config("Excitations")
+            except ConfigParser.NoOptionError:
                 pass
         # Cecking that excitations were given in the correct format
         try:
@@ -325,15 +343,6 @@ def remove_punctuation(basis_set):
     basis_set = basis_set.replace('*','s').replace('-','').replace('(','').replace(')','').replace(',','').upper()
     return basis_set
 
-def Basis_Loop(new_mol, state, coords, alpha_MOs, beta_MOs, sets):
-    for basis in sets[1:]:
-        old_mol = deepcopy(new_mol)
-        new_mol = Molecule(input, coords, basis)
-        alpha_MOs = Basis_Fitting.Basis_Fit(old_mol, alpha_MOs, basis)
-        beta_MOs = Basis_Fitting.Basis_Fit(old_mol, beta_MOs, basis)
-        alpha_MOs, beta_MOs = hartree_fock.do(system,new_mol,state,alpha_MOs, beta_MOs)
-    return alpha_MOs, beta_MOs
-
 def Excite(matrix,occupancy, NElectrons):
 # This function permutes the an array give an list describing the
 # orbital occupancy
@@ -356,37 +365,60 @@ def Excite(matrix,occupancy, NElectrons):
 #                        THE MAIN PROGRAM                        #
 #----------------------------------------------------------------#
 
-system = System(input)
-coords = input.Coords
-alpha_MO_list = []
-beta_MO_list = []
-sets = map(remove_punctuation,input.BasisSets)
+# Function representing a single calulation as stored in the input file
+def calculation(config):
+    system = System(config)
+    coords = config("Coords")
+    alpha_MO_list = []
+    beta_MO_list = []
+    sets = map(remove_punctuation, config("BasisSets"))
 
-# do ground state calculation in the starting basis
-molecule = Molecule(input, coords, sets[0])
-base_alpha_MOs, base_beta_MOs = hartree_fock.do(system, molecule)
-alpha_MO_list.append(base_alpha_MOs)
-beta_MO_list.append(base_beta_MOs)
+    # do ground state calculation in the starting basis
+    molecule = Molecule(config, coords, sets[0])
+    base_alpha_MOs, base_beta_MOs = hartree_fock.do(system, molecule)
+    alpha_MO_list.append(base_alpha_MOs)
+    beta_MO_list.append(base_beta_MOs)
 
-#Generate starting orbitals for each of the requested exicted states and do first calculation
-for i, state in enumerate(molecule.States[1:], start = 1):
-    alpha_MO_list.append(Excite(base_alpha_MOs, state.AlphaOccupancy, molecule.NAlphaElectrons))
-    beta_MO_list.append(Excite(base_beta_MOs, state.BetaOccupancy, molecule.NBetaElectrons))
-    alpha_MOs, beta_MOs = hartree_fock.do(system, molecule, alpha_MO_list, beta_MO_list, i)
-    alpha_MO_list[-1] = alpha_MOs
-    beta_MO_list[-1] = beta_MOs
+    # Store the MOs in a file
+    # Currently onluy supports writing to file for a single calculation
+    if system.out.MOFileWrite is not None:
+        system.out.Print_MOs_to_file(base_alpha_MOs, base_beta_MOs)
 
-# Possibly could also keep a list of the energies of each state and throw an
-# error if they are not ordered at the end.
-for basis_set in sets[1:]:
-    # Iterate over list and preform basis fitting on each state
-    for i in range(len(alpha_MO_list)):
-        alpha_MO_list[i] = Basis_Fitting.Basis_Fit(molecule, alpha_MO_list[i], basis_set)
-        beta_MO_list[i] = Basis_Fitting.Basis_Fit(molecule, beta_MO_list[i], basis_set)
-
-    # Iterate over the list of states doing calculations while enforcing orthoginality
-    molecule = Molecule(input, coords, basis_set)
-    for i in range(len(alpha_MO_list)):
+    #Generate starting orbitals for each of the requested exicted states and do first calculation
+    for i, state in enumerate(molecule.States[1:], start = 1):
+        alpha_MO_list.append(Excite(base_alpha_MOs, state.AlphaOccupancy, molecule.NAlphaElectrons))
+        beta_MO_list.append(Excite(base_beta_MOs, state.BetaOccupancy, molecule.NBetaElectrons))
         alpha_MOs, beta_MOs = hartree_fock.do(system, molecule, alpha_MO_list, beta_MO_list, i)
-        alpha_MO_list[i] = alpha_MOs
-        beta_MO_list[i] = beta_MOs
+        alpha_MO_list[-1] = alpha_MOs
+        beta_MO_list[-1] = beta_MOs
+
+    # Possibly could also keep a list of the energies of each state and throw an
+    # error if they are not ordered at the end.
+    for basis_set in sets[1:]:
+        # Iterate over list and preform basis fitting on each state
+        for i in range(len(alpha_MO_list)):
+            alpha_MO_list[i] = Basis_Fitting.Basis_Fit(molecule, alpha_MO_list[i], basis_set)
+            beta_MO_list[i] = Basis_Fitting.Basis_Fit(molecule, beta_MO_list[i], basis_set)
+
+        # Iterate over the list of states doing calculations while enforcing orthoginality
+        molecule = Molecule(config, coords, basis_set)
+        for i in range(len(alpha_MO_list)):
+            alpha_MOs, beta_MOs = hartree_fock.do(system, molecule, alpha_MO_list, beta_MO_list, i)
+            alpha_MO_list[i] = alpha_MOs
+            beta_MO_list[i] = beta_MOs
+
+
+if len(sys.argv) is 1:
+    print("Please give an input file")
+else:
+    parser = ConfigParser.SafeConfigParser()
+    has_read_data = parser.read(sys.argv[1])
+    if not has_read_data:
+        print("Could not open input file")
+        sys.exit()
+    calc_num = 1
+    config = make_config_reader(calc_num, parser)
+    while config:    # loops over all the calulations specified in the input file
+        calculation(config)
+        calc_num += 1
+        config = make_config_reader(calc_num, parser)

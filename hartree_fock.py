@@ -391,9 +391,7 @@ def do(system, molecule, alpha_MO_list = [[None]], beta_MO_list = [[None]], inde
     #Generating the initial density matrices
     #Note there are no reference orbitals in the first caclulation
     if isFirstCalc is False:
-        # Assumming that excitaions are carried out in pychem
-        #alpha_reference = Excite(alpha_reference, state.AlphaOccupancy, molecule.NAlphaElectrons)
-        #beta_reference = Excite(beta_reference, state.BetaOccupancy, molecule.NBetaElectrons)
+        # Assumming that excitaions are carried out in pychem.py
         alpha_MOs, beta_MOs, density = Init.readGuess(alpha_reference, beta_reference, molecule)
     elif system.SCFGuess == "READ":
         alpha_MOs, beta_MOs, density = Init.readFromFile(system.MOFileRead, molecule, template_matrix)

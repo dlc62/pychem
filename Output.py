@@ -1,38 +1,37 @@
 # need new functionally and removed the need of having hartree_fock.py inclding
 # literal strings for printing
-import input
 import numpy
 import constants as c
 
 #may need to import input for this to work
 class PrintSettings:
-    def __init__(self):
+    def __init__(self, config):
         try:
-            self.SCFPrint = input.SCFPrint
+            self.SCFPrint = config("SCFPrint")
         except:
             self.SCFPrint = 0
         try:
-            self.SCFFinalPrint = input.SCFFinalPrint
+            self.SCFFinalPrint = config("SCFFinalPrint")
         except:
             self.SCFFinalPrint = 1
         try:
-            self.DIISPrint = input.DIIS_Print
+            self.DIISPrint = config("DIIS_Print")
         except:
             self.DIISPrint = 0
         try:
-            self.MinimalPrint = input.MinimalPrint
+            self.MinimalPrint = config("MinimalPrint")
         except:
             self.MinimalPrint = False
         try:
-            self.MOMPrint = input.MOM_Print
+            self.MOMPrint = config("MOM_Print")
         except:
             self.MOMPrint = 0
         try:
-            self.OutFile = input.OutFile
+            self.OutFile = config("OutFile")
         except:
             self.OutFile = ''
         try:
-            self.MOFileWrite = input.MOFileWrite
+            self.MOFileWrite = config("MOFileWrite")
         except:
             self.MOFileWrite = None
 
@@ -147,12 +146,13 @@ class PrintSettings:
 
         self.outPrint(outString)
 
+# Note that this allong with parts of the read function in init.py could be trivaly
+# used to store any kind of array including gradients and integrals
     def Print_MOs_to_file(self, alpha_MOs, beta_MOs):
         """ Takes the alpha and beta MO coefficents and the prints them to a file to
         retrive latter, currently does not produce easily human readable files """
         file_obj = open(self.MOFileWrite, 'w')
         # First line is the alpha MO coeffs and the second line the beta coeffs
-        # Are most easily read by converting via a list then to a numpy array
         alpha_string = str(alpha_MOs.tolist())
         beta_string = str(beta_MOs.tolist())
         file_obj.write(alpha_string)
