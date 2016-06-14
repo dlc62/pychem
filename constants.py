@@ -13,6 +13,10 @@ nOrbitals = {'H':1,'HE':1,'LI':5,'BE':5,'B':5,'C':5,'N':5,'O':5,'F':5,'NE':5,
              'NA':9,'MG':9,'AL':9,'SI':9,'P':9,'S':9,'CL':9,'AR':9,
              'K':13,'CA':13,'SC':13,'TI':18,'V':18,'CR':18,'MN':18,'FE':18,'CO':18,
              'NI':18,'CU':18,'ZN':18,'GA':18,'GE':18,'AS':18,'SE':18,'BR':18,'KR':18}
+atomicMultiplicity = {'H':2,'HE':1,'LI':2,'BE':1,'B':2,'C':3,'N':4,'O':3,'F':2,'NE':1,
+                      'NA':2,'MG':1,'AL':2,'SI':3,'P':4,'S':3,'CL':2,'AR':1,
+                      'K':2,'CA':1,'SC':2,'TI':3,'V':4,'CR':5,'MN':4,'FE':3,'CO':2,
+                      'NI':1,'CU':2,'ZN':1,'GA':2,'GE':3,'AS':4,'SE':3,'BR':2,'KR':1}
 # note: assuming Cartesian basis functions (not spherical polar) below
 nAngMomFunctions = {0:1,1:3,2:6,3:10,4:15,5:21,6:28}
 lQuanta = {0:[[0,0,0]],
@@ -30,4 +34,4 @@ integral_threshold = -1.e-10
 energy_convergence = 1.e-6
 density_convergence = 1.e-6
 DIIS_convergence = 1.e-5
-DIIS_MAX_CONDITION = 1e6
+DIIS_max_condition = 1e6

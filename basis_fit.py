@@ -1,17 +1,10 @@
+# System libraries
 import numpy 
 import copy
+# Custom-written data modules
 import basis
 
-def Get_Overlap(prim1, prim2, l):
-    gamma = prim1[0] + prim2[0]
-#    fact = factorial2(2*l-1,exact = True)
-#    norm = ((2 ** l) * (prim1[0]*prim2[0])**(3./4 + l/2.)) / (pi**3./2 * fact)
-#    integral = (pi / gamma)**(3./2) * (fact/(2*gamma)**l) * norm * prim1[1] * prim2[1]
-    norm = (prim1[0]*prim2[0])**(3./4 + l/2.)
-    integral = (1 / gamma)**(3./2) * (1/(2*gamma)**l) * norm * prim1[1] * prim2[1]
-    return integral 
-    
-def Basis_Fit(molecule, MOs, new_basis):
+def do(molecule, MOs, new_basis):
     #iterating over each MO in the old basis 
     for MO in xrange(len(MOs)):
         old_coeffs = numpy.ndarray.tolist(MOs[:,MO])      # pulling out the MO coefficents associated with a single state 
@@ -21,17 +14,29 @@ def Basis_Fit(molecule, MOs, new_basis):
             coeffs = Basis_Fit_Atom(atom, old_coeffs, cgto_count, new_basis)    
             new_MO += coeffs
             cgto_count += atom.NFunctions                 # keeps track of the index to fit next 
-        #initializing matrix to store the coeffs one its size is known
+        #initializing matrix to store the coeffs once its size is known
         if MO == 0:
             size = len(new_MO)
             new_coeffs = [[0.0]*size]*size
         new_coeffs[MO] = new_MO
     return numpy.transpose(numpy.array(new_coeffs))    
     
+#---------------------------------------------------------------------------------------
     
+def Get_Overlap(prim1, prim2, l):
+    gamma = prim1[0] + prim2[0]
+#    fact = factorial2(2*l-1,exact = True)
+#    norm = ((2 ** l) * (prim1[0]*prim2[0])**(3./4 + l/2.)) / (pi**3./2 * fact)
+#    integral = (pi / gamma)**(3./2) * (fact/(2*gamma)**l) * norm * prim1[1] * prim2[1]
+    norm = (prim1[0]*prim2[0])**(3./4 + l/2.)
+    integral = (1 / gamma)**(3./2) * (1/(2*gamma)**l) * norm * prim1[1] * prim2[1]
+    return integral 
+    
+#---------------------------------------------------------------------------------------
+
 def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis):
     atom_coeffs = []
-    for Ang in xrange(atom.MaxAng+1):    #iterating over angular momenum quantum numbers
+    for Ang in xrange(atom.MaxAng+1):    #iterating over angular momentum quantum numbers
         degen = 2*Ang + 1 
         ang_set = []
         for cgto in atom.Basis:
@@ -61,6 +66,8 @@ def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis):
                     
     return atom_coeffs 
        
+#---------------------------------------------------------------------------------------
+
 def Basis_Fit_Ang(atom, old_set, MOs, cgto_count, new_ang_set):    #Take all the MO coefficents for the state
     
     #Getting the set of function of the right l from the new basis 
