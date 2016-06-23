@@ -20,7 +20,7 @@ import mom
 #                        MAIN SUBROUTINE                          #
 #=================================================================#
 
-def do(settings, molecule, state, state_index = 0):
+def do_SCF(settings, molecule, state, state_index = 0):
 
     # Calculate values that are constant throughout the calculation
     molecule.NuclearRepulsion = integrals.nuclear_repulsion(molecule)
@@ -55,7 +55,7 @@ def do(settings, molecule, state, state_index = 0):
     calculate_energy(molecule, state)
     dE = state.Energy
 
-    # Print initial 
+    # Print initial
     printf.HF_Initial(molecule, state, settings)
 
     #-------------------------------------------#
@@ -67,14 +67,14 @@ def do(settings, molecule, state, state_index = 0):
 
     while c.energy_convergence < abs(dE):
         num_iterations += 1
-        
+
         #-------------------------------------------#
         #               Main SCF step               #
         #-------------------------------------------#
         initialize_fock_matrices(molecule.Core, state)
         make_coulomb_exchange_matrices(molecule, state, num_iterations)
 #        make_fock_matrices(molecule, state)
-         
+
         # apply CUHF constraints
         if settings.SCF.Reference == "CUHF":
             constrain_UHF(molecule, state)
@@ -91,11 +91,11 @@ def do(settings, molecule, state, state_index = 0):
         if settings.MOM.Use is True:
             if settings.MOM.Reference == 'MUTABLE':
                 reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
-        
+
         make_MOs(molecule, state)
 
         # Optionally, use MOM to reorder MOs
-        if settings.MOM.Use is True and reference_orbitals != None:  
+        if settings.MOM.Use is True and reference_orbitals != None:
             mom.do(molecule, state, state_index, reference_orbitals)
        #-------------------------------------------#
 
@@ -153,7 +153,7 @@ def make_density_matrices(molecule,this):
                this.Beta.Density[ia][ib] += this.Beta.MOs[ia][n]*this.Beta.MOs[ib][n]
 
     this.Total.Density = numpy.add(this.Alpha.Density,this.Beta.Density)
-   
+
 #----------------------------------------------------------------------
 
 def calculate_energy(molecule,this):
@@ -196,7 +196,7 @@ def make_core_matrices(molecule):
 #----------------------------------------------------------------------
 
 def make_coulomb_exchange_matrices(molecule, this, num_iterations):
-    
+
     this.Total.Coulomb.fill(0)
     this.Alpha.Exchange.fill(0)
     this.Beta.Exchange.fill(0)
@@ -293,4 +293,3 @@ def constrain_UHF(molecule, this):
     this.Beta.Fock = this.Beta.Fock - lambda_matrix
 
 #----------------------------------------------------------------------
-

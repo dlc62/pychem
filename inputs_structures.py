@@ -33,7 +33,7 @@ def inputs_return_function(section, parser):
     return inputs
 
 def new_molecule(basis):
-    molecule = Molecule(inputs=None, settings=None, basis)
+    molecule = Molecule(inputs=None, settings=None, basis=None)
     return molecule
 
 #=====================================================================#
@@ -43,7 +43,7 @@ def new_molecule(basis):
 #  Settings contains system-independent input data                    #
 #  ------------------------------------------------------------------ #
 #  Molecule contains system-dependent derived data                    #
-#    -> each Molecule is made up of Atoms                             # 
+#    -> each Molecule is made up of Atoms                             #
 #       -> each Atom is described by a set of ContractedGaussians     #
 #    -> each Molecule may exist in a range of ground/excited states   #
 #  ------------------------------------------------------------------ #
@@ -103,25 +103,25 @@ class Settings:
            sys.exit()
         #---------------------- Print Settings -----------------------#
         available_print_levels = ['MINIMAL','BASIC','VERBOSE','DEBUG']
-        available_custom_print_options = ['MOM','DIIS'] 
+        available_custom_print_options = ['MOM','DIIS']
         try:
            self.PrintLevel = inputs("Print_Level")
            assert self.PrintLevel in available_print_levels
         except:
-           print('Printing options not supplied or recognised, defaulting to basic printing') 
+           print('Printing options not supplied or recognised, defaulting to basic printing')
            self.PrintLevel = 'BASIC'
         try:
            self.CustomPrint = inputs("Custom_Print")
            assert self.CustomPrint in available_custom_print_options
         except:
-           print('Custom print options not supplied or recognised, defaulting to basic printing') 
+           print('Custom print options not supplied or recognised, defaulting to basic printing')
         #-------------------------------------------------------------#
         #                         SCF Settings                        #
         #-------------------------------------------------------------#
         self.SCF = Set_SCF(inputs,len(self.BasisSets),self.Method)
         self.DIIS = Set_DIIS(inputs,self.SCF.Reference)
         self.MOM = Set_MOM(inputs)
-        
+
     def set_outfile(self, section_name):
         self.OutFileName = str(section_name) + '.out'
         self.OutFile = None
@@ -267,7 +267,7 @@ class Molecule:
         #------------------------- Basis Set --------------------------#
         if basis == None:
            self.Basis = settings.BasisSets[0]
-        else: 
+        else:
            self.Basis = basis
 
         #------------------------ Coordinates -------------------------#
@@ -336,10 +336,10 @@ class Molecule:
         self.NBetaOrbitals = int(math.ceil(n_alpha/2.0))
 
         #----------- SCF structures - common to all states ------------#
-        #           contains ShellPair -> Shell subclasses             #    
+        #           contains ShellPair -> Shell subclasses             #
         #--------------------------------------------------------------#
         if settings != None:
-            self.Store2eInts = (settings.SCF.Ints_Handling == 'INCORE') 
+            self.Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
             self.Recalc2eInts = (settings.SCF.Ints_Handling == 'DIRECT')
             self.Dump2eInts = (settings.SCF.Ints_Handling == 'ONDISK')
         self.Core = numpy.zeros((self.NOrbitals,) * 2)
@@ -349,8 +349,8 @@ class Molecule:
         self.Xt = []
         self.S = []
         if self.Store2eInts:
-            self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
-            self.ExchangeIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
+            self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4)
+            self.ExchangeIntegrals = numpy.zeros((self.NOrbitals,) * 4)
         ### Generate ShellPair data for Molecule ###
         self.make_shell_pairs()
 
@@ -385,7 +385,7 @@ class Molecule:
         self.generate_excited_states()
         self.NStates = len(self.States)
 
-    #================== MOLECULE CLASS SUBROUTINES ===================# 
+    #================== MOLECULE CLASS SUBROUTINES ===================#
 
     #------------------------------------------------------------------#
     #       Shell pairs required for all states including ground       #
@@ -420,7 +420,7 @@ class Molecule:
         alpha_unoccupied = [0 for i in range(0,self.NOrbitals-self.NAlphaElectrons)]
         beta_unoccupied = [0 for i in range(0,self.NOrbitals-self.NBetaElectrons)]
         # Combine the occupied and unoccupied lists to make two (alpha and beta) total occupancy lists
-        alpha_occupancy = alpha_occupied + alpha_unoccupied  
+        alpha_occupancy = alpha_occupied + alpha_unoccupied
         beta_occupancy = beta_occupied + beta_unoccupied
         ground = ElectronicState(alpha_occupancy,beta_occupancy,self.NOrbitals)
         self.States = self.make_excitations(ground)
@@ -491,7 +491,7 @@ class Molecule:
 #        self.NOrbitals = n_orbitals
 #        self.initialize_intermediates()
 #        self.generate_excited_states()
-        
+
 
 #=====================================================================#
 #                      MOLECULE SUBCLASS - ATOM                       #
@@ -504,7 +504,7 @@ class Atom:
         self.Label = label.upper()
         self.NuclearCharge = Z
         self.Coordinates = [x*c.toBohr,y*c.toBohr,z*c.toBohr]
-        self.update_atomic_basis(basis_set) 
+        self.update_atomic_basis(basis_set)
     def update_atomic_basis(self,basis_set):
         self.Basis = []
         self.NFunctions = 0
@@ -543,8 +543,8 @@ class ElectronicState:
         self.Energy = None
         self.TotalEnergy = None
         self.Total = Matrices(n_orbitals,total=True)
-        self.Alpha = Matrices(n_orbitals) 
-        self.Beta = Matrices(n_orbitals) 
+        self.Alpha = Matrices(n_orbitals)
+        self.Beta = Matrices(n_orbitals)
 #        self.Gradient = gradient
 #        self.Hessian = hessian
         self.AlphaDIIS = StoreDIIS()
@@ -561,7 +561,7 @@ class Matrices:
         if not total:
             self.Exchange = numpy.zeros((n_orbitals,) * 2)
             self.MOs = []
-            self.Energies = [] 
+            self.Energies = []
         else:
             self.Coulomb = numpy.zeros((n_orbitals,) * 2)
 
@@ -597,4 +597,3 @@ class Shell:
        self.Cgtf = cgtf
        self.Index = index     # Index for the CGTO in atom.Basis
        self.Ivec = index_vec  # Indexs of the angular momentum functions in a list of all angular momentum functions on the atom
-

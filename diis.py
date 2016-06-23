@@ -11,7 +11,6 @@ import constants as c
 # Custom-written code modules
 import util
 
-
 #======================================================================#
 #                           MAIN ROUTINES                              #
 #======================================================================#
@@ -22,15 +21,15 @@ import util
 def do(molecule, this, settings):
 
     # Set up error estimates
-    alpha_residual = get_residual(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.X, molecule.Xt) 
-    beta_residual = get_residual(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.X, molecule.Xt) 
+    alpha_residual = get_residual(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.X, molecule.Xt)
+    beta_residual = get_residual(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.X, molecule.Xt)
     this.AlphaDIIS.Error = alpha_residual.max()
     this.BetaDIIS.Error = beta_residual.max()
     settings.DIIS.Threshold = -0.1 * this.Energy
 
     # Perform DIIS procedure
     this.Alpha.Fock = diis(alpha_residual, this.Alpha.Fock, this.AlphaDIIS, settings)
-    this.Beta.Fock = diis(beta_residual, this.Beta.Fock, this.BetaDIIS, settings) 
+    this.Beta.Fock = diis(beta_residual, this.Beta.Fock, this.BetaDIIS, settings)
 
 #----------------------------------------------------------------------#
 #                           DIIS Procedure                             #
@@ -41,7 +40,7 @@ def diis(residual, fock, DIIS, settings):
         DIIS.Residuals.append(residual)
         DIIS.OldFocks.append(fock)
         if len(DIIS.Residuals) > 1:
-            make_diis_matrix(DIIS,settings) 
+            make_diis_matrix(DIIS,settings)
             reduce_space(DIIS,settings)
             coeffs = get_coeffs(DIIS,settings)
             fock = make_fock_matrix(DIIS,coeffs)
@@ -51,7 +50,7 @@ def diis(residual, fock, DIIS, settings):
 #                             SUBROUTINES                              #
 #======================================================================#
 #----------------------------------------------------------------------#
-    
+
 def get_residual(overlap, density, fock, X, Xt):
     residual  = overlap.dot(density).dot(fock) - fock.dot(density).dot(overlap)
     residual = Xt.dot(residual).dot(X)
@@ -114,7 +113,7 @@ def get_C1_coeffs(matrix):
     return coeffs[:-1]    # not returning the lagrange multiplier
 
 def get_C2_coeffs(matrix, residuals):
-    eigvals, vects = numpy.linalg.eig(matrix)    
+    eigvals, vects = numpy.linalg.eig(matrix)
     min_error = float("Inf")               # Arbitrary large number
     best_vect = None
     for vect in vects:
@@ -136,9 +135,8 @@ def estimate_error(coeffs, residuals):
 
 def make_fock_matrix(DIIS, coeffs):
     new_fock = numpy.zeros(numpy.shape(DIIS.Residuals[0]))
-    for i in xrange(len(coeffs)):
+    for i in range(len(coeffs)):
         new_fock += coeffs[i] * DIIS.OldFocks[i]
     return new_fock
 
 #----------------------------------------------------------------------#
-

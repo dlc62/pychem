@@ -7,3 +7,7 @@
 outfiles
 basis.py
 input.py
+
+*.inp 
+examples 
+*.MOs
