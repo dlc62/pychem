@@ -18,7 +18,7 @@ def finalize(settings, method = None):
 
 def print_to_file(outfile,string):
     try:
-       outfile.write(string) 
+       outfile.write(string)
     except:
        print(string)
 
@@ -46,7 +46,7 @@ def HF_Initial(molecule, this, settings):
         print_to_file(settings.OutFile, outString)
 
 #Possibly need to allow this to print the coulomb and exchange matrices (if PrintLevel == VERBOSE)
-def HF_Loop(this, settings, cycles, dE, diis_error, final): 
+def HF_Loop(this, settings, cycles, dE, diis_error, final):
 
     #testing to see if the alpha and beta orbital energies are the same
     #equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
@@ -91,6 +91,8 @@ def HF_Loop(this, settings, cycles, dE, diis_error, final):
 
     outString += '----------------------------------------------------' + '\n'
 
+    if settings.PrintToTerminal:
+        print(outString)
     print_to_file(settings.OutFile, outString)
 
 def HF_Final(settings):
@@ -99,7 +101,7 @@ def HF_Final(settings):
     print_to_file(settings.OutFile, outString)
 
 def MP2_Final(settings, state_index, EMP2):
-    outString =  ' Total MP2 energy for state ' + str(state_index) + ' = ' + str(EMP2) + '\n' 
+    outString =  ' Total MP2 energy for state ' + str(state_index) + ' = ' + str(EMP2) + '\n'
     outString += '----------------------------------------------------' + '\n'
     outString +=  '                 End (No, really!)                  ' + '\n'
     outString += '----------------------------------------------------' + '\n'
@@ -111,4 +113,3 @@ def MP2_Final(settings, state_index, EMP2):
 #        outString += "Beta Overlap Vector" + '\n'
 #        outString += str(beta_overlaps)
 #        print_to_file(self.outFile, outString)
-

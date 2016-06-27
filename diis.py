@@ -67,7 +67,7 @@ def make_diis_matrix(DIIS, settings):
     new_matrix.fill(-1.0)
     new_matrix[-1,-1] = 0.0
     # Create the first matrix
-    if DIIS.Matrix == None:
+    if DIIS.Matrix[0][0] == None:
         for i, res1 in enumerate(DIIS.Residuals):
             for j, res2 in enumerate(DIIS.Residuals):
                 new_matrix[i,j] = util.inner_product(res1, res2)

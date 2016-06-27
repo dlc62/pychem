@@ -6,10 +6,10 @@ from numpy import dot
 
 def do(molecule, this, state_index, ref_MOs):
 
-    """ Reorders MO array and MO energies, placing columns in 
+    """ Reorders MO array and MO energies, placing columns in
         descending order of their overlap with the reference state"""
 
-    # Load up reference orbitals 
+    # Load up reference orbitals
     alpha_ref_MOs = ref_MOs[0]
     beta_ref_MOs = ref_MOs[1]
 
@@ -26,15 +26,15 @@ def do(molecule, this, state_index, ref_MOs):
         alpha_state_overlaps += make_p_vector(this.Alpha.MOs, molecule.States[i].Alpha.MOs, molecule.NElectrons, molecule.Overlap)
         beta_state_overlaps += make_p_vector(this.Beta.MOs, molecule.States[i].Beta.MOs, molecule.NElectrons, molecule.Overlap)
 
-    alpha_state_overlaps /= (len(alpha_MOs)-1)
-    beta_state_overlaps /= (len(beta_MOs)-1)
+    alpha_state_overlaps /= (len(ref_MOs)-1)
+    beta_state_overlaps /= (len(ref_MOs)-1)
 
-    alpha_p_vector -= state_overlaps
-    beta_p_vector -= state_overlaps
+    alpha_p_vector -= alpha_state_overlaps
+    beta_p_vector -= beta_state_overlaps
 
     # Store MOs according to p-vector ordering
-    this.Alpha.MOs, this.Alpha.Energies = Sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector) 
-    this.Beta.MOs, this.Beta.Energies = Sort_MOs(this.Beta.MOs, this.Beta.Energies, beta_p_vector) 
+    this.Alpha.MOs, this.Alpha.Energies = Sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector)
+    this.Beta.MOs, this.Beta.Energies = Sort_MOs(this.Beta.MOs, this.Beta.Energies, beta_p_vector)
 
 
 def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
@@ -43,7 +43,7 @@ def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
 
     # Get the overlap with the reference orbitals
     P_vector = numpy.zeros(len(new_MOs))
-    for i in xrange(len(new_MOs)):
+    for i in range(len(new_MOs)):
         P_vector[i] = sum(MO_overlap[:,i])
 
     return numpy.abs(P_vector)
@@ -57,4 +57,3 @@ def Sort_MOs(MOs, energies, p):
     new_MOs = numpy.array([line[1] for line in temp])
     new_energies = [line[2] for line in temp]
     return numpy.transpose(new_MOs), new_energies
-

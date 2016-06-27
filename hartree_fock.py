@@ -64,6 +64,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
     num_iterations = 0
     final_loop = False
     diis_error = None
+    energies = []
 
     while c.energy_convergence < abs(dE):
         num_iterations += 1
@@ -83,7 +84,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
         # DIIS
-        if settings.DIIS.Use is True:
+        if settings.DIIS.Use is True and dE < 0:
             diis.do(molecule, state, settings)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
@@ -105,6 +106,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         calculate_energy(molecule, state)
         dE = state.Energy - old_energy
         state.TotalEnergy = state.Energy + molecule.NuclearRepulsion
+        energies.append(state.TotalEnergy)
 
         if abs(dE) < c.energy_convergence:
             final_loop = True
@@ -116,7 +118,6 @@ def do_SCF(settings, molecule, state, state_index = 0):
             break
 
     printf.HF_Final(settings)
-
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #

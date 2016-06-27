@@ -8,6 +8,7 @@ else:
 import ast
 import numpy
 import math
+import copy
 # Custom-written data modules
 import basis
 import constants as c
@@ -115,6 +116,11 @@ class Settings:
            assert self.CustomPrint in available_custom_print_options
         except:
            print('Custom print options not supplied or recognised, defaulting to basic printing')
+        try:
+            self.PrintToTerminal = inputs("Print_To_Terminal")
+            assert(isinstance(self.PrintToTerminal, bool))
+        except:
+            self.PrintToTerminal = False
         #-------------------------------------------------------------#
         #                         SCF Settings                        #
         #-------------------------------------------------------------#
@@ -197,13 +203,10 @@ class Set_SCF:
 
 class Set_DIIS:
     def __init__(self,inputs,reference):
-        if reference == "CUHF":
-            self.Use = False
-        else:
-            try:
-                self.Use = inputs("Use_DIIS")
-            except:
-                self.Use = True
+        try:
+            self.Use = inputs("Use_DIIS")
+        except:
+            self.Use = True
         try:
             self.Size = inputs("DIIS_Size")
         except:
@@ -371,7 +374,7 @@ class Molecule:
            # Check that excitations were given in the correct format
            try:
               alpha_is_list = type(alpha_excitations) is list
-              alpha_is_keyword = alpha_excitations in ['Single', 'Double']
+              alpha_is_keyword = alpha_excitations in ['SINGLE', 'DOUBLE']
               assert alpha_is_list or alpha_is_keyword
               if alpha_is_list:
                  assert type(beta_excitations) is list
@@ -415,6 +418,7 @@ class Molecule:
     #-------------------------------------------------------------------------#
 
     def generate_excited_states(self):
+        # Occupany lists for the ground state
         alpha_occupied = [1 for i in range(0,self.NAlphaElectrons)]
         beta_occupied = [1 for i in range(0,self.NBetaElectrons)]
         alpha_unoccupied = [0 for i in range(0,self.NOrbitals-self.NAlphaElectrons)]
@@ -432,10 +436,11 @@ class Molecule:
 
         if self.AlphaExcitations == self.BetaExcitations == [[]]:
             # immediately returns if no excitations were specified
+            print("Returning")
             return self.States
-        elif alpha_excitations == 'Single':
-            alpha_excitations = util.single_excitations(self.NAlphaElectrons, self.NOrbitals)
-        elif alpha_excitations == 'Double':
+        elif self.AlphaExcitations == 'Single':
+            self.AlphaExcitations = util.single_excitations(self.NAlphaElectrons, self.NOrbitals)
+        elif self.AlphaExcitations == 'Double':
             alpha_singles = util.single_excitations(self.NAlphaElectrons, self.NOrbitals)
             beta_singles = util.single_excitations(self.NBetaElectrons, self.NOrbitals)
             for excite1 in alpha_singles:
@@ -443,22 +448,22 @@ class Molecule:
                     pass
         # else manual specification of orbitals
 
-        util.make_length_equal(alpha_excitations, beta_excitations)
+        util.make_length_equal(self.AlphaExcitations, self.BetaExcitations)
         # Common loop to make the excitations for all cases
-        for i in range(len(alpha_excitations)):
+        for i in range(len(self.AlphaExcitations)):
             try:
-                assert type(alpha_excitations[i]) is list
-                assert type(beta_excitations[i]) is list
+                assert type(self.AlphaExcitations[i]) is list
+                assert type(self.BetaExcitations[i]) is list
             except AssertionError:
                 print("Each excitation must be a pair of two integers")
                 sys.exit()
-            alpha_occupied = self.do_excitation(self.NAlphaElectrons, alpha_ground, alpha_excitations[i])
-            beta_occupied = self.do_excitation(self.NBetaElectrons, beta_ground, beta_excitations[i])
+            alpha_occupied = self.do_excitation(self.NAlphaElectrons, alpha_ground, self.AlphaExcitations[i])
+            beta_occupied = self.do_excitation(self.NBetaElectrons, beta_ground, self.BetaExcitations[i])
             self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
         return self.States
 
     def do_excitation(self, n_electrons, ground_occ, excitation):
-        occupied = deepcopy(ground_occ)
+        occupied = copy.deepcopy(ground_occ)
         if excitation != []:
             occupied[n_electrons + excitation[0]] = 0
             occupied[n_electrons + excitation[1] - 1] = 1
@@ -550,6 +555,10 @@ class ElectronicState:
         self.AlphaDIIS = StoreDIIS()
         self.BetaDIIS = StoreDIIS()
 
+    def add_MOs(self, alphaMOs, alphaOccupancy, NAlphaElectrons, betaMOs, betaOccupancy, NBetaElectrons):
+        self.Alpha.MOs = excite(alphaMOs, alphaOccupancy, NAlphaElectrons)
+        self.Beta.MOs = excite(betaMOs, betaOccupanc, NBetaElectrons)
+
 #---------------------------------------------------------------------#
 #                ELECTRONIC STATE SUBCLASS - MATRICES                 #
 #---------------------------------------------------------------------#
@@ -573,7 +582,7 @@ class StoreDIIS:
     def __init__(self):
         self.OldFocks = []
         self.Residuals = []
-        self.Matrix = None
+        self.Matrix = [[None]]
         self.Error = 1
 
 #=====================================================================#

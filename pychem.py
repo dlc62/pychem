@@ -47,8 +47,11 @@ def do_calculation(settings, molecule):
     # Generate starting orbital sets for each of the requested excited states and do calculation in first basis
     for index, state in enumerate(molecule.States[1:], start = 1):
 
-        state.add_MOs(util.excite(molecule.States[0].alpha_MOs, state.AlphaOccupancy, molecule.NAlphaElectrons),
-                      util.excite(molecule.States[0].beta_MOs, state.BetaOccupancy, molecule.NBetaElectrons))
+        state.Alpha.MOs = util.excite(molecule.States[0].Alpha.MOs, state.AlphaOccupancy, molecule.NAlphaElectrons)
+        state.Beta.MOs = util.excite(molecule.States[0].Beta.MOs, state.BetaOccupancy, molecule.NBetaElectrons)
+
+        #state.add_MOs(util.excite(molecule.States[0].Alpha.MOs, state.AlphaOccupancy, molecule.NAlphaElectrons),
+        #              util.excite(molecule.States[0].Beta.MOs, state.BetaOccupancy, molecule.NBetaElectrons))
 
         hartree_fock.do_SCF(settings, molecule, state, index)
 

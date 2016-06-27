@@ -26,14 +26,14 @@ def do(settings, molecule, state, state_index):
 
     # Allocate space to store transformed orbitals (in MO basis)
 
-    Alpha_Coulomb = numpy.zeros((molecule.NOrbitals,) * 4) 
-    Beta_Coulomb = numpy.zeros((molecule.NOrbitals,) * 4) 
-    Alpha_Beta_Coulomb = numpy.zeros((molecule.NOrbitals,) * 4) 
-    Alpha_Exchange = numpy.zeros((molecule.NOrbitals,) * 4) 
-    Beta_Exchange = numpy.zeros((molecule.NOrbitals,) * 4) 
-        
+    Alpha_Coulomb = numpy.zeros((molecule.NOrbitals,) * 4)
+    Beta_Coulomb = numpy.zeros((molecule.NOrbitals,) * 4)
+    Alpha_Beta_Coulomb = numpy.zeros((molecule.NOrbitals,) * 4)
+    Alpha_Exchange = numpy.zeros((molecule.NOrbitals,) * 4)
+    Beta_Exchange = numpy.zeros((molecule.NOrbitals,) * 4)
+
     # Do brute-force (N^8) transformation, express each MO (a,b,c,d) as a linear combination of AOs (m,n,l,s)
-    for a in range(0, molecule.NOrbitals): 
+    for a in range(0, molecule.NOrbitals):
       for b in range(0, molecule.NOrbitals):
         for c in range(0, molecule.NOrbitals):
           for d in range(0, molecule.NOrbitals):
@@ -49,7 +49,7 @@ def do(settings, molecule, state, state_index):
                     Beta_Exchange[a][b][c][d]      +=  Cb[m][a]*Cb[n][b]*Cb[l][c]*Cb[s][d] * molecule.ExchangeIntegrals[m][n][l][s]
 
     # Use the transformed integrals in the MP2 energy expression, i,j index occupied MOs and p,q are virtuals
-    MP2_Eaa = 0.0 
+    MP2_Eaa = 0.0
     MP2_Eab = 0.0
     MP2_Ebb = 0.0
 
@@ -57,21 +57,20 @@ def do(settings, molecule, state, state_index):
       for j in range(0, i+1):
         for p in range(molecule.NAlphaOrbitals, molecule.NOrbitals):
           for q in range(molecule.NAlphaOrbitals, p+1):
-            MP2_Eaa += (Alpha_Coulomb[i][p][j][q] - Alpha_Exchange[i][q][j][p])**2 / (Ea[i] + Ea[j] - Ea[p] - Ea[q]) 
+            MP2_Eaa += (Alpha_Coulomb[i][p][j][q] - Alpha_Exchange[i][q][j][p])**2 / (Ea[i] + Ea[j] - Ea[p] - Ea[q])
 
     for i in range(0, molecule.NBetaOrbitals):
       for j in range(0, i+1):
         for p in range(molecule.NBetaOrbitals, molecule.NOrbitals):
           for q in range(molecule.NBetaOrbitals, p+1):
-            MP2_Ebb += (Alpha_Coulomb[i][p][j][q] - Alpha_Exchange[i][q][j][p])**2 / (Eb[i] + Eb[j] - Eb[p] - Eb[q]) 
+            MP2_Ebb += (Alpha_Coulomb[i][p][j][q] - Alpha_Exchange[i][q][j][p])**2 / (Eb[i] + Eb[j] - Eb[p] - Eb[q])
 
     for i in range(0, molecule.NAlphaOrbitals):
       for j in range(0, molecule.NBetaOrbitals):
         for p in range(molecule.NAlphaOrbitals, molecule.NOrbitals):
           for q in range(molecule.NBetaOrbitals, molecule.NOrbitals):
-            MP2_Eab += (Alpha_Beta_Coulomb[i][p][j][q])**2 / (Ea[i] + Eb[j] - Ea[p] - Eb[q]) 
+            MP2_Eab += (Alpha_Beta_Coulomb[i][p][j][q])**2 / (Ea[i] + Eb[j] - Ea[p] - Eb[q])
 
     MP2_Total_Energy = MP2_Eaa + MP2_Eab + MP2_Ebb
 
     printf.MP2_Final(settings, state_index, MP2_Total_Energy)
-

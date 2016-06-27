@@ -9,5 +9,6 @@ basis.py
 input.py
 
 *.inp 
-examples 
+/examples 
 *.MOs
+pathtable
