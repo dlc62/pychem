@@ -16,6 +16,7 @@ import util
 import printf
 import mp2
 
+
 #======================================================================#
 #                           THE MAIN PROGRAM                           #
 #                  Compatible with python2.7 or higher                 #
@@ -50,9 +51,6 @@ def do_calculation(settings, molecule):
         state.Alpha.MOs = util.excite(molecule.States[0].Alpha.MOs, state.AlphaOccupancy, molecule.NAlphaElectrons)
         state.Beta.MOs = util.excite(molecule.States[0].Beta.MOs, state.BetaOccupancy, molecule.NBetaElectrons)
 
-        #state.add_MOs(util.excite(molecule.States[0].Alpha.MOs, state.AlphaOccupancy, molecule.NAlphaElectrons),
-        #              util.excite(molecule.States[0].Beta.MOs, state.BetaOccupancy, molecule.NBetaElectrons))
-
         hartree_fock.do_SCF(settings, molecule, state, index)
 
     # Dump MOs to file for initial basis set, all states
@@ -63,11 +61,11 @@ def do_calculation(settings, molecule):
         # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones
         alpha_MOs = []; beta_MOs = []
         for state in molecule.States:
-            alpha_MOs.append(basis_fit.do(molecule, state.alphaMOs, basis_set))
-            beta_MOs.append(basis_fit.do(molecule, state.betaMOs, basis_set))
+            alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
+            beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
 
         # Make new molecule with a new basis set and copy in old orbitals (fit using new basis set)
-        molecule = inputs_structures.new_molecule(basis_set)
+        molecule = inputs_structures.new_molecule(basis=basis_set, settings=settings)
         for state in molecule.States:
             state.Alpha.MOs = alpha_MOs.pop(0)
             state.Beta.MOs = beta_MOs.pop(0)

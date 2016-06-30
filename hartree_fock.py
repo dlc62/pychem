@@ -76,8 +76,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         make_coulomb_exchange_matrices(molecule, state, num_iterations)
 #        make_fock_matrices(molecule, state)
 
-        # apply CUHF constraints
-        if settings.SCF.Reference == "CUHF":
+        if settings.SCF.Reference == "CUHF" and num_iterations > 1:
             constrain_UHF(molecule, state)
 
         #-------------------------------------------#
@@ -99,7 +98,6 @@ def do_SCF(settings, molecule, state, state_index = 0):
         if settings.MOM.Use is True and reference_orbitals != None:
             mom.do(molecule, state, state_index, reference_orbitals)
        #-------------------------------------------#
-
         make_density_matrices(molecule,state)
 
         old_energy = state.Energy

@@ -45,6 +45,9 @@ def HF_Initial(molecule, this, settings):
 
         print_to_file(settings.OutFile, outString)
 
+        if settings.PrintToTerminal:
+            print(outString)
+
 #Possibly need to allow this to print the coulomb and exchange matrices (if PrintLevel == VERBOSE)
 def HF_Loop(this, settings, cycles, dE, diis_error, final):
 

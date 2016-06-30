@@ -14,6 +14,7 @@ import basis
 import constants as c
 # Custom-written code modules
 import util
+from hartree_fock import make_density_matrices
 
 #=====================================================================#
 #  MAIN ROUTINES - called from pychem.py and hartree_fock.py          #
@@ -33,8 +34,8 @@ def inputs_return_function(section, parser):
         return var
     return inputs
 
-def new_molecule(basis):
-    molecule = Molecule(inputs=None, settings=None, basis=None)
+def new_molecule(basis, settings):
+    molecule = Molecule(inputs=None, settings=settings, basis=None)
     return molecule
 
 #=====================================================================#
@@ -554,10 +555,6 @@ class ElectronicState:
 #        self.Hessian = hessian
         self.AlphaDIIS = StoreDIIS()
         self.BetaDIIS = StoreDIIS()
-
-    def add_MOs(self, alphaMOs, alphaOccupancy, NAlphaElectrons, betaMOs, betaOccupancy, NBetaElectrons):
-        self.Alpha.MOs = excite(alphaMOs, alphaOccupancy, NAlphaElectrons)
-        self.Beta.MOs = excite(betaMOs, betaOccupanc, NBetaElectrons)
 
 #---------------------------------------------------------------------#
 #                ELECTRONIC STATE SUBCLASS - MATRICES                 #
