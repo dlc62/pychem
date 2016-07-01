@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python
 
 # System libraries
 from __future__ import print_function
@@ -65,14 +65,14 @@ def do_calculation(settings, molecule):
             beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
 
         # Make new molecule with a new basis set and copy in old orbitals (fit using new basis set)
-        molecule = inputs_structures.new_molecule(basis=basis_set, settings=settings)
+        molecule.update_basis(basis_set)
         for state in molecule.States:
             state.Alpha.MOs = alpha_MOs.pop(0)
             state.Beta.MOs = beta_MOs.pop(0)
 
         # Iterate over the list of states doing calculations while enforcing orthogonality
         for index, state in enumerate(molecule.States):
-            hartree_fock.do(settings, molecule, state, index)
+            hartree_fock.do_SCF(settings, molecule, state, index)
 
         # Dump MOs to file for other basis sets, all states
         util.store('MOs', molecule.States, settings.SectionName, basis_set)

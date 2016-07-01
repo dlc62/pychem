@@ -22,7 +22,7 @@ from hartree_fock import make_density_matrices
 def process_input(section, parser):
     inputs = inputs_return_function(section, parser)
     settings = Settings(inputs)
-    molecule = Molecule(inputs, settings, basis=None)
+    molecule = Molecule(inputs=inputs, settings=settings)
     return molecule,settings
 
 def inputs_return_function(section, parser):
@@ -33,10 +33,6 @@ def inputs_return_function(section, parser):
             var = var.upper()
         return var
     return inputs
-
-def new_molecule(basis, settings):
-    molecule = Molecule(inputs=None, settings=settings, basis=None)
-    return molecule
 
 #=====================================================================#
 #  Global data structures, used absolutely everywhere                 #
@@ -263,7 +259,7 @@ class Set_MOM:
 #=====================================================================#
 
 class Molecule:
-    def __init__(self, inputs, settings, basis = None):
+    def __init__(self, inputs = None, settings = None, basis = None):
         #--------------------------------------------------------------#
         #                    Molecular Specifications                  #
         #--------------------------------------------------------------#
@@ -337,26 +333,12 @@ class Molecule:
         self.NBetaElectrons = int(n_beta)
         self.NOrbitals = int(n_orbitals)
         self.NAlphaOrbitals = int(math.ceil(n_alpha/2.0))
-        self.NBetaOrbitals = int(math.ceil(n_alpha/2.0))
+        self.NBetaOrbitals = int(math.ceil(n_beta/2.0))
 
         #----------- SCF structures - common to all states ------------#
         #           contains ShellPair -> Shell subclasses             #
         #--------------------------------------------------------------#
-        if settings != None:
-            self.Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
-            self.Recalc2eInts = (settings.SCF.Ints_Handling == 'DIRECT')
-            self.Dump2eInts = (settings.SCF.Ints_Handling == 'ONDISK')
-        self.Core = numpy.zeros((self.NOrbitals,) * 2)
-        self.Overlap = numpy.zeros((self.NOrbitals,) * 2)
-        self.NuclearRepulsion = None
-        self.X = []
-        self.Xt = []
-        self.S = []
-        if self.Store2eInts:
-            self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4)
-            self.ExchangeIntegrals = numpy.zeros((self.NOrbitals,) * 4)
-        ### Generate ShellPair data for Molecule ###
-        self.make_shell_pairs()
+        self.initialize_intermediates(settings=settings)
 
         #-------------- Excited state specifications ------------------#
         #       contains ElectronicState -> Matrices subclasses        #
@@ -390,6 +372,26 @@ class Molecule:
         self.NStates = len(self.States)
 
     #================== MOLECULE CLASS SUBROUTINES ===================#
+
+    #----------- SCF structures - common to all states ------------#
+    #           contains ShellPair -> Shell subclasses             #
+    #--------------------------------------------------------------#
+    def initialize_intermediates(self, settings=None):
+        if settings != None:
+            self.Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
+            self.Recalc2eInts = (settings.SCF.Ints_Handling == 'DIRECT')
+            self.Dump2eInts = (settings.SCF.Ints_Handling == 'ONDISK')
+        self.Core = numpy.zeros((self.NOrbitals,) * 2)
+        self.Overlap = numpy.zeros((self.NOrbitals,) * 2)
+        self.NuclearRepulsion = None
+        self.X = []
+        self.Xt = []
+        self.S = []
+        if self.Store2eInts:
+            self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4)
+            self.ExchangeIntegrals = numpy.zeros((self.NOrbitals,) * 4)
+        ### Generate ShellPair data for Molecule ###
+        self.make_shell_pairs()
 
     #------------------------------------------------------------------#
     #       Shell pairs required for all states including ground       #
@@ -485,19 +487,18 @@ class Molecule:
             full_coords.append([atom.Label,atom.NuclearCharge,x*c.toAng, y*c.toAng, z*c.toAng])
         return coords,labelled_coords,full_coords
 
-#    #-------------------------------------------------------------------------#
-#    #                           Basis set update                              #
-#    #-------------------------------------------------------------------------#
-#    def update_basis(self,basis_set):
-#        # update variables then structures
-#        n_orbitals = 0
-#        for atom in self.Atoms:
-#            atom.update_atomic_basis(basis_set)
-#            n_orbitals += atom.NFunctions
-#        self.NOrbitals = n_orbitals
-#        self.initialize_intermediates()
-#        self.generate_excited_states()
-
+    #-------------------------------------------------------------------------#
+    #                           Basis set update                              #
+    #-------------------------------------------------------------------------#
+    def update_basis(self,basis_set):
+        # update variables then structures
+        n_orbitals = 0
+        for atom in self.Atoms:
+            atom.update_atomic_basis(basis_set)
+            n_orbitals += atom.NFunctions
+        self.NOrbitals = n_orbitals
+        self.initialize_intermediates()
+        self.generate_excited_states()
 
 #=====================================================================#
 #                      MOLECULE SUBCLASS - ATOM                       #
@@ -518,7 +519,7 @@ class Atom:
         basis_data = basis.get[basis_set][self.Label]
         for function in basis_data:
             self.Basis.append(ContractedGaussian(function))
-            self.NFunctions += (function[0]+1)*(function[0]+2)/2
+            self.NFunctions += int((function[0]+1)*(function[0]+2)/2)
             if function[0] > self.MaxAng:
                 self.MaxAng = function[0]
     def update_coords(self,xyz):
