@@ -13,31 +13,36 @@ def do(molecule, this, state_index, ref_MOs):
     alpha_ref_MOs = ref_MOs[0]
     beta_ref_MOs = ref_MOs[1]
 
-    alpha_state_overlaps = numpy.zeros(molecule.NOrbitals)
-    beta_state_overlaps = numpy.zeros(molecule.NOrbitals)
-    NStates = 0    # keeps track of the number of states included
+    alpha_p_vector = make_p_vector(this.Alpha.MOs, alpha_ref_MOs, molecule.NAlphaElectrons, molecule.Overlap)
+    beta_p_vector = make_p_vector(this.Beta.MOs, beta_ref_MOs, molecule.NBetaElectrons, molecule.Overlap)
+    
+    # Testing overlap againts other states currently isn't working well
+    #alpha_state_overlaps = numpy.zeros(molecule.NOrbitals)
+    #beta_state_overlaps = numpy.zeros(molecule.NOrbitals)
+    #NStates = 0    # keeps track of the number of states included
 
     # Calculate the overlap of the new MOs with all the states
     #for i, state in enumerate(molecule.States):                         # Using unoptimized states
-    for i, state in enumerate(molecule.States[:state_index+1]):          # Only using previously optimized states
+    #for i, state in enumerate(molecule.States[:state_index+1]):          # Only using previously optimized states
 
     # Overlap with the reference orbitals
-        if i == state_index:
-            alpha_p_vector = make_p_vector(this.Alpha.MOs, alpha_ref_MOs, molecule.NAlphaElectrons, molecule.Overlap)
-            beta_p_vector = make_p_vector(this.Beta.MOs, beta_ref_MOs, molecule.NBetaElectrons, molecule.Overlap)
+    #    if i == state_index:
+    #        alpha_p_vector = make_p_vector(this.Alpha.MOs, alpha_ref_MOs, molecule.NAlphaElectrons, molecule.Overlap)
+    #        beta_p_vector = make_p_vector(this.Beta.MOs, beta_ref_MOs, molecule.NBetaElectrons, molecule.Overlap)
     # Overlap with the (ideally) nearly orthoginal states
-        else:
-            alpha_state_overlaps = make_p_vector(this.Alpha.MOs, state.Alpha.MOs, molecule.NAlphaElectrons, molecule.Overlap)
-            beta_state_overlaps = make_p_vector(this.Beta.MOs, state.Beta.MOs, molecule.NBetaElectrons, molecule.Overlap)
-            NStates +=1
-
+    #    else:
+    #        alpha_state_overlaps += make_p_vector(this.Alpha.MOs, state.Alpha.MOs, molecule.NAlphaElectrons, molecule.Overlap)
+    #        beta_state_overlaps += make_p_vector(this.Beta.MOs, state.Beta.MOs, molecule.NBetaElectrons, molecule.Overlap)
+    #        NStates +=1
+    #
     # Take average of the state overlaps
-    alpha_state_overlaps /= NStates    # Use 'NStates' for now to keep track of how the divisor chanages
-    beta_state_overlaps /= NStates     # depending on whether the uoptimized states are used or not
+    #if NStates:
+    #    alpha_state_overlaps /= NStates    # Use 'NStates' for now to keep track of how the divisor chanages
+    #    beta_state_overlaps /= NStates     # depending on whether the uoptimized states are used or not
 
-    # subtract this from the overlap woth the reference orbitals
-    alpha_p_vector -= alpha_state_overlaps
-    beta_p_vector -= beta_state_overlaps
+        # subtract this from the overlap with the reference orbitals
+    #    alpha_p_vector -= alpha_state_overlaps
+    #    beta_p_vector -= beta_state_overlaps
 
     # Store MOs according to p-vector ordering
     this.Alpha.MOs, this.Alpha.Energies = Sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector)

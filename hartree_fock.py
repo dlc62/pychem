@@ -29,6 +29,12 @@ def do_SCF(settings, molecule, state, state_index = 0):
     # Set up for SCF calculation
     initialize_fock_matrices(molecule.Core, state)
 
+    # Set a higher convergence threshold on the final calculations
+    if molecule.Basis == settings.BasisSets[-1]:
+        energy_convergence = c.energy_convergence_final
+    else:
+        energy_convergence = c.energy_convergence
+
     # Generate initial orbitals and/or density matrices
     if state.Alpha.MOs != []:
         reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
@@ -66,9 +72,8 @@ def do_SCF(settings, molecule, state, state_index = 0):
     diis_error = None
     energies = []
 
-    while c.energy_convergence < abs(dE):
+    while energy_convergence < abs(dE):
         num_iterations += 1
-
         #-------------------------------------------#
         #               Main SCF step               #
         #-------------------------------------------#
@@ -106,7 +111,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         state.TotalEnergy = state.Energy + molecule.NuclearRepulsion
         energies.append(state.TotalEnergy)
 
-        if abs(dE) < c.energy_convergence:
+        if abs(dE) < energy_convergence:
             final_loop = True
 
         printf.HF_Loop(state, settings, num_iterations, dE, diis_error, final_loop)
@@ -114,6 +119,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         if num_iterations >= settings.SCF.MaxIter:
             print("SCF not converging")
             break
+
 
     printf.HF_Final(settings)
 

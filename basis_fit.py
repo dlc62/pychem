@@ -25,6 +25,7 @@ def do(molecule, MOs, new_basis):
 
 def Get_Overlap(prim1, prim2, l):
     gamma = prim1[0] + prim2[0]
+#    Don't need this assuming the AOs are already normalized
 #    fact = factorial2(2*l-1,exact = True)
 #    norm = ((2 ** l) * (prim1[0]*prim2[0])**(3./4 + l/2.)) / (pi**3./2 * fact)
 #    integral = (pi / gamma)**(3./2) * (fact/(2*gamma)**l) * norm * prim1[1] * prim2[1]
@@ -70,7 +71,7 @@ def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis):
 
 def Basis_Fit_Ang(atom, old_set, MOs, cgto_count, new_ang_set):    #Take all the MO coefficents for the state
 
-    #Getting the set of function of the right l from the new basis
+    #Getting the set of functions of the right l from the new basis
     ang_set = [cgto.Primitives for cgto in old_set]
     Ang = old_set[0].AngularMomentum
 

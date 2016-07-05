@@ -5,6 +5,9 @@ import numpy
 # Custom-written data modules
 import constants as c
 
+# pretty printing to the terminal for numpy arrays
+numpy.set_printoptions(precision=5, linewidth=300)
+
 def initialize(settings, method = None):
     if method == None:
         try:
