@@ -82,7 +82,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         #               Main SCF step               #
         #-------------------------------------------#
         initialize_fock_matrices(molecule.Core, state)
-        make_coulomb_exchange_matrices(molecule, state, num_iterations)
+        make_coulomb_exchange_matrices(molecule, state, num_iterations, settings.SCF.Ints_Handling)
 #        make_fock_matrices(molecule, state)
 
         if settings.SCF.Reference == "CUHF" and num_iterations > 1:
@@ -124,7 +124,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
             print("SCF not converging")
             break
 
-    printf.HF_Final(settings)     # Get this to trigger even when the calculation doesn't converge
+    printf.HF_Final(settings)
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #
@@ -203,7 +203,7 @@ def make_core_matrices(molecule):
 
 #----------------------------------------------------------------------
 
-def make_coulomb_exchange_matrices(molecule, this, num_iterations):
+def make_coulomb_exchange_matrices(molecule, this, num_iterations, ints_handling):
 
     this.Total.Coulomb.fill(0)
     this.Alpha.Exchange.fill(0)
@@ -217,7 +217,7 @@ def make_coulomb_exchange_matrices(molecule, this, num_iterations):
             id_vec = shell_pair2.Centre2.Ivec
 
             # Calculate integrals if direct HF or first iteration
-            if (molecule.Recalc2eInts) or (num_iterations == 1):
+            if (ints_handling == 'DIRECT') or (num_iterations == 1):
                 coulomb,exchange = integrals.two_electron(shell_pair1,shell_pair2)
 
             for m in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
@@ -226,15 +226,15 @@ def make_coulomb_exchange_matrices(molecule, this, num_iterations):
                         for s in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
 
                             # Save the integrals on the first pass of an indirect HF job
-                            if (molecule.Store2eInts) and (num_iterations == 1):
+                            if (ints_handling == 'INCORE') and (num_iterations == 1):
                                 molecule.CoulombIntegrals[ia_vec[m]][ib_vec[n]][ic_vec[l]][id_vec[s]] = coulomb[m][n][l][s]
                                 molecule.ExchangeIntegrals[ia_vec[m]][id_vec[s]][ic_vec[l]][ib_vec[n]] = exchange[m][s][l][n]
                             ## FUTURE ##
-                            # elif (molecule.Dump2eInts) and (num_iterations == 1):
+                            # elif (ints_handling == 'ONDISK') and (num_iterations == 1):
                             #   -> dump non-negligible values to file, along with their ia_vec etc indices
 
                             # Construct coulomb and exchange matrices
-                            if (molecule.Store2eInts):
+                            if (ints_handling == 'INCORE'):
                                 this.Total.Coulomb[ia_vec[m]][ib_vec[n]]  +=  this.Total.Density[ic_vec[l]][id_vec[s]]* \
                                                                               molecule.CoulombIntegrals[ia_vec[m],ib_vec[n],ic_vec[l],id_vec[s]]
                                 this.Alpha.Exchange[ia_vec[m]][ib_vec[n]] += -this.Alpha.Density[ic_vec[l]][id_vec[s]]* \
@@ -242,7 +242,7 @@ def make_coulomb_exchange_matrices(molecule, this, num_iterations):
                                 this.Beta.Exchange[ia_vec[m]][ib_vec[n]]  += -this.Beta.Density[ic_vec[l]][id_vec[s]]* \
                                                                               molecule.ExchangeIntegrals[ia_vec[m],id_vec[s],ic_vec[l],ib_vec[n]]
                             ## FUTURE ##
-                            # elif (molecule.Dump2eInts):
+                            # elif (ints_handling == 'ONDISK'):
                             #   ->  reload orbitals from file
                             else:
                                 this.Total.Coulomb[ia_vec[m]][ib_vec[n]]  +=  this.Total.Density[ic_vec[l]][id_vec[s]]*coulomb[m][n][l][s]

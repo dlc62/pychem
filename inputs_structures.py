@@ -22,7 +22,7 @@ from hartree_fock import make_density_matrices
 def process_input(section, parser):
     inputs = inputs_return_function(section, parser)
     settings = Settings(inputs)
-    molecule = Molecule(inputs=inputs, settings=settings)
+    molecule = Molecule(inputs, settings)
     return molecule,settings
 
 def inputs_return_function(section, parser):
@@ -37,10 +37,11 @@ def inputs_return_function(section, parser):
 #=====================================================================#
 #  Global data structures, used absolutely everywhere                 #
 #  Convention: class variables are capitalized, instances not         #
+#              sub-routine names also not capitalized                 #
 #  ------------------------------------------------------------------ #
-#  Settings contains system-independent input data                    #
+#  Settings contains molecule-independent input data                  #
 #  ------------------------------------------------------------------ #
-#  Molecule contains system-dependent derived data                    #
+#  Molecule contains molecule-dependent derived data                  #
 #    -> each Molecule is made up of Atoms                             #
 #       -> each Atom is described by a set of ContractedGaussians     #
 #    -> each Molecule may exist in a range of ground/excited states   #
@@ -55,8 +56,18 @@ def inputs_return_function(section, parser):
 class Settings:
     def __init__(self, inputs):
         #-------------------------------------------------------------#
-        #                     Universal settings                      #
+        #               Universal settings subroutine                 #
         #-------------------------------------------------------------#
+        self.set_universal(inputs)
+        #-------------------------------------------------------------#
+        #                  SCF settings subclasses                    #
+        #-------------------------------------------------------------#
+        self.SCF = Set_SCF(inputs,len(self.BasisSets),self.Method)
+        self.DIIS = Set_DIIS(inputs,self.SCF.Reference)
+        self.MOM = Set_MOM(inputs)
+
+    #=================================================================#
+    def set_universal(self, inputs):
         #------------------------- Method ----------------------------#
         available_methods = ['HF','MP2']
         try:
@@ -72,8 +83,8 @@ class Settings:
            self.JobType = inputs("Job_Type")
            assert self.JobType in available_jobtypes
         except:
-           print('Job type either not specified or not recognised, defaulting to single point energy')
-           print('Available job types:', available_jobtypes)
+#           print('Job type either not specified or not recognised, defaulting to single point energy')
+#           print('Available job types:', available_jobtypes)
            self.JobType = 'ENERGY'
         #------------------------ Basis Set --------------------------#
         available_basis_sets = basis.get.keys()
@@ -106,34 +117,31 @@ class Settings:
            self.PrintLevel = inputs("Print_Level")
            assert self.PrintLevel in available_print_levels
         except:
-           print('Printing options not supplied or recognised, defaulting to basic printing')
+#           print('Printing options not supplied or recognised, defaulting to basic printing')
            self.PrintLevel = 'BASIC'
         try:
            self.CustomPrint = inputs("Custom_Print")
            assert self.CustomPrint in available_custom_print_options
         except:
-           print('Custom print options not supplied or recognised, defaulting to basic printing')
+#           print('Custom print options not supplied or recognised, defaulting to basic printing')
+           pass
         try:
             self.PrintToTerminal = inputs("Print_To_Terminal")
             assert(isinstance(self.PrintToTerminal, bool))
         except:
             self.PrintToTerminal = False
-        #-------------------------------------------------------------#
-        #                         SCF Settings                        #
-        #-------------------------------------------------------------#
-        self.SCF = Set_SCF(inputs,len(self.BasisSets),self.Method)
-        self.DIIS = Set_DIIS(inputs,self.SCF.Reference)
-        self.MOM = Set_MOM(inputs)
 
+    #=================================================================#
+    #                 Set output file from pychem.py                  #
     def set_outfile(self, section_name):
         self.OutFileName = str(section_name) + '.out'
         self.OutFile = None
         self.SectionName = section_name
-
-#=====================================================================#
-#                      SETTINGS Subclass - Set_SCF                    #
 #=====================================================================#
 
+#=====================================================================#
+#          SETTINGS Subclasses - Set_SCF, Set_DIIS, Set_MOM           #
+#=====================================================================#
 class Set_SCF:
     def __init__(self, inputs, NBasisSets, Method):
         #------------------------- Reference -------------------------#
@@ -154,7 +162,7 @@ class Set_SCF:
             self.Guess = inputs("SCF_Guess")
             assert(self.Guess in available_guesses)
         except:
-            print("Could not identify SCF guess keyword, defaulting to core guess")
+#            print("Could not identify SCF guess keyword, defaulting to core guess")
             self.Guess = "CORE"
         if self.Guess == "READ":
             try:
@@ -187,17 +195,10 @@ class Set_SCF:
             self.Ints_Handling = inputs("2e_Ints_Handling")
             assert self.Ints_Handling in available_handling_options
         except:
-            if Method == 'MP2':
-                # Make INCORE storage default for MP2
-                self.Ints_Handling = 'INCORE'
-            else:
-                # Choose the lowest memory option by default
-                self.Ints_Handling = 'DIRECT'
+            # Make INCORE storage default (fastest)
+            self.Ints_Handling = 'INCORE'
 
-#=====================================================================#
-#                     SETTINGS Subclass - Set_DIIS                    #
-#=====================================================================#
-
+#---------------------------------------------------------------------#
 class Set_DIIS:
     def __init__(self,inputs,reference):
         try:
@@ -225,13 +226,9 @@ class Set_DIIS:
             self.MaxCondition = c.DIIS_max_condition
         self.Threshold = 0.0
 
-#=====================================================================#
-#                     SETTINGS Subclass - Set_MOM                     #
-#=====================================================================#
-
+#---------------------------------------------------------------------#
 class Set_MOM:
     def __init__(self,inputs):
-        #---------------------------- MOM ----------------------------#
         available_MOM_references = ["MUTABLE","FIXED"]
         try:
             self.Use = inputs("Use_MOM")
@@ -251,26 +248,26 @@ class Set_MOM:
             assert self.Reference in available_MOM_references
         except:
             self.Reference = "FIXED"
-
-#######################################################################
+#=====================================================================#
 
 #=====================================================================#
 #                             MOLECULE                                #
 #=====================================================================#
-
 class Molecule:
-    def __init__(self, inputs = None, settings = None, basis = None):
-        #--------------------------------------------------------------#
-        #                    Molecular Specifications                  #
-        #--------------------------------------------------------------#
+    def __init__(self, inputs, settings):
+        #-------------------------------------------------------------#
+        #  General molecule specifications - basis set independent    #
+        #-------------------------------------------------------------#
+        self.set_general(inputs)
+        #-------------------------------------------------------------#
+        #  Set up data structures and excitations for minimal basis   #
+        #-------------------------------------------------------------#
+        self.set_initial(inputs, settings)
+        self.set_excitations(inputs)
 
-        #------------------------- Basis Set --------------------------#
-        if basis == None:
-           self.Basis = settings.BasisSets[0]
-        else:
-           self.Basis = basis
-
-        #------------------------ Coordinates -------------------------#
+    #=================================================================#
+    def set_general(self, inputs):
+        #----------------------- Coordinates -------------------------#
         if inputs != None:
            try:
               coords = inputs("Coords")
@@ -286,116 +283,71 @@ class Molecule:
               print('Each atom entry is of form [atom_symbol,atom_nuc_charge,x,y,z]')
               sys.exit()
            self.NAtom = len(coords)
-
-        #-------------------------- Charge ----------------------------#
+        #------------------------- Charge ----------------------------#
         if inputs != None:
            try:
               self.Charge = inputs("Charge")
            except:
               print('Error: must specify molecule charge using Charge =')
               sys.exit()
-
-        #----------------------- Multiplicity -------------------------#
+        #---------------------- Multiplicity -------------------------#
         if inputs != None:
            try:
               self.Multiplicity = inputs("Multiplicity")
            except:
               print('Error: must specify molecule multiplicity using Multiplicity =')
               sys.exit()
+        #------------ Ground State Electronic Configuration -----------#
+        self.NElectrons = 0
+        self.NCoreOrbitals = 0
+        for [label,Z,x,y,z] in coords:
+            self.NElectrons += c.nElectrons[label]
+            self.NCoreOrbitals += c.nCoreOrbitals[label]
+        self.NElectrons = self.NElectrons - self.Charge
+        try:
+            self.NAlphaElectrons = int((self.NElectrons + (self.Multiplicity-1))/2)
+            self.NBetaElectrons = int((self.NElectrons - (self.Multiplicity-1))/2)
+        except:
+            print('Error: charge and multiplicity inconsistent with specified molecule')
+            sys.exit()
+        self.NAlphaOrbitals = int(math.ceil(self.NAlphaElectrons/2.0))
+        self.NBetaOrbitals = int(math.ceil(self.NBetaElectrons/2.0))
 
-        #-------------------------- Atoms List ------------------------#
-        #        contains Atom -> ContractedGaussian subclasses        #
-        #--------------------------------------------------------------#
+    #=================================================================#
+    def set_initial(self, inputs, settings):
+        #------------------------ Basis Set --------------------------#
+        self.Basis = settings.BasisSets[0]
+        #------------------------- Atoms List ------------------------#
+        #       contains Atom -> ContractedGaussian subclasses        #
+        #-------------------------------------------------------------#
         self.Atoms = []
-        n_electrons = 0
-        n_orbitals = 0
-        n_core_orbitals = 0
+        self.NOrbitals = 0
         index = 0
+        coords = inputs("Coords")
         for row in coords:
             ### Add Atom to Molecule ###
             atom = Atom(index,row,self.Basis)
             self.Atoms.append(atom)
-            n_electrons += c.nElectrons[atom.Label]
-            n_core_orbitals += c.nCoreOrbitals[atom.Label]
-            n_orbitals += atom.NFunctions
+            self.NOrbitals += atom.NFunctions
             index += 1
+        #---------- SCF structures - common to all states ------------#
+        #          contains ShellPair -> Shell subclasses             #
+        #-------------------------------------------------------------#
+        Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
+        self.initialize_intermediates(Store2eInts)
 
-        #------------ Ground State Electronic Configuration -----------#
-        n_electrons = n_electrons - self.Charge
-        try:
-            n_alpha = (n_electrons + (self.Multiplicity-1))/2
-            n_beta  = (n_electrons - (self.Multiplicity-1))/2
-        except:
-            print('Error: charge and multiplicity inconsistent with specified molecule')
-            sys.exit()
-        self.NElectrons = int(n_electrons)
-        self.NAlphaElectrons = int(n_alpha)
-        self.NBetaElectrons = int(n_beta)
-        self.NOrbitals = int(n_orbitals)
-        self.NAlphaOrbitals = int(math.ceil(n_alpha/2.0))
-        self.NBetaOrbitals = int(math.ceil(n_beta/2.0))
-
-        #----------- SCF structures - common to all states ------------#
-        #           contains ShellPair -> Shell subclasses             #
-        #--------------------------------------------------------------#
-        self.initialize_intermediates(settings=settings)
-
-        #-------------- Excited state specifications ------------------#
-        #       contains ElectronicState -> Matrices subclasses        #
-        #--------------------------------------------------------------#
-        if inputs != None:
-           alpha_excitations = [[]]
-           beta_excitations = [[]]
-           try:
-              alpha_excitations = inputs("Alpha_Excitations")
-              beta_excitations = inputs("Beta_Excitations")
-           except ConfigParser.NoOptionError:
-              try:
-                 alpha_excitations = inputs("Excitations")
-              except ConfigParser.NoOptionError:
-                 pass
-           # Check that excitations were given in the correct format
-           try:
-              alpha_is_list = type(alpha_excitations) is list
-              alpha_is_keyword = alpha_excitations in ['SINGLE', 'DOUBLE']
-              assert alpha_is_list or alpha_is_keyword
-              if alpha_is_list:
-                 assert type(beta_excitations) is list
-           except AssertionError:
-              print("""Excitations must be specified as a list of excitations each containing two elements
-                       or using the keywords 'Single' or 'Double'""")
-              sys.exit()
-           self.AlphaExcitations = alpha_excitations
-           self.BetaExcitations = beta_excitations
-        ### Generate excited states, each an ElectronicState ###
-        self.generate_excited_states()
-        self.NStates = len(self.States)
-
-    #================== MOLECULE CLASS SUBROUTINES ===================#
-
-    #----------- SCF structures - common to all states ------------#
-    #           contains ShellPair -> Shell subclasses             #
-    #--------------------------------------------------------------#
-    def initialize_intermediates(self, settings=None):
-        if settings != None:
-            self.Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
-            self.Recalc2eInts = (settings.SCF.Ints_Handling == 'DIRECT')
-            self.Dump2eInts = (settings.SCF.Ints_Handling == 'ONDISK')
+    def initialize_intermediates(self, Store2eInts):
         self.Core = numpy.zeros((self.NOrbitals,) * 2)
         self.Overlap = numpy.zeros((self.NOrbitals,) * 2)
         self.NuclearRepulsion = None
         self.X = []
         self.Xt = []
         self.S = []
-        if self.Store2eInts:
+        if Store2eInts:
             self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4)
             self.ExchangeIntegrals = numpy.zeros((self.NOrbitals,) * 4)
         ### Generate ShellPair data for Molecule ###
         self.make_shell_pairs()
-
-    #------------------------------------------------------------------#
-    #       Shell pairs required for all states including ground       #
-    #------------------------------------------------------------------#
 
     def make_shell_pairs(self):
         ia = -1
@@ -416,9 +368,37 @@ class Molecule:
                     shell_pairs.append(shell_pair)
         self.ShellPairs = shell_pairs
 
-    #-------------------------------------------------------------------------#
-    #       Generate orbital occupancy lists that define excited states       #
-    #-------------------------------------------------------------------------#
+    #=================================================================#
+    def set_excitations(self, inputs):
+        #------------- Excited state specifications ------------------#
+        #      contains ElectronicState -> Matrices subclasses        #
+        #-------------------------------------------------------------#
+        alpha_excitations = [[]]
+        beta_excitations = [[]]
+        try:
+           alpha_excitations = inputs("Alpha_Excitations")
+           beta_excitations = inputs("Beta_Excitations")
+        except ConfigParser.NoOptionError:
+           try:
+              alpha_excitations = inputs("Excitations")
+           except ConfigParser.NoOptionError:
+              pass
+        # Check that excitations were given in the correct format
+        try:
+           alpha_is_list = type(alpha_excitations) is list
+           alpha_is_keyword = alpha_excitations in ['SINGLE', 'DOUBLE']
+           assert alpha_is_list or alpha_is_keyword
+           if alpha_is_list:
+              assert type(beta_excitations) is list
+        except AssertionError:
+           print("""Excitations must be specified as a list of excitations each containing two elements
+                    or using the keywords 'Single' or 'Double'""")
+           sys.exit()
+        self.AlphaExcitations = alpha_excitations
+        self.BetaExcitations = beta_excitations
+        ### Generate excited states, each an ElectronicState ###
+        self.generate_excited_states()
+        self.NStates = len(self.States)
 
     def generate_excited_states(self):
         # Occupany lists for the ground state
@@ -439,11 +419,11 @@ class Molecule:
 
         if self.AlphaExcitations == self.BetaExcitations == [[]]:
             # immediately returns if no excitations were specified
-            print("Returning")
+#            print("No excitations specified, returning from make_excitations")
             return self.States
-        elif self.AlphaExcitations == 'Single':
+        elif self.AlphaExcitations == 'SINGLE':
             self.AlphaExcitations = util.single_excitations(self.NAlphaElectrons, self.NOrbitals)
-        elif self.AlphaExcitations == 'Double':
+        elif self.AlphaExcitations == 'DOUBLE':
             alpha_singles = util.single_excitations(self.NAlphaElectrons, self.NOrbitals)
             beta_singles = util.single_excitations(self.NBetaElectrons, self.NOrbitals)
             for excite1 in alpha_singles:
@@ -458,7 +438,7 @@ class Molecule:
                 assert type(self.AlphaExcitations[i]) is list
                 assert type(self.BetaExcitations[i]) is list
             except AssertionError:
-                print("Each excitation must be a pair of two integers")
+                print("Each excitation must be specified by a pair of integers")
                 sys.exit()
             alpha_occupied = self.do_excitation(self.NAlphaElectrons, alpha_ground, self.AlphaExcitations[i])
             beta_occupied = self.do_excitation(self.NBetaElectrons, beta_ground, self.BetaExcitations[i])
@@ -472,10 +452,8 @@ class Molecule:
             occupied[n_electrons + excitation[1] - 1] = 1
         return occupied
 
-    #-----------------------------------------------------------------#
+    #=================================================================#
     #     Helper function to return coordinates in useful formats     #
-    #-----------------------------------------------------------------#
-
     def get_coords(self):
         full_coords = []
         labelled_coords = []
@@ -487,18 +465,22 @@ class Molecule:
             full_coords.append([atom.Label,atom.NuclearCharge,x*c.toAng, y*c.toAng, z*c.toAng])
         return coords,labelled_coords,full_coords
 
-    #-------------------------------------------------------------------------#
-    #                           Basis set update                              #
-    #-------------------------------------------------------------------------#
-    def update_basis(self,basis_set):
+    #=================================================================#
+    #                       Basis set update                          #
+    def update_basis(self,basis_set,Store2eInts):
         # update variables then structures
-        n_orbitals = 0
+        self.NOrbitals = 0
         for atom in self.Atoms:
             atom.update_atomic_basis(basis_set)
-            n_orbitals += atom.NFunctions
-        self.NOrbitals = n_orbitals
-        self.initialize_intermediates()
-        self.generate_excited_states()
+            self.NOrbitals += atom.NFunctions
+        self.initialize_intermediates(Store2eInts)
+        new_states = []
+        for state in self.States:
+            alpha_occupied = state.AlphaOccupancy + [0]*(self.NOrbitals-len(state.AlphaOccupancy))
+            beta_occupied = state.BetaOccupancy + [0]*(self.NOrbitals-len(state.BetaOccupancy))
+            new_state = ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals) 
+            new_states.append(new_state)
+        self.States = new_states
 
 #=====================================================================#
 #                      MOLECULE SUBCLASS - ATOM                       #

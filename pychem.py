@@ -64,7 +64,9 @@ def do_calculation(settings, molecule):
             alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
             beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
 
-        molecule.update_basis(basis_set)
+        Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
+        molecule.update_basis(basis_set, Store2eInts)
+
         for state in molecule.States:
             state.Alpha.MOs = alpha_MOs.pop(0)
             state.Beta.MOs = beta_MOs.pop(0)
