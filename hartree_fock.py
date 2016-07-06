@@ -121,7 +121,6 @@ def do_SCF(settings, molecule, state, state_index = 0):
             break
 
     printf.HF_Final(settings)     # Get this to trigger even when the calculation doesn't converge
-    import pdb; pdb.set_trace()
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #
