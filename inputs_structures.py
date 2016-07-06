@@ -549,9 +549,10 @@ class ElectronicState:
         self.S2 = None
         self.Energy = None
         self.TotalEnergy = None
-        self.Total = Matrices(n_orbitals,total=True)
-        self.Alpha = Matrices(n_orbitals)
-        self.Beta = Matrices(n_orbitals)
+        total_occupancy = [alpha_occupancy[i] + beta_occupancy[i] for i in range(len(alpha_occupancy))]
+        self.Total = Matrices(n_orbitals, total_occupancy, total=True)
+        self.Alpha = Matrices(n_orbitals, alpha_occupancy)
+        self.Beta = Matrices(n_orbitals, beta_occupancy)
 #        self.Gradient = gradient
 #        self.Hessian = hessian
         self.AlphaDIIS = StoreDIIS()
@@ -562,9 +563,10 @@ class ElectronicState:
 #---------------------------------------------------------------------#
 
 class Matrices:
-    def __init__(self,n_orbitals,total=False):
+    def __init__(self,n_orbitals,occupancy,total=False):
         self.Density = numpy.zeros((n_orbitals,) * 2)
         self.Fock = numpy.zeros((n_orbitals,) * 2)
+        self.Occupancy = occupancy
         if not total:
             self.Exchange = numpy.zeros((n_orbitals,) * 2)
             self.MOs = []

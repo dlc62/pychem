@@ -120,8 +120,8 @@ def do_SCF(settings, molecule, state, state_index = 0):
             print("SCF not converging")
             break
 
-
-    printf.HF_Final(settings)
+    printf.HF_Final(settings)     # Get this to trigger even when the calculation doesn't converge
+    import pdb; pdb.set_trace()
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #
@@ -298,3 +298,14 @@ def constrain_UHF(molecule, this):
     this.Beta.Fock = this.Beta.Fock - lambda_matrix
 
 #----------------------------------------------------------------------
+
+def plot(energies):
+    """ For use in plotting energies in the interactive debugger """
+    import sys
+    if sys.version_info.major == 2:
+        import matplotlib.pyplot as plt
+        plt.plot(energies, marker='o')
+        plt.ylabel("Energies")
+        plt.show()
+    else:
+        print("Plotting only supported for Python 2")
