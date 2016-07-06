@@ -584,6 +584,7 @@ class StoreDIIS:
         self.Residuals = []
         self.Matrix = [[None]]
         self.Error = 1
+        self.pre_DIIS_fock = [[None]]
 
 #=====================================================================#
 #                  MOLECULE SUBCLASS - SHELLPAIR                      #

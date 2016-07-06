@@ -1,8 +1,3 @@
-
-# Currently this is selecting orbitals based on the overlap with the occupied orbital
-# space of the reference and excluding them based on the overlap with the virtual orbital
-# space of the other states.
-
 # System libraries
 import numpy
 from numpy import dot
@@ -21,7 +16,7 @@ def do(molecule, this, state_index, ref_MOs):
     # Testing overlap againts other states currently isn't working well
     alpha_state_overlaps = numpy.zeros(molecule.NOrbitals)
     beta_state_overlaps = numpy.zeros(molecule.NOrbitals)
-    NStates = 0    # keeps track of the number of states included
+    #NStates = 0    # keeps track of the number of states included
 
     # Calculate the overlap of the new MOs with all the states
     #for i, state in enumerate(molecule.States):                         # Using unoptimized states
@@ -39,14 +34,13 @@ def do(molecule, this, state_index, ref_MOs):
             #NStates += 1
 
     # Take average of the state overlaps
-    if NStates:
 
         #alpha_state_overlaps /= NStates    # Use 'NStates' for now to keep track of how the divisor chanages
         #beta_state_overlaps /= NStates     # depending on whether the uoptimized states are used or not
 
         # subtract this from the overlap with the reference orbitals
-        alpha_p_vector += alpha_state_overlaps
-        beta_p_vector += beta_state_overlaps
+    alpha_p_vector += alpha_state_overlaps
+    beta_p_vector += beta_state_overlaps
 
     # Sort MOs according to p vector ordering
     this.Alpha.MOs, this.Alpha.Energies = Sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector)

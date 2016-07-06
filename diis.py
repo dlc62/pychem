@@ -11,6 +11,10 @@ import constants as c
 # Custom-written code modules
 import util
 
+# The argument 'error_vec' determins which of the two possible residual vectors are used
+# error_vec = 'commute' uses the commutator of the fock and density matrices - this works best for ground states
+# error_vec = 'diff' uses the difference between sucessive fock matrices - this works best for excited states
+
 #======================================================================#
 #                           MAIN ROUTINES                              #
 #======================================================================#
@@ -18,11 +22,15 @@ import util
 #                           Entry Point                                #
 #----------------------------------------------------------------------#
 
-def do(molecule, this, settings):
+def do(molecule, this, settings, error_vec):
 
     # Set up error estimates
-    alpha_residual = get_residual(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.X, molecule.Xt)
-    beta_residual = get_residual(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.X, molecule.Xt)
+    if error_vec == "commute":
+        alpha_residual = get_residual_com(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.X, molecule.Xt)
+        beta_residual = get_residual_com(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.X, molecule.Xt)
+    else:
+        alpha_residual = get_residual_diff(this.AlphaDIIS.pre_DIIS_fock, this.Alpha.Fock)
+        beta_residual = get_residual_diff(this.BetaDIIS.pre_DIIS_fock, this.Beta.Fock)
     this.AlphaDIIS.Error = alpha_residual.max()
     this.BetaDIIS.Error = beta_residual.max()
     settings.DIIS.Threshold = -0.1 * this.Energy
@@ -36,6 +44,7 @@ def do(molecule, this, settings):
 #----------------------------------------------------------------------#
 
 def diis(residual, fock, DIIS, settings):
+    DIIS.pre_DIIS_fock = fock
     if residual.max() < settings.DIIS.Threshold:
         DIIS.Residuals.append(residual)
         DIIS.OldFocks.append(fock)
@@ -51,10 +60,16 @@ def diis(residual, fock, DIIS, settings):
 #======================================================================#
 #----------------------------------------------------------------------#
 
-def get_residual(overlap, density, fock, X, Xt):
+def get_residual_com(overlap, density, fock, X, Xt):
     residual  = overlap.dot(density).dot(fock) - fock.dot(density).dot(overlap)
     residual = Xt.dot(residual).dot(X)
     return residual
+
+def get_residual_diff(old_fock, new_fock):
+    if old_fock[0][0] == None:
+        return new_fock
+    else:
+        return new_fock - old_fock
 
 #----------------------------------------------------------------------#
 

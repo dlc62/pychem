@@ -71,6 +71,10 @@ def do_SCF(settings, molecule, state, state_index = 0):
     final_loop = False
     diis_error = None
     energies = []
+    if state_index == 0:
+        diis_error_vec = "commute"   # Use the commutator of F and D for the ground state
+    else:
+        diis_error_vec = "diff"      # Use the difference between succesive fock matrices for other states
 
     while energy_convergence < abs(dE):
         num_iterations += 1
@@ -82,14 +86,14 @@ def do_SCF(settings, molecule, state, state_index = 0):
 #        make_fock_matrices(molecule, state)
 
         if settings.SCF.Reference == "CUHF" and num_iterations > 1:
-            constrain_UHF(molecule, state)
+            lambda_max = constrain_UHF(molecule, state)
 
         #-------------------------------------------#
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
         # DIIS
-        if settings.DIIS.Use is True and dE < 0:
-            diis.do(molecule, state, settings)
+        if settings.DIIS.Use is True: #and dE < 0:
+            diis.do(molecule, state, settings, diis_error_vec)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
         # Update MOM reference orbitals to last iteration values if requested
