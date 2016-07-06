@@ -297,3 +297,14 @@ def constrain_UHF(molecule, this):
     this.Beta.Fock = this.Beta.Fock - lambda_matrix
 
 #----------------------------------------------------------------------
+
+def plot(energies):
+    """ For use in plotting energies in the interactive debugger """
+    import sys
+    if sys.version_info.major == 2:
+        import matplotlib.pyplot as plt
+        plt.plot(energies, marker='o')
+        plt.ylabel("Energies")
+        plt.show()
+    else:
+        print("Plotting only supported for Python 2")
