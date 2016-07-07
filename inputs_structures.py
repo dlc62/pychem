@@ -301,6 +301,7 @@ class Molecule:
         self.NElectrons = 0
         self.NCoreOrbitals = 0
         for [label,Z,x,y,z] in coords:
+            label = label.upper()
             self.NElectrons += c.nElectrons[label]
             self.NCoreOrbitals += c.nCoreOrbitals[label]
         self.NElectrons = self.NElectrons - self.Charge
@@ -478,7 +479,7 @@ class Molecule:
         for state in self.States:
             alpha_occupied = state.AlphaOccupancy + [0]*(self.NOrbitals-len(state.AlphaOccupancy))
             beta_occupied = state.BetaOccupancy + [0]*(self.NOrbitals-len(state.BetaOccupancy))
-            new_state = ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals) 
+            new_state = ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals)
             new_states.append(new_state)
         self.States = new_states
 

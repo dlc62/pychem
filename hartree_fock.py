@@ -5,6 +5,7 @@ from numpy import dot
 import scipy
 from scipy.linalg import sqrtm
 import copy
+from math import floor
 
 # Custom-written data modules
 import constants as c
@@ -82,11 +83,21 @@ def do_SCF(settings, molecule, state, state_index = 0):
         #               Main SCF step               #
         #-------------------------------------------#
         initialize_fock_matrices(molecule.Core, state)
+        # Sanity check on the fock matrices remove this later
+        try:
+            from numpy import allclose
+            assert(allclose(state.Alpha.Fock.T, state.Alpha.Fock))
+            assert(allclose(state.Beta.Fock.T, state.Beta.Fock))
+        except:
+            print("Non-Hermitean Fock Matrix")
+            import sys
+            sys.exit()
+
         make_coulomb_exchange_matrices(molecule, state, num_iterations, settings.SCF.Ints_Handling)
-#        make_fock_matrices(molecule, state)
+        #make_fock_matrices(molecule, state)
 
         if settings.SCF.Reference == "CUHF" and num_iterations > 1:
-            lambda_max = constrain_UHF(molecule, state)
+            lambda_max = constrain_UHF(molecule, state, state_index)
 
         #-------------------------------------------#
         #    Convergence accelerators/modifiers     #
@@ -267,12 +278,12 @@ def make_fock_matrices(molecule, this):
 
 #----------------------------------------------------------------------
 
-def constrain_UHF(molecule, this):
+def constrain_UHF(molecule, this, state_index):
 
     N = molecule.NElectrons
     Nab = molecule.NAlphaElectrons * molecule.NBetaElectrons
-    Na = molecule.Multiplicity / 2                              # Dimension of active space
-    Nc = molecule.NAlphaElectrons - Na                          # Dimension of core space
+    Na = floor(molecule.Multiplicity / 2)                              # Dimension of active space
+    Nc = molecule.NAlphaElectrons - Na                                 # Dimension of core space
     S = molecule.S
 
     half_density_matrix = S.dot(this.Total.Density/2).dot(S)
