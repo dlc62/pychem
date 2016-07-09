@@ -521,7 +521,7 @@ class Molecule:
         for state in self.States:
             alpha_occupied = state.AlphaOccupancy + [0]*(self.NOrbitals-len(state.AlphaOccupancy))
             beta_occupied = state.BetaOccupancy + [0]*(self.NOrbitals-len(state.BetaOccupancy))
-            new_state = ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals) 
+            new_state = ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals)
             new_states.append(new_state)
         self.States = new_states
 

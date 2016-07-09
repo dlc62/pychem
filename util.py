@@ -50,15 +50,11 @@ def remove_punctuation(basis_set):
     basis_set = basis_set.replace('*','s').replace('-','').replace('(','').replace(')','').replace(',','').upper()
     return basis_set
 
-def single_excitations(n_electrons, n_orbitals):
-    """Takes the number of electrons of a particular spin and the number
-    of orbitals and returns the list of pairs corresponding to all single
-    excitations"""
+def single_excitations(occ_start, occ_stop, virt_start, virt_stop):
     excitations = []
-    n_virtual_orbitals = n_orbitals - n_electrons
-    for i in range(1,n_electrons+1):
-        for j in range(1,n_virtual_orbitals+1):
-            excitations.append([-i,j])
+    for i in range(occ_start, occ_stop):
+        for j in range(virt_start, virt_stop):
+            excitations.append([i,j])
     return excitations
 
 def make_length_equal(list1, list2, place_holder = []):
