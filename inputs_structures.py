@@ -403,10 +403,10 @@ class Molecule:
            try:
               assert type(alpha_excitations) is list
               for alpha_excitation in alpha_excitations:
-                 assert alpha_excitation is list
+                 assert type(alpha_excitation) is list
               assert type(beta_excitations) is list
               for beta_excitation in beta_excitations:
-                 assert beta_excitation is list
+                 assert type(beta_excitation) is list
               excitation_type = 'CUSTOM'
            except AssertionError:
               print("""Excitations can be specified using Excitations = 'Single, 'Double', 'Homo-Lumo' or 'Double-Paired', or as 
