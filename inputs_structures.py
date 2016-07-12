@@ -371,7 +371,7 @@ class Molecule:
         #------------- Excited state specifications ------------------#
         #      contains ElectronicState -> Matrices subclasses        #
         #-------------------------------------------------------------#
-        available_excitation_types = ['SINGLE', 'DOUBLE', 'HOMO-LUMO', 'DOUBLE-PAIRED']
+        available_excitation_types = ['SINGLE', 'DOUBLE', 'HOMO-LUMO', 'DOUBLE-PAIRED', 'CUSTOM-SINGLE','CUSTOM-PAIRED']
         try:
            excitation_type = inputs("Excitations")
         except ConfigParser.NoOptionError:
@@ -388,18 +388,22 @@ class Molecule:
            elif (alpha_excitations != [[]]) and (beta_excitations != [[]]):
               try:
                  assert len(alpha_excitations) == len(beta_excitations) 
-                 excitation_type = 'PAIRED'
+                 excitation_type = 'CUSTOM-PAIRED'
               except AssertionError:
                  print("""Alpha_Excitations and Beta_Excitations lists must be equal in length if both keywords present,
                           blank sub-lists can be used as placeholders""")
                  sys.exit()
            else:
-              excitation_type = 'SINGLE'
+              excitation_type = 'CUSTOM-SINGLE'
 
         # Check that excitations were given in the correct format
         try:
            assert excitation_type in available_excitation_types
         except:
+           print("""Excitations can be specified by keyword as Excitations = 'Single, 'Double', 'Homo-Lumo' or 'Double-Paired'""")
+           sys.exit()
+ 
+        if (excitation_type is 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'): 
            try:
               assert type(alpha_excitations) is list
               for alpha_excitation in alpha_excitations:
@@ -407,10 +411,8 @@ class Molecule:
               assert type(beta_excitations) is list
               for beta_excitation in beta_excitations:
                  assert type(beta_excitation) is list
-              excitation_type = 'CUSTOM'
            except AssertionError:
-              print("""Excitations can be specified using Excitations = 'Single, 'Double', 'Homo-Lumo' or 'Double-Paired', or as 
-                    Alpha_Excitations and/or Beta_Excitations lists of [from,to] orbital pairs, with absolute indexing from 0""")
+              print("""Custom excitations specified as Alpha_Excitations or Beta_Excitations lists of [from,to] orbital pairs""")
               sys.exit()
 
         # Make excitation lists for corresponding keywords 
@@ -421,7 +423,7 @@ class Molecule:
            self.AlphaExcitations = util.single_excitations(self.NCoreOrbitals, self.NBetaElectrons, self.NAlphaElectrons, self.NOrbitals)
         if (excitation_type == 'HOMO-LUMO'):
            self.AlphaExcitations = util.single_excitations(self.NAlphaElectrons-1, self.NAlphaElectrons, self.NAlphaElectrons, self.NAlphaElectrons+1) 
-        if (excitation_type == 'CUSTOM'):
+        if (excitation_type == 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'):
            self.AlphaExcitations = alpha_excitations
            self.BetaExcitations = beta_excitations
         self.ExcitationType = excitation_type 
@@ -455,7 +457,7 @@ class Molecule:
             if alpha_excitation != []:
                alpha_occupied = self.do_excitation(alpha_ground, alpha_excitation)
             else:
-               if self.ExcitationType == 'PAIRED':
+               if self.ExcitationType == 'CUSTOM-PAIRED':
                   alpha_occupied = alpha_ground
                   beta_occupied = self.do_excitation(beta_ground, self.BetaExcitations[i])
                else:
@@ -469,10 +471,11 @@ class Molecule:
                   beta_occupied = self.do_excitation(beta_ground, beta_excitation)
                   self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
             else:
+               beta_occupied = beta_ground
                self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
 
         # Do single beta excitations separately
-        if (self.ExcitationType == 'SINGLE'):
+        if (self.ExcitationType == 'SINGLE') or (self.ExcitationType == 'CUSTOM-SINGLE'):
             alpha_occupied = alpha_ground
             if ((self.ExcitationType == 'SINGLE') and (self.Multiplicity == 1) and (self.AlphaExcitations != [[]])):
                pass
