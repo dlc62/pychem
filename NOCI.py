@@ -2,7 +2,7 @@ import numpy as np
 import copy
 import hartree_fock as HF
 import integrals
-from util import inner_product, resize_array
+from util import inner_product, resize_array, occupied
 from scipy.linalg import eigh as gen_eig
 
 THRESH = 1e-8  # Maybe move this into constants.py
@@ -25,11 +25,10 @@ def biorthoginalize(state1, state2, molecule):
     # Note this only returns the MO coeffs corresponding to the occupied MOs """
 
     # Finding the overlap of the occupied MOs
-    MOs1 = occupied(state1);     MOs2 = state2.occupied(state1)
+    MOs1 = occupied(state1);     MOs2 = occupied(state2)
     det_overlap = MOs1.T.dot(molecule.Overlap).dot(MOs2)
 
-    U, o, Vt = np.linalg.svd(det_overlap)
-    overlap = np.linalg.det(U) * np.linalg.det(Vt) * np.product(o)
+    U, _, Vt = np.linalg.svd(det_overlap)
 
     # Transforming each of the determinants into a biorthoginal basis
     new_MOs1 = MOs1.dot(U)
@@ -200,5 +199,5 @@ def do_NOCI(molecule):
 
     print("State Energies")
     print(energies)
-
+   
     return 0
