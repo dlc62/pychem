@@ -15,6 +15,7 @@ import basis_fit
 import util
 import printf
 import mp2
+from NOCI import do_NOCI
 
 
 #======================================================================#
@@ -78,12 +79,15 @@ def do_calculation(settings, molecule):
         # Dump MOs to file for other basis sets, all states
         util.store('MOs', molecule.States, settings.SectionName, basis_set)
     #-------------------------------------------------------------------
-
+    #import NOCI
+    #NOCI.NOCI(molecule)
     # Do state-specific MP2 in final basis only
     if settings.Method == 'MP2':
         for index, state in enumerate(molecule.States):
             mp2.do(settings, molecule, state, index)
 
+    #do_NOCI(molecule)
+    
     # Close output file
     printf.finalize(settings)
 

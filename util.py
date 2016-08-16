@@ -2,14 +2,13 @@
 from copy import deepcopy
 import pickle
 import numpy
-from numpy import dot
 
-# --------------------- Helpful subroutines ---------------------------# 
+# --------------------- Helpful subroutines ---------------------------#
 
 # Used in pychem.py
 
 def excite(matrix, occupancy, NElectrons):
-# This function permutes the molecular orbitals for excited states 
+# This function permutes the molecular orbitals for excited states
 # so that the newly occupied orbitals come before newly unoccupied ones
     new_matrix = deepcopy(matrix)
     frm = []                        # list contains indexes of orbitals to be excited from
@@ -24,7 +23,7 @@ def excite(matrix, occupancy, NElectrons):
         new_matrix[:,[frm[i],to[i]]] = new_matrix[:,[to[i],frm[i]]]
     return new_matrix
 
-# Used everywhere 
+# Used everywhere
 
 def store(data_type_suffix, data, section_name, basis_set=None):
     if basis_set == None:
@@ -34,14 +33,14 @@ def store(data_type_suffix, data, section_name, basis_set=None):
        # store data for all basis sets
        section_name = section_name + '_'
        basis_set = basis_set + '.'
-    pickle.dump(data, open(section_name + basis_set + data_type_suffix,'wb')) 
+    pickle.dump(data, open(section_name + basis_set + data_type_suffix,'wb'))
 
 def fetch(data_type_suffix, section_name, basis_set=None):
     if basis_set == None:
        section_name = section_name + '.'
     else:
        section_name = section_name + '_'
-    data = pickle.load(open(section_name + basis_set + data_type_suffix,'rb')) 
+    data = pickle.load(open(section_name + basis_set + data_type_suffix,'rb'))
     return data
 
 # Used in inputs_structures.py
@@ -67,13 +66,29 @@ def make_length_equal(list1, list2, place_holder = []):
 
 # Used in diis.py
 
-def inner_product(mat1, mat2):
+def inner_product(mat1, mat2):    # Also used in NOCI
     product = mat1.dot(mat2.T)
     return numpy.trace(product)
 
 def eigenvalue_condition_number(matrix):
     eigvals, eigvecs = numpy.linalg.eig(matrix)
     abs_eigvals = [abs(element) for element in eigvals]
-    condition_number = max(abs_eigvals) / min(abs_eigvals) 
+    condition_number = max(abs_eigvals) / min(abs_eigvals)
     return condition_number
 
+# used in NOCI
+
+def resize_array(src, dest):
+    """ Makes array src the same size as array dest, the old array is embeded in
+     the upper right corner and the other elements are zero. Only works for
+     for projecting a vector into a vector or a matrix into a matrix """
+    new_shape = numpy.shape(dest)
+    old_shape = numpy.shape(src)
+    new_array = numpy.zeros(new_shape)
+    if len(old_shape) is 2:              # Matrix
+        height, width = old_shape
+        new_array[:height, :width] = src
+    else:                                # Vector
+        length = old_shape[0]
+        new_array[:length] = src
+    return new_array

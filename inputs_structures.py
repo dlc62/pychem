@@ -387,7 +387,7 @@ class Molecule:
               excitation_type = None
            elif (alpha_excitations != [[]]) and (beta_excitations != [[]]):
               try:
-                 assert len(alpha_excitations) == len(beta_excitations) 
+                 assert len(alpha_excitations) == len(beta_excitations)
                  excitation_type = 'CUSTOM-PAIRED'
               except AssertionError:
                  print("""Alpha_Excitations and Beta_Excitations lists must be equal in length if both keywords present,
@@ -402,8 +402,8 @@ class Molecule:
         except:
            print("""Excitations can be specified by keyword as Excitations = 'Single, 'Double', 'Homo-Lumo' or 'Double-Paired'""")
            sys.exit()
- 
-        if (excitation_type is 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'): 
+
+        if (excitation_type is 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'):
            try:
               assert type(alpha_excitations) is list
               for alpha_excitation in alpha_excitations:
@@ -415,18 +415,18 @@ class Molecule:
               print("""Custom excitations specified as Alpha_Excitations or Beta_Excitations lists of [from,to] orbital pairs""")
               sys.exit()
 
-        # Make excitation lists for corresponding keywords 
+        # Make excitation lists for corresponding keywords
         if (excitation_type == 'SINGLE') or (excitation_type == 'DOUBLE'):
            self.AlphaExcitations = util.single_excitations(self.NCoreOrbitals, self.NAlphaElectrons, self.NAlphaElectrons, self.NOrbitals)
            self.BetaExcitations = util.single_excitations(self.NCoreOrbitals, self.NBetaElectrons, self.NBetaElectrons, self.NOrbitals)
-        if (excitation_type == 'DOUBLE-PAIRED'): 
+        if (excitation_type == 'DOUBLE-PAIRED'):
            self.AlphaExcitations = util.single_excitations(self.NCoreOrbitals, self.NBetaElectrons, self.NAlphaElectrons, self.NOrbitals)
         if (excitation_type == 'HOMO-LUMO'):
-           self.AlphaExcitations = util.single_excitations(self.NAlphaElectrons-1, self.NAlphaElectrons, self.NAlphaElectrons, self.NAlphaElectrons+1) 
+           self.AlphaExcitations = util.single_excitations(self.NAlphaElectrons-1, self.NAlphaElectrons, self.NAlphaElectrons, self.NAlphaElectrons+1)
         if (excitation_type == 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'):
            self.AlphaExcitations = alpha_excitations
            self.BetaExcitations = beta_excitations
-        self.ExcitationType = excitation_type 
+        self.ExcitationType = excitation_type
 
         #-------------------------------------------------------------#
         #   Generate excited states, each an ElectronicState object   #

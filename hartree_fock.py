@@ -22,7 +22,6 @@ import mom
 #=================================================================#
 
 def do_SCF(settings, molecule, state, state_index = 0):
-
     # Calculate values that are constant throughout the calculation
     molecule.NuclearRepulsion = integrals.nuclear_repulsion(molecule)
     make_core_matrices(molecule)
@@ -72,10 +71,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
     final_loop = False
     diis_error = None
     energies = []
-    if state_index == 0:
-        diis_error_vec = "commute"   # Use the commutator of F and D for the ground state
-    else:
-        diis_error_vec = "diff"      # Use the difference between succesive fock matrices for other states
+    diis_error_vec = "commute" if state_index is 0 else "diff"
 
     while energy_convergence < abs(dE):
         num_iterations += 1
@@ -83,19 +79,8 @@ def do_SCF(settings, molecule, state, state_index = 0):
         #               Main SCF step               #
         #-------------------------------------------#
         initialize_fock_matrices(molecule.Core, state)
-        # Sanity check on the fock matrices remove this later
-        try:
-            from numpy import allclose
-            assert(allclose(state.Alpha.Fock.T, state.Alpha.Fock))
-            assert(allclose(state.Beta.Fock.T, state.Beta.Fock))
-        except:
-            print("Non-Hermitean Fock Matrix")
-            import sys
-            sys.exit()
-
         make_coulomb_exchange_matrices(molecule, state, num_iterations, settings.SCF.Ints_Handling)
         #make_fock_matrices(molecule, state)
-
         if settings.SCF.Reference == "CUHF" and num_iterations > 1:
             lambda_max = constrain_UHF(molecule, state, state_index)
 
@@ -159,19 +144,11 @@ def make_MOs(molecule,this):
 
 #----------------------------------------------------------------------
 
-def make_density_matrices(molecule,this):
-
-    this.Alpha.Density.fill(0)
-    this.Beta.Density.fill(0)
-
-    for ia in range(0,molecule.NOrbitals):
-        for ib in range(0,molecule.NOrbitals):
-           for n in range(0,molecule.NAlphaElectrons):
-               this.Alpha.Density[ia][ib] += this.Alpha.MOs[ia][n]*this.Alpha.MOs[ib][n]
-           for n in range(0,molecule.NBetaElectrons):
-               this.Beta.Density[ia][ib] += this.Beta.MOs[ia][n]*this.Beta.MOs[ib][n]
-
-    this.Total.Density = numpy.add(this.Alpha.Density,this.Beta.Density)
+def make_density_matrices(molecule, this):
+    nA = molecule.NAlphaElectrons; nB = molecule.NBetaElectrons
+    this.Alpha.Density = this.Alpha.MOs[:,:nA].dot(this.Alpha.MOs[:,:nA].T)
+    this.Beta.Density = this.Beta.MOs[:,:nB].dot(this.Beta.MOs[:,:nB].T)
+    this.Total.Density = numpy.add(this.Alpha.Density, this.Beta.Density)
 
 #----------------------------------------------------------------------
 
@@ -323,3 +300,11 @@ def plot(energies):
         plt.show()
     else:
         print("Plotting only supported for Python 2")
+
+def distance(density1, density2, molecule):
+    """ Calculatest he distance between two sets of MOs using the metric
+        from Phys. Rev. Lett. 101 193001 """
+
+    co_density = molecule.Overlap.dot(density2).dot(molecule.Overlap)  # Calculating the covarient density matrix
+    solution_overlap = numpy.einsum('ij,ji', density1, co_density)
+    return molecule.NElectrons - solution_overlap
