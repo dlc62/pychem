@@ -92,3 +92,9 @@ def resize_array(src, dest):
         length = old_shape[0]
         new_array[:length] = src
     return new_array
+
+def occupied(matrices):
+    """ Returns a matrix corresponding to just the occupied MOs"""
+    n = sum(matrices.Occupancy)
+    size = len(matrices.Occupancy)
+    return matrices.MOs[:,0:n]
