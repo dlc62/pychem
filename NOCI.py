@@ -1,23 +1,80 @@
 import numpy as np
 import copy
-import hartree_fock as HF
 import integrals
 from util import inner_product, resize_array, occupied
 from scipy.linalg import eigh as gen_eig
 
-THRESH = 1e-8  # Maybe move this into constants.py
+# Maximum Overlap value to consider a zero overlap
+# This only seems to happen in spin-flip CI 
+THRESH = 1e-10  # Maybe move this into constants.py
 
-class CoDensity_State:
-    # A state like object used for calculating and
-    # storing the psudo fock matrix
-    def __init__(self, Alpha_Density, Beta_Density):
-        size = len(Alpha_Density)
-        self.alpha = Alpha_Density
-        self.beta = Beta_Density
-        self.total = Alpha_Density + Beta_Density
-        self.coulomb = np.zeros((size, size))
-        self.alpha_exchange = np.zeros((size, size))
-        self.beta_exchange = np.zeros((size, size))
+def do_NOCI(molecule):
+    """ Main function - takes a molecule and perfroms NOCI using all the availible
+        States """
+    dims = len(molecule.States)              # Dimensionality of the CI space
+    CI_matrix = np.zeros((dims, dims))
+    CI_overlap = np.zeros((dims, dims))
+
+    #for i in range(len(molecule.States)):
+    #    molecule.States[i].Alpha.MOs /= np.sqrt(2)
+    #    molecule.States[i].Beta.MOs /= np.sqrt(2)
+
+    # Building the CI matrix
+    for i, state1 in enumerate(molecule.States):
+        for j, state2 in enumerate(molecule.States[:i+1]):
+
+
+
+            # Biorthoginalize the occupied MOs
+            alpha = biorthoginalize(state1.Alpha, state2.Alpha, molecule)
+            beta = biorthoginalize(state1.Beta, state2.Beta, molecule)
+
+            # Calculate the core fock matrix for the state transformed into the MOs basis
+            molecule.alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1])
+            molecule.beta_core = beta[0].T.dot(molecule.Core).dot(beta[1])
+
+            # Get the diagonal elements and use them to calculated the overlap, reduced overlap
+            # and the list of zero overlaps
+            alpha_overlaps = np.diagonal(alpha[0].T.dot(molecule.Overlap).dot(alpha[1]))
+            beta_overlaps = np.diagonal(beta[0].T.dot(molecule.Overlap).dot(beta[1]))
+            #state_overlap = (np.product(alpha_overlaps) * np.product(beta_overlaps))
+            state_overlap = (np.product(alpha_overlaps) + np.product(beta_overlaps)) / 2
+            reduced_overlap, zeros_list = process_overlaps(1, [], alpha_overlaps, "alpha")
+            reduced_overlap, zeros_list = process_overlaps(reduced_overlap, zeros_list, beta_overlaps, "beta")
+
+            # Ensure that the alpha and beta arrays are the same size
+            if molecule.NAlphaElectrons > molecule.NBetaElectrons:
+                beta_overlaps = resize_array(beta_overlaps, alpha_overlaps)
+                beta[0] = resize_array(beta[0], alpha[0])
+                beta[1] = resize_array(beta[1], alpha[1])
+
+            num_zeros = len(zeros_list)
+        # Calculated the element of the Hamiltonian matrix
+            if num_zeros is 0:
+                elem = no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule)
+            elif num_zeros is 1:
+                elem = one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zeros_list[0], molecule)
+            elif num_zeros is 2:
+                elem = two_zeros(alpha, beta, zeros_list, molecule)
+            else:  # num_zeros > 2
+                elem = 0
+            elem *= reduced_overlap
+
+            CI_matrix[i,j] = CI_matrix[j,i] = elem
+            CI_overlap[i,j] = CI_overlap[j,i] = state_overlap
+
+    # Solve the generalized eigenvalue problem
+    energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
+    # Check that the generalized eigenvalue problem was solved correctly
+    # remove this once I'm confident everything is working
+    assert(np.allclose(CI_matrix.dot(wavefunctions), CI_overlap.dot(wavefunctions).dot(np.diag(energies))))
+
+    print("States")
+    print(wavefunctions)
+
+    print("State Energies")
+    print(energies)
+
 
 def biorthoginalize(state1, state2, molecule):
     # This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
@@ -31,17 +88,35 @@ def biorthoginalize(state1, state2, molecule):
     U, _, Vt = np.linalg.svd(det_overlap)
 
     # Transforming each of the determinants into a biorthoginal basis
-    new_MOs1 = MOs1.dot(U)
-    new_MOs2 = MOs2.dot(Vt.T)
+    new_MOs1 = MOs1.dot(U.T)
+    new_MOs2 = MOs2.dot(Vt)
+
+    # ensuring the relative phases of the orbitals are maintained
+    MO1_overlap = new_MOs1[:,0].dot(molecule.Overlap).dot(new_MOs2[:,0])
+    if MO1_overlap < 0:
+        new_MOs1 *= -1
 
     return [new_MOs1, new_MOs2]      # This is returned as a list to allows reassignment later
+
+class CoDensity_State:
+    # A state like object used for calculating and
+    # storing the psudo fock matrix
+    def __init__(self, Alpha_Density, Beta_Density):
+        size = len(Alpha_Density)
+        self.alpha = Alpha_Density
+        self.beta = Beta_Density
+        self.total = Alpha_Density + Beta_Density
+        self.coulomb = np.zeros((size, size))
+        self.alpha_exchange = np.zeros((size, size))
+        self.beta_exchange = np.zeros((size, size))
 
 def make_coulomb_exchange_matrices(molecule, state):
     # Modified version for calculating the coulomb and exhange matrices without
     #building the fock matrices
 
+    # Check if the ColoumbIntegrals have been stored in core
     if hasattr(molecule, "ColoumbIntegrals"):
-        ints_handleing = "INCORE"
+        ints_handling = "INCORE"
     else:
         ints_handling = "DIRECT"
 
@@ -74,69 +149,15 @@ def make_coulomb_exchange_matrices(molecule, state):
                                 state.alpha_exchange[ia_vec[m]][ib_vec[n]] += -state.alpha[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
                                 state.beta_exchange[ia_vec[m]][ib_vec[n]]  += -state.beta[ic_vec[l]][id_vec[s]]*exchange[m][s][l][n]
 
-# -----------------------------------------------------------#
-#     Functions for calculating the CI matrix elements       #
-#       Note: these do not include the reduced overlap       #
-#             term, that is included latter.                 #
-# -----------------------------------------------------------#
-
-def two_zeros(alpha, beta, zeros_list, molecule):
-    elem = 0
-    for (index, spin) in zeros_list:
-        P_alpha = np.outer(alpha[0][:,i].dot(alpha[1][:,i]))
-        P_beta = np.outer(beta[0][:,i].dot(beta[1][:,i]))
-        state = CoDensity_State(P_alpha, P_beta)
-        make_coulomb_exchange_matrices(molecule, state)
-        active_exhange = state.alpha_exhange if spin == 'alpha' else state.beta_exchange
-
-        elem += inner_product(state.total, state.coulomb) + inner_product(state.total, active_exhange)
-
-    return elem
-
-def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
-
-    zero_index = zero[0]
-
-    # Making all the required Codensity matrices
-    W_alpha = make_weighted_density(alpha, alpha_overlaps)
-    W_beta = make_weighted_density(beta, beta_overlaps)
-    P_alpha = np.outer(alpha[0][:,zero_index], alpha[1][:,zero_index])
-    P_beta = np.outer(beta[0][:,zero_index], beta[1][:,zero_index])
-    P_total = P_alpha + P_beta
-
-    state = CoDensity_State(W_alpha, W_beta)
-    make_coulomb_exchange_matrices(molecule, state)
-    active_exchange = state.alpha_exchange if zero[1] == "alpha" else state.beta_exchange
-
-    elem = inner_product(P_total, state.total) + inner_product(P_total, active_exchange) + molecule.Core[zero_index, zero_index]
-
-    return elem
-
-def no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule):
-
-    W_alpha = make_weighted_density(alpha, alpha_overlaps)
-    W_beta = make_weighted_density(beta, beta_overlaps)
-    state = CoDensity_State(W_alpha, W_beta)
-    make_coulomb_exchange_matrices(molecule, state)
-
-    elem = 0.5 * inner_product(W_alpha + W_beta, state.coulomb)
-    elem += inner_product(W_alpha, state.alpha_exchange) + inner_product(W_beta, state.beta_exchange)
-
-    for i in range(len(alpha_overlaps)):
-        total_overlap = alpha_overlaps[i] + beta_overlaps[i]
-        if total_overlap > 2 * THRESH:
-            elem += molecule.Core[i,i] / total_overlap
-
-    return elem
-
-def make_weighted_density(MOs, overlaps):
-    nElec = np.shape(MOs)[1]
-    density = np.zeros((nElec, nElec))
+def make_weighted_density(MOs, overlaps, molecule):
+    nOrbs = np.shape(MOs)[1]
+    density = np.zeros((nOrbs, nOrbs))
+    MOs[0] = resize_array(MOs[0], density)
+    MOs[1] = resize_array(MOs[1], density)
     for i, overlap in enumerate(overlaps):
         if overlap > THRESH:
             P = np.outer(MOs[0][:,i], MOs[1][:,i])
             density += P / overlap
-
     return density
 
 def process_overlaps(reduced_overlap, zeros_list, overlaps, spin):
@@ -149,55 +170,63 @@ def process_overlaps(reduced_overlap, zeros_list, overlaps, spin):
             reduced_overlap *= overlap
     return reduced_overlap, zeros_list
 
-def do_NOCI(molecule):
-    """ Main function - takes a molecule and perfroms NOCI using all the availible
-        States """
-    dims = len(molecule.States)              # Dimensionality of the CI space
-    CI_matrix = np.zeros((dims, dims))
-    CI_overlap = np.zeros((dims, dims))
+# -----------------------------------------------------------#
+#     Functions for calculating the CI matrix elements       #
+#       Note: these do not include the reduced overlap       #
+#             term, that is included latter.                 #
+# -----------------------------------------------------------#
 
-    # Building the CI matrix
-    for i, state1 in enumerate(molecule.States):
-        for j, state2 in enumerate(molecule.States[:i+1]):
+def two_zeros(alpha, beta, zeros_list, molecule):
+    elem = 0
+    for (i, spin) in zeros_list:
+        P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
+        P_beta = np.outer(beta[0][:,i], beta[1][:,i])
+        state = CoDensity_State(P_alpha, P_beta)
+        make_coulomb_exchange_matrices(molecule, state)
+        active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
 
-            # Biorthoginalize the occupied MOs
-            alpha = biorthoginalize(state1.Alpha, state2.Alpha, molecule)
-            beta = biorthoginalize(state1.Beta, state2.Beta, molecule)
+        elem += inner_product(state.total, state.coulomb) + inner_product(state.total, active_exhange)
 
-            # Get the diagonal elements and use them to calculated the overlap, reduced overlap
-            # and the list of zero overlaps
-            alpha_overlaps = np.diagonal(alpha[0].T.dot(molecule.Overlap).dot(alpha[1]))
-            beta_overlaps = np.diagonal(beta[0].T.dot(molecule.Overlap).dot(beta[1]))
-            state_overlap = (np.product(alpha_overlaps) + np.product(beta_overlaps)) / 2
-            reduced_overlap, zeros_list = process_overlaps(1, [], alpha_overlaps, "alpha")
-            reduced_overlap, zeros_list = process_overlaps(reduced_overlap, zeros_list, beta_overlaps, "beta")
+    return elem
 
-            # Ensure that the alpha and beta arrays are the same size
-            if molecule.NAlphaElectrons > molecule.NBetaElectrons:
-                beta_overlaps = resize_array(beta_overlaps, alpha_overlaps)
-                beta[0] = resize_array(beta[0], alpha[0])
-                beta[1] = resize_array(beta[1], alpha[1])
+def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
 
-            num_zeros = len(zeros_list)
+    zero_index = zero[0]
 
-        # Calculated the element of the Hamiltonian matrix
-            if num_zeros is 2:
-                elem = two_zeros(alpha, beta, zeros_list, molecule)
-            elif num_zeros is 1:
-                elem = one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zeros_list[0], molecule)
-            elif num_zeros is 0:
-                elem = no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule)
-            else:  # num_zeros > 2
-                elem = 0
-            elem *= reduced_overlap
+    # Making all the required Codensity matrices
+    W_alpha = make_weighted_density(alpha, alpha_overlaps, molecule)
+    W_beta = make_weighted_density(beta, beta_overlaps, molecule)
+    P_alpha = np.outer(alpha[0][:,zero_index], alpha[1][:,zero_index])
+    P_beta = np.outer(beta[0][:,zero_index], beta[1][:,zero_index])
+    P_total = P_alpha + P_beta
 
-            CI_matrix[i,j] = CI_matrix[j,i] = elem
-            CI_overlap[i,j] = CI_overlap[j,i] = state_overlap
+    state = CoDensity_State(W_alpha, W_beta)
+    make_coulomb_exchange_matrices(molecule, state)
+    active_exchange = state.alpha_exchange if zero[1] == "alpha" else state.beta_exchange
+    active_core = molecule.alpha_core if zero[1] == "alpha" else molecule.beta_core
 
-    # Solve the generalized eigenvalue problem
-    energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
+    elem = inner_product(P_total, state.coulomb) + inner_product(P_total, active_exchange) + active_core[zero_index, zero_index]
 
-    print("State Energies")
-    print(energies)
-   
-    return 0
+    return elem
+
+def no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule):
+
+    W_alpha = make_weighted_density(alpha, alpha_overlaps, molecule)
+    W_beta = make_weighted_density(beta, beta_overlaps, molecule)
+    state = CoDensity_State(W_alpha, W_beta)
+    make_coulomb_exchange_matrices(molecule, state)
+
+    elem = 0.5 * inner_product(W_alpha + W_beta, state.coulomb)
+    elem += inner_product(W_alpha, state.alpha_exchange)
+    elem += inner_product(W_beta, state.beta_exchange)
+
+    # Add the one electron terms
+    for i in range(molecule.NAlphaElectrons):
+        if alpha_overlaps[i] > THRESH:
+            elem += molecule.alpha_core[i,i] / alpha_overlaps[i]
+
+    for i in range(molecule.NBetaElectrons):
+        if beta_overlaps[i] > THRESH:
+             elem += molecule.beta_core[i,i] / beta_overlaps[i]
+
+    return elem
