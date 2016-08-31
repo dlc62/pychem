@@ -78,13 +78,12 @@ def eigenvalue_condition_number(matrix):
 
 # used in NOCI
 
-def resize_array(src, dest):
+def resize_array(src, dest, fill=0):
     """ Makes array src the same size as array dest, the old array is embeded in
      the upper right corner and the other elements are zero. Only works for
      for projecting a vector into a vector or a matrix into a matrix """
-    new_shape = numpy.shape(dest)
     old_shape = numpy.shape(src)
-    new_array = numpy.zeros(new_shape)
+    new_array = numpy.full_like(dest, fill)
     if len(old_shape) is 2:              # Matrix
         height, width = old_shape
         new_array[:height, :width] = src

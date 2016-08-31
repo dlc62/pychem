@@ -36,3 +36,4 @@ energy_convergence_final = 1e-6
 density_convergence = 1.e-6
 DIIS_convergence = 1.e-5
 DIIS_max_condition = 1e6
+NOCI_Thresh = 1e-10
