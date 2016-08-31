@@ -6,7 +6,7 @@ from constants import NOCI_Thresh as THRESH
 from util import inner_product, resize_array, occupied
 
 
-def do_NOCI(molecule):
+def do_NOCI(molecule, settings):
     """ Main function - takes a molecule and perfroms NOCI using all the availible
         States """
     dims = len(molecule.States)              # Dimensionality of the CI space
@@ -60,17 +60,21 @@ def do_NOCI(molecule):
     # Solve the generalized eigenvalue problem
     energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
 
-    print("Hamiltonian")
-    print(CI_matrix)
+    print("=== NOCI Output ===")
+    
+    if (settings.print_level > 1):
+        print("Hamiltonian")
+        print(CI_matrix)
 
-    print("CI Overlap")
-    print(CI_overlap)
+    if (settings.print_level > 2):
+        print("State Overlaps")
+        print(CI_overlap)
 
     print("States")
     print(wavefunctions)
 
     print("State Energies")
-    print(energies) #+ molecule.NuclearRepulsion)
+    print(energies)
 
 def biorthoginalize(state1, state2, molecule):
     # This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
@@ -226,52 +230,3 @@ def two_zeros(alpha, beta, zeros_list, molecule):
         elem += inner_product(state.total, state.coulomb) + inner_product(state.total, active_exhange)
 
     return elem
-
-
-"""
-def no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule):
-
-    elem = 0
-    size = molecule.NAlphaElectrons
-
-    # Two Electron Terms
-    wCa = alpha[0] ; xCa = alpha[1]
-    wCb = beta[0]  ; xCb = beta[1]
-
-    for i in range(size):
-        for j in range(size):
-            a_coul = 0
-            b_coul = 0
-            ab_coul = 0
-            a_exch = 0
-            b_exch = 0
-
-            for a in range(size):
-                for b in range(size):
-                    for c in range(size):
-                        for d in range(size):
-                            a_coul  += wCa[a,i]*wCa[b,j]*xCa[c,i]*xCa[d,j] * molecule.CoulombIntegrals[a,b,c,d]
-                            b_coul  += wCb[a,i]*wCb[b,j]*xCb[c,i]*xCb[d,j] * molecule.CoulombIntegrals[a,b,c,d]
-                            a_exch  += wCa[a,i]*wCa[b,j]*xCa[c,j]*xCa[d,i] * molecule.ExchangeIntegrals[a,b,d,c]
-                            ab_coul += wCa[a,i]*wCb[b,j]*xCa[c,i]*xCb[d,j] * molecule.CoulombIntegrals[a,b,c,d]
-                            b_exch  += wCb[a,i]*wCb[b,j]*xCb[c,j]*xCb[d,i] * molecule.ExchangeIntegrals[a,b,d,c]
-            a_coul  /= (alpha_overlaps[i] * alpha_overlaps[j])
-            b_coul  /= (beta_overlaps[i] * beta_overlaps[j])
-            ab_coul /= (alpha_overlaps[i] * beta_overlaps[j])
-            a_exch  /= (alpha_overlaps[i] * alpha_overlaps[j])
-            b_exch  /= (beta_overlaps[i] * beta_overlaps[j])
-
-            elem += a_coul + b_coul + ab_coul + a_exch + b_exch
-    elem *= 0.5
-
-    # One electron terms
-    for i in range(molecule.NAlphaElectrons):
-        if alpha_overlaps[i] > THRESH:
-            elem += molecule.alpha_core[i,i] / alpha_overlaps[i]
-
-    for i in range(molecule.NBetaElectrons):
-        if beta_overlaps[i] > THRESH:
-             elem += molecule.beta_core[i,i] / beta_overlaps[i]
-
-    return elem
-"""

@@ -84,6 +84,9 @@ def do_calculation(settings, molecule):
         for index, state in enumerate(molecule.States):
             mp2.do(settings, molecule, state, index)
 
+    if settings.NOCI.Use:
+        do_NOCI(molecule, settings.NOCI)
+
     # Close output file
     printf.finalize(settings)
 

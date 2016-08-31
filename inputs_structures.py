@@ -65,6 +65,7 @@ class Settings:
         self.SCF = Set_SCF(inputs,len(self.BasisSets),self.Method)
         self.DIIS = Set_DIIS(inputs,self.SCF.Reference)
         self.MOM = Set_MOM(inputs)
+        self.NOCI = Set_NOCI(inputs)
 
     #=================================================================#
     def set_universal(self, inputs):
@@ -248,6 +249,22 @@ class Set_MOM:
             assert self.Reference in available_MOM_references
         except:
             self.Reference = "FIXED"
+
+
+#---------------------------------------------------------------------#
+class Set_NOCI:
+    def __init__(self, inputs):
+        try:
+            self.Use = inputs("Use_NOCI")
+            assert type(self.Use) is bool
+        except:
+            self.Use = False
+
+        try:
+            self.print_level = inputs("NOCI_Print_Level")
+        except:
+            self.print_level = 1
+
 #=====================================================================#
 
 #=====================================================================#
