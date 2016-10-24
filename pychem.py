@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # System libraries
 from __future__ import print_function
@@ -52,6 +52,7 @@ def do_calculation(settings, molecule):
         state.Alpha.MOs = util.excite(molecule.States[0].Alpha.MOs, state.AlphaOccupancy, molecule.NAlphaElectrons)
         state.Beta.MOs = util.excite(molecule.States[0].Beta.MOs, state.BetaOccupancy, molecule.NBetaElectrons)
 
+    for index, state in enumerate(molecule.States[1:], start = 1):
         hartree_fock.do_SCF(settings, molecule, state, index)
 
     # Dump MOs to file for initial basis set, all states
@@ -60,10 +61,19 @@ def do_calculation(settings, molecule):
     for basis_set in settings.BasisSets[1:]:
 
         # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones
+        # Or Read starting MOs from disk
         alpha_MOs = []; beta_MOs = []
-        for state in molecule.States:
-            alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
-            beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
+        if settings.SCF.Guess == "READ":
+            try:
+                molecule.States = util.fetch('MOs',settings.SCF.MOReadName,settings.SCF.MOReadBasis)
+                assert (molecule.States[0].Alpha.MOs) != []
+            except:
+                pass
+        else:
+            for state in molecule.States:
+                if settings.SCF.Guess != "READ":
+                    alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
+                    beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
 
         Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
         molecule.update_basis(basis_set, Store2eInts)
@@ -98,6 +108,8 @@ def do_calculation(settings, molecule):
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Please give an input file")
+    elif sys.argv[1] == "test":
+        util.run_tests()
     else:
         parser = ConfigParser.SafeConfigParser()
         has_read_data = parser.read(sys.argv[1])

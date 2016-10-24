@@ -172,6 +172,12 @@ class Set_SCF:
             except:
                 print("Must give appropriate details of file to read MOs from, using keywords MO_Read_Name and MO_Read_Basis")
                 sys.exit()
+            configparser.NoOptionError
+        if self.Guess == "CORE":
+            try:
+                self.Guess_Mix = inputs("SCF_Guess_Mix")
+            except ConfigParser.NoOptionError:
+                self.Guess_Mix = 0
         #------------------------- SCF Cycles ------------------------#
         try:
             self.MaxIter = inputs("Max_SCF_Iterations")
@@ -619,6 +625,15 @@ class Matrices:
         else:
             self.Coulomb = numpy.zeros((n_orbitals,) * 2)
 
+    def damp(self, coeff):
+        try:
+            self.old_Fock
+        except AttributeError:
+            self.old_Fock = copy.deepcopy(self.Fock)
+        damped_Fock = self.old_Fock * coeff + self.Fock * (1 - coeff)
+        self.old_Fock = copy.deepcopy(self.Fock)
+        self.Fock = damped_Fock
+        
 #---------------------------------------------------------------------#
 #                  ELECTRONIC STATE SUBCLASS - DIIS                   #
 #---------------------------------------------------------------------#

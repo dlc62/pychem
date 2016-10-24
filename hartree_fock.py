@@ -15,13 +15,14 @@ import integrals
 import printf
 import diis
 import mom
-#import initial_guess
+import util
 
 #=================================================================#
 #                        MAIN SUBROUTINE                          #
 #=================================================================#
 
 def do_SCF(settings, molecule, state, state_index = 0):
+
     # Calculate values that are constant throughout the calculation
     molecule.NuclearRepulsion = integrals.nuclear_repulsion(molecule)
     make_core_matrices(molecule)
@@ -39,9 +40,9 @@ def do_SCF(settings, molecule, state, state_index = 0):
     if state.Alpha.MOs != []:
         reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
     elif settings.SCF.Guess == "READ":
-        molecule.States = util.fetch('MOs',settings.MOReadName,settings.MOReadBasis)
+        molecule.States = util.fetch('MOs',settings.SCF.MOReadName,settings.SCF.MOReadBasis)
         try:
-            state = molecules.States[state_index]
+            state = molecule.States[state_index]
             assert len(state.Alpha.MOs) == molecule.NOrbitals
             reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
         except:
@@ -49,10 +50,16 @@ def do_SCF(settings, molecule, state, state_index = 0):
             sys.exit()
     elif settings.SCF.Guess == "CORE":
         make_MOs(molecule, state)
+        if settings.SCF.Guess_Mix != 0:
+            mix_orbitals(state.Alpha.MOs, state.AlphaOccupancy, settings.SCF.Guess_Mix)
+            reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
         reference_orbitals = None
 #    elif settings.SCF.Guess == "SAD":
 #        molecule.AlphaDensity, molecule.BetaDensity = initial_guess.sad(molecule)
 #        reference_orbitals = None
+    if state_index is not 0 and settings.SCF.Guess == "READ":
+        state = util.fetch('MOs',settings.SCF.MOReadName,settings.SCF.MOReadBasis)[state_index]
+        reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
 
     if settings.SCF.Guess != 'SAD':
         make_density_matrices(molecule, state)
@@ -80,16 +87,15 @@ def do_SCF(settings, molecule, state, state_index = 0):
         #-------------------------------------------#
         initialize_fock_matrices(molecule.Core, state)
         make_coulomb_exchange_matrices(molecule, state, num_iterations, settings.SCF.Ints_Handling)
-        #make_fock_matrices(molecule, state)
-        if settings.SCF.Reference == "CUHF" and num_iterations > 1:
-            lambda_max = constrain_UHF(molecule, state, state_index)
 
+        if settings.SCF.Reference == "CUHF" and num_iterations > 1:
+            constrain_UHF(molecule, state, state_index)
         #-------------------------------------------#
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
         # DIIS
-        if settings.DIIS.Use is True: #and dE < 0:
-            diis.do(molecule, state, settings, diis_error_vec)
+        if settings.DIIS.Use:
+            diis.do(molecule, state, settings, diis_error_vec, state_index, num_iterations)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
         # Update MOM reference orbitals to last iteration values if requested
@@ -111,7 +117,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         state.TotalEnergy = state.Energy + molecule.NuclearRepulsion
         energies.append(state.TotalEnergy)
 
-        if abs(dE) < energy_convergence:
+        if abs(dE) < energy_convergence or num_iterations >= settings.SCF.MaxIter:
             final_loop = True
 
         printf.HF_Loop(state, settings, num_iterations, dE, diis_error, final_loop)
@@ -244,23 +250,13 @@ def make_coulomb_exchange_matrices(molecule, this, num_iterations, ints_handling
 
 #----------------------------------------------------------------------
 
-def make_fock_matrices(molecule, this):
-    for shell_pair in molecule.ShellPairs:
-        ia_vec = shell_pair.Centre1.Ivec
-        ib_vec = shell_pair.Centre2.Ivec
-        for m in range(0,shell_pair.Centre1.Cgtf.NAngMom):
-            for n in range(0,shell_pair.Centre2.Cgtf.NAngMom):
-                this.Alpha.Fock[ia_vec[m]][ib_vec[n]] += (this.Total.Coulomb[ia_vec[m]][ib_vec[n]] + this.Alpha.Exchange[ia_vec[m]][ib_vec[n]])
-                this.Beta.Fock[ia_vec[m]][ib_vec[n]] += (this.Total.Coulomb[ia_vec[m]][ib_vec[n]] + this.Beta.Exchange[ia_vec[m]][ib_vec[n]])
-
-#----------------------------------------------------------------------
-
 def constrain_UHF(molecule, this, state_index):
 
+    occupancy = numpy.add(this.AlphaOccupancy, this.BetaOccupancy)
     N = molecule.NElectrons
     Nab = molecule.NAlphaElectrons * molecule.NBetaElectrons
-    Na = floor(molecule.Multiplicity / 2)                              # Dimension of active space
-    Nc = molecule.NAlphaElectrons - Na                                 # Dimension of core space
+    Na = numpy.count_nonzero(occupancy == 1)                    # Dimension of active space
+    Nc = numpy.count_nonzero(occupancy == 2)                    # Dimension of core space
     S = molecule.S
 
     half_density_matrix = S.dot(this.Total.Density/2).dot(S)
@@ -269,10 +265,10 @@ def constrain_UHF(molecule, this, state_index):
     back_trans = numpy.linalg.inv(NO_coeffs)
 
     # Calculate the expectation value of the spin operator
+    # Note the factor of 2 rather than 0.5 before the sum, this accounts for using half densities
     this.S2 = N*(N+4)/4. - Nab - 2 * sum([x ** 2 for x in NO_vals])   # Using formula from J. Chem. Phys. 88, 4926
-
     # Sort in order of descending occupancy
-    idx = NO_vals.argsort()[::-1]                    # Note the [::-1] reverses the index array
+    idx = NO_vals.argsort()
     core_space = idx[:Nc]                            # Indices of the core NOs
     valence_space = idx[(Nc + Na):]                  # Indices of the valence NOs
 
@@ -290,8 +286,14 @@ def constrain_UHF(molecule, this, state_index):
 
 #----------------------------------------------------------------------
 
+def mix_orbitals(MOs, occupancy, mix_coeff):
+    """ Mixes the HOMO and LUMO of the alpha orbitals by an ammount specified
+    by mix, 0 is not mixing, 1 is replacing the HOMO with the LUMO """
+    HOMO = numpy.count_nonzero(occupancy) - 1
+    MOs[:,HOMO] = MOs[:,HOMO] * (1 - mix_coeff) + MOs[:,HOMO+1] * mix_coeff
+#----------------------------------------------------------------------
+
 def plot(energies):
-    """ For use in plotting energies in the interactive debugger """
     import sys
     if sys.version_info.major == 2:
         import matplotlib.pyplot as plt
@@ -300,11 +302,3 @@ def plot(energies):
         plt.show()
     else:
         print("Plotting only supported for Python 2")
-
-def distance(density1, density2, molecule):
-    """ Calculatest he distance between two sets of MOs using the metric
-        from Phys. Rev. Lett. 101 193001 """
-
-    co_density = molecule.Overlap.dot(density2).dot(molecule.Overlap)  # Calculating the covarient density matrix
-    solution_overlap = numpy.einsum('ij,ji', density1, co_density)
-    return molecule.NElectrons - solution_overlap
