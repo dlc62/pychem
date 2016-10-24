@@ -2,6 +2,7 @@
 from copy import deepcopy
 import pickle
 import numpy
+import scipy
 
 # --------------------- Helpful subroutines ---------------------------#
 
@@ -23,6 +24,7 @@ def excite(matrix, occupancy, NElectrons):
         new_matrix[:,[frm[i],to[i]]] = new_matrix[:,[to[i],frm[i]]]
     return new_matrix
 
+
 # Used everywhere
 
 def store(data_type_suffix, data, section_name, basis_set=None):
@@ -37,10 +39,10 @@ def store(data_type_suffix, data, section_name, basis_set=None):
 
 def fetch(data_type_suffix, section_name, basis_set=None):
     if basis_set == None:
-       section_name = section_name + '.'
+       section_name = section_name.upper() + '.'
     else:
-       section_name = section_name + '_'
-    data = pickle.load(open(section_name + basis_set + data_type_suffix,'rb'))
+       section_name = section_name.upper() + '_'
+    data = pickle.load(open(section_name + basis_set + "." + data_type_suffix,'rb'))
     return data
 
 # Used in inputs_structures.py
@@ -97,3 +99,17 @@ def occupied(matrices):
     n = sum(matrices.Occupancy)
     size = len(matrices.Occupancy)
     return matrices.MOs[:,0:n]
+
+def distance(density1, density2, molecule):
+    """ Calculatest he distance between two sets of MOs using the metric
+        from Phys. Rev. Lett. 101 193001 """
+    co_density = molecule.Overlap.dot(density2).dot(molecule.Overlap)  # Calculating the covarient density matrix
+    den_prod, _ = scipy.linalg.sqrtm(density1.dot(co_density), disp=False)       # Note the sqrtm which isn't in the paper
+    return molecule.NElectrons - numpy.real(numpy.trace(den_prod))     # Imaginary part is a machine precision error
+
+def randU(n):
+    """ Generates a random n x n unitary matrix """
+    X = numpy.random.randn(n,n)
+    q, r = numpy.linalg.qr(X)
+    R = numpy.diag(numpy.sign(numpy.diag(r)))
+    return q.dot(R)

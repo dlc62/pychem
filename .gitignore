@@ -2,15 +2,17 @@
 /__pycache__
 *.pyc
 *.pyo
-*.out
 *.txt
 .DS_Store
 *.swp
 outfiles
-basis.py
 input.py
 
 *.inp 
 /examples 
 *.MOs
 pathtable
+*.out
+
+*.jl
+Outputs/

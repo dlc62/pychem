@@ -22,7 +22,7 @@ import util
 #                           Entry Point                                #
 #----------------------------------------------------------------------#
 
-def do(molecule, this, settings, error_vec):
+def do(molecule, this, settings, error_vec, state_index):
 
     # Set up error estimates
     if error_vec == "commute":
@@ -31,19 +31,20 @@ def do(molecule, this, settings, error_vec):
     else:
         alpha_residual = get_residual_diff(this.AlphaDIIS.pre_DIIS_fock, this.Alpha.Fock)
         beta_residual = get_residual_diff(this.BetaDIIS.pre_DIIS_fock, this.Beta.Fock)
+
     this.AlphaDIIS.Error = alpha_residual.max()
     this.BetaDIIS.Error = beta_residual.max()
     settings.DIIS.Threshold = -0.1 * this.Energy
 
     # Perform DIIS procedure
-    this.Alpha.Fock = diis(alpha_residual, this.Alpha.Fock, this.AlphaDIIS, settings)
-    this.Beta.Fock = diis(beta_residual, this.Beta.Fock, this.BetaDIIS, settings)
+    this.Alpha.Fock = diis(alpha_residual, this.Alpha.Fock, this.AlphaDIIS, settings, state_index, molecule)
+    this.Beta.Fock = diis(beta_residual, this.Beta.Fock, this.BetaDIIS, settings, state_index, molecule)
 
 #----------------------------------------------------------------------#
 #                           DIIS Procedure                             #
 #----------------------------------------------------------------------#
 
-def diis(residual, fock, DIIS, settings):
+def diis(residual, fock, DIIS, settings, state_index, molecule):
     DIIS.pre_DIIS_fock = fock
     if residual.max() < settings.DIIS.Threshold:
         DIIS.Residuals.append(residual)
@@ -133,7 +134,7 @@ def get_C2_coeffs(matrix, residuals):
     best_vect = None
     for vect in vects:
         vect /= sum(vect)         # renormalization
-        if abs(max(vect)) < 100:  # exluding vectors with large non-linearities
+        if abs(max(vect)) < 10:  # exluding vectors with large non-linearities
             error = estimate_error(vect, residuals)
             error_val = numpy.linalg.norm(error)
             if error_val < min_error:
@@ -155,3 +156,21 @@ def make_fock_matrix(DIIS, coeffs):
     return new_fock
 
 #----------------------------------------------------------------------#
+
+def reset_diis(DIIS):
+    DIIS.Residuals = []
+    DIIS.Matrix = [[None]]
+    DIIS.OldFocks = []
+
+def add_distance(DIIS, molecule, state_index, num_iterations):
+    density = molecule.States[state_index].Total.Density     # The current density matrix
+
+    # Evaluate the distance of the current state from each of the optimized states
+    if state_index != 0:
+        dist = 0
+        for i, state in enumerate(molecule.States[0:state_index]):
+            if i != state_index:
+                dist += util.distance(density, state.Total.Density, molecule)
+        bias = numpy.exp(-dist)
+        DIIS.Matrix[0:-1,-2] /= bias
+        DIIS.Matrix[-2:0:-2] /= bias
