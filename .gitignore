@@ -8,8 +8,8 @@
 outfiles
 input.py
 
-*.inp 
-/examples 
+*.inp
+/examples
 *.MOs
 pathtable
 *.out

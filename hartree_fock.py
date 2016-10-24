@@ -95,7 +95,7 @@ def do_SCF(settings, molecule, state, state_index = 0):
         #-------------------------------------------#
         # DIIS
         if settings.DIIS.Use:
-            diis.do(molecule, state, settings, diis_error_vec, state_index, num_iterations)
+            diis.do(molecule, state, settings, diis_error_vec, state_index)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
         # Update MOM reference orbitals to last iteration values if requested

@@ -84,7 +84,6 @@ def Sort_MOs(MOs, energies, p):
     """Sorts MOs and energies in decending order
     based on a vector p (the overlap vector)"""
     indexes = p.argsort()[::-1]
-    print(indexes)
     new_MOs = MOs[:,indexes]
     new_energies = energies[indexes]
     return new_MOs, new_energies
