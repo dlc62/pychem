@@ -94,6 +94,8 @@ def HF_Loop(this, settings, cycles, dE, diis_error, final):
 
     if final and this.S2 != None:
         outString += "<S^2> = %.2f\n" % this.S2
+        outString += "Alpha Occupany: {}\n".format(this.AlphaOccupancy)
+        outString += "Beta Occupancy : {}\n".format(this.BetaOccupancy)
 
     outString += '----------------------------------------------------' + '\n'
 

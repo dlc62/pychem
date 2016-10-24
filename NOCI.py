@@ -17,6 +17,13 @@ def do_NOCI(molecule, settings):
     for i, state1 in enumerate(molecule.States):
         for j, state2 in enumerate(molecule.States[:i+1]):
 
+            # In the case of diagonal elements the energy is just the state energy
+            # and the overlap is 1
+            if i == j:
+                CI_matrix[i,i] = state1.TotalEnergy
+                CI_overlap[i,i] = 1
+                continue
+
             # Biorthoginalize the occupied MOs
             alpha = biorthoginalize(state1.Alpha, state2.Alpha, molecule)
             beta = biorthoginalize(state1.Beta, state2.Beta, molecule)
@@ -37,11 +44,15 @@ def do_NOCI(molecule, settings):
 
             # Ensure that the alpha and beta arrays are the same size
             if molecule.NAlphaElectrons > molecule.NBetaElectrons:
-                beta_overlaps = resize_array(beta_overlaps, alpha_overlaps, fill=1)
+                beta_overlaps = resize_array(beta_overlaps, alpha_overlaps, fill=1)   # Fill with 1s so as not to effect the product
                 beta[0] = resize_array(beta[0], alpha[0])
                 beta[1] = resize_array(beta[1], alpha[1])
 
             num_zeros = len(zeros_list)
+
+            if num_zeros is not 0:
+                print("Warning: NOCI currently not working for determinants with orthoginal orbitals")
+
         # Calculated the element of the Hamiltonian matrix
             if num_zeros is 0:
                 elem = no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule)
@@ -51,8 +62,8 @@ def do_NOCI(molecule, settings):
                 elem = two_zeros(alpha, beta, zeros_list, molecule)
             else:  # num_zeros > 2
                 elem = 0
-            elem += molecule.NuclearRepulsion * state_overlap
             elem *= reduced_overlap
+            elem += molecule.NuclearRepulsion * state_overlap
 
             CI_matrix[i,j] = CI_matrix[j,i] = elem
             CI_overlap[i,j] = CI_overlap[j,i] = state_overlap
@@ -61,7 +72,7 @@ def do_NOCI(molecule, settings):
     energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
 
     print("=== NOCI Output ===")
-    
+
     if (settings.print_level > 1):
         print("Hamiltonian")
         print(CI_matrix)
@@ -156,6 +167,8 @@ def make_weighted_density(MOs, overlaps, molecule):
         if overlap > THRESH:
             P = np.outer(MOs[0][:,i], MOs[1][:,i])
             density += P / overlap
+        else:
+             density += np.outer(MOs[0][:,i], MOs[1][:,i])
     return density
 
 def process_overlaps(reduced_overlap, zeros_list, overlaps, spin):
@@ -199,7 +212,6 @@ def no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule):
     return elem
 
 def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
-
     zero_index = zero[0]
 
     # Making all the required Codensity matrices
@@ -212,21 +224,37 @@ def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
     state = CoDensity_State(W_alpha, W_beta)
     make_coulomb_exchange_matrices(molecule, state)
     active_exchange = state.alpha_exchange if zero[1] == "alpha" else state.beta_exchange
-    active_core = molecule.alpha_core if zero[1] == "alpha" else molecule.beta_core
+    P_active = P_alpha if zero[1] == "alpha" else P_beta
 
-    elem = inner_product(P_total, state.coulomb) + inner_product(P_total, active_exchange) + active_core[zero_index, zero_index]
+    #elem = inner_product(P_total, state.coulomb) + inner_product(P_total, active_exchange) + active_core[zero_index, zero_index]
+    elem = inner_product(P_total, state.coulomb) + inner_product(P_active, active_exchange)
+    elem += molecule.alpha_core[zero_index, zero_index] + molecule.beta_core[zero_index, zero_index]
 
     return elem
 
 def two_zeros(alpha, beta, zeros_list, molecule):
     elem = 0
+
+    [[i, spin1], [j, spin2]] = zeros_list
+
+    wCa = alpha[0]; xCa = alpha[1]
+    wCb = beta[0]; xCb = beta[1]
+
+    for a in range(molecule.NOrbitals):
+      for b in range(molecule.NOrbitals):
+        for c in range(molecule.NOrbitals):
+          for d in range(molecule.NOrbitals):
+            elem += wCa[a,i] * wCb[b,j] * xCa[c,i] * xCb[d,i] * molecule.CoulombIntegrals[a,b,c,d]
+            elem += wCa[a,i] * wCb[b,j] * xCa[c,i] * xCb[d,j] * molecule.ExchangeIntegrals[a,b,d,c]
+
+    """
     for (i, spin) in zeros_list:
         P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
         P_beta = np.outer(beta[0][:,i], beta[1][:,i])
         state = CoDensity_State(P_alpha, P_beta)
         make_coulomb_exchange_matrices(molecule, state)
         active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
-
-        elem += inner_product(state.total, state.coulomb) + inner_product(state.total, active_exhange)
-
+        active_P = P_alpha if spin == "alpha" else P_beta
+        elem += 0.5 * inner_product(state.total, state.coulomb) + inner_product(active_P, active_exhange)
+    """
     return elem
