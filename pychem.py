@@ -7,15 +7,15 @@ if sys.version_info.major is 2:
   import ConfigParser
 else:
   import configparser as ConfigParser
-# Custom-written object modules (data and derived data at this level)
-import inputs_structures
 # Custom-written code modules
-import hartree_fock
-import basis_fit
-import util
-import printf
-import mp2
-from NOCI import do_NOCI
+from Methods import hartree_fock
+from Methods import basis_fit
+from Methods import mp2
+from Methods import NOCI
+
+from Util import util
+from Util import printf
+from Util import inputs_structures
 
 
 #======================================================================#
@@ -95,7 +95,7 @@ def do_calculation(settings, molecule):
             mp2.do(settings, molecule, state, index)
 
     if settings.NOCI.Use:
-        do_NOCI(molecule, settings.NOCI)
+        NOCI.do_NOCI(molecule, settings.NOCI)
 
     # Close output file
     printf.finalize(settings)

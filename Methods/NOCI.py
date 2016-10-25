@@ -1,9 +1,12 @@
+# Import system libraries
 import numpy as np
-import copy
-import integrals
 from scipy.linalg import eigh as gen_eig
-from constants import NOCI_Thresh as THRESH
-from util import inner_product, resize_array, occupied
+import copy
+
+#import pychem modules
+from Methods import integrals
+from Data.constants import NOCI_Thresh as THRESH
+from Util.util import inner_product, resize_array, occupied
 
 
 def do_NOCI(molecule, settings):

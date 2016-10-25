@@ -10,11 +10,11 @@ import numpy
 import math
 import copy
 # Custom-written data modules
-import basis
-import constants as c
+from Data import basis
+import Data.constants as c
 # Custom-written code modules
-import util
-from hartree_fock import make_density_matrices
+from Util import util
+from Methods.hartree_fock import make_density_matrices
 
 #=====================================================================#
 #  MAIN ROUTINES - called from pychem.py and hartree_fock.py          #
@@ -633,7 +633,7 @@ class Matrices:
         damped_Fock = self.old_Fock * coeff + self.Fock * (1 - coeff)
         self.old_Fock = copy.deepcopy(self.Fock)
         self.Fock = damped_Fock
-        
+
 #---------------------------------------------------------------------#
 #                  ELECTRONIC STATE SUBCLASS - DIIS                   #
 #---------------------------------------------------------------------#

@@ -2,7 +2,7 @@
 import numpy
 import copy
 # Custom-written data modules
-import basis
+from Data import basis
 
 def do(molecule, MOs, new_basis):
     #iterating over each MO in the old basis

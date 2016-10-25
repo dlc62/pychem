@@ -3,7 +3,7 @@ import sys
 from math import pi
 from math import sqrt
 from math import exp
-import constants as c
+import Data.constants as c
 import copy
 import itertools
 from scipy.special import gamma

@@ -6,10 +6,10 @@ from scipy.linalg import sqrtm
 import copy
 
 # Custom-written data modules
-import constants as c
+import Data.constants as c
 
 # Custom-written code modules
-import util
+from Util import util
 
 # The argument 'error_vec' determins which of the two possible residual vectors are used
 # error_vec = 'commute' uses the commutator of the fock and density matrices - this works best for ground states

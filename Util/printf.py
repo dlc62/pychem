@@ -3,7 +3,7 @@ from __future__ import print_function
 import os
 import numpy
 # Custom-written data modules
-import constants as c
+import Data.constants as c
 
 # pretty printing to the terminal for numpy arrays
 numpy.set_printoptions(precision=5, linewidth=300)

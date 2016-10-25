@@ -8,14 +8,14 @@ import copy
 from math import floor
 
 # Custom-written data modules
-import constants as c
+import Data.constants as c
+
+from Util import util, printf
 
 # Custom-written code modules
-import integrals
-import printf
-import diis
-import mom
-import util
+from Methods import integrals
+from Methods import diis
+from Methods import mom
 
 #=================================================================#
 #                        MAIN SUBROUTINE                          #

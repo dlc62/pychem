@@ -3,10 +3,10 @@ import numpy
 from numpy import dot
 
 # Custom-written data modules
-import constants as c
+import Data.constants as c 
 
 # Custom-written code modules
-import printf
+from Util import printf
 
 #=================================================================#
 #                                                                 #
