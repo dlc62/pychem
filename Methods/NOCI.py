@@ -7,7 +7,8 @@ import copy
 from Methods import integrals
 from Data.constants import NOCI_Thresh as THRESH
 from Util.util import inner_product, resize_array, occupied
-
+from Util import printf
+from Methods.mom import make_p_vector, Sort_MOs
 
 def do_NOCI(molecule, settings):
     """ Main function - takes a molecule and perfroms NOCI using all the availible
@@ -20,8 +21,8 @@ def do_NOCI(molecule, settings):
     for i, state1 in enumerate(molecule.States):
         for j, state2 in enumerate(molecule.States[:i+1]):
 
-            # In the case of diagonal elements the energy is just the state energy
-            # and the overlap is 1
+            # For the diagonal elements the energy is just
+            # the state energy and the overlap is 1
             if i == j:
                 CI_matrix[i,i] = state1.TotalEnergy
                 CI_overlap[i,i] = 1
@@ -30,6 +31,9 @@ def do_NOCI(molecule, settings):
             # Biorthoginalize the occupied MOs
             alpha = biorthoginalize(state1.Alpha, state2.Alpha, molecule)
             beta = biorthoginalize(state1.Beta, state2.Beta, molecule)
+
+            #alpha[0] = match_orbitals(alpha[0], alpha[1], molecule.NAlphaElectrons, molecule.Overlap)
+            #beta[0] = match_orbitals(beta[0], beta[1], molecule.NBetaElectrons, molecule.Overlap)
 
             # Calculate the core fock matrix for the state transformed into the MOs basis
             molecule.alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1])
@@ -53,15 +57,13 @@ def do_NOCI(molecule, settings):
 
             num_zeros = len(zeros_list)
 
-            if num_zeros is not 0:
-                print("Warning: NOCI currently not working for determinants with orthoginal orbitals")
-
         # Calculated the element of the Hamiltonian matrix
             if num_zeros is 0:
                 elem = no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule)
             elif num_zeros is 1:
                 elem = one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zeros_list[0], molecule)
             elif num_zeros is 2:
+                print("Warning: determinats with two othroginal orbitals not yet tested")
                 elem = two_zeros(alpha, beta, zeros_list, molecule)
             else:  # num_zeros > 2
                 elem = 0
@@ -72,23 +74,14 @@ def do_NOCI(molecule, settings):
             CI_overlap[i,j] = CI_overlap[j,i] = state_overlap
 
     # Solve the generalized eigenvalue problem
-    energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
+    try:
+        energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
+    except numpy.linalg.linalg.LinAlgError:
+        printf.printf(settings, """Could not solve NOCI equations, this suggest two MOM calculations converged to the same state""")
+        energies = "ERROR"
+        wavefunctions = "ERROR"
 
-    print("=== NOCI Output ===")
-
-    if (settings.print_level > 1):
-        print("Hamiltonian")
-        print(CI_matrix)
-
-    if (settings.print_level > 2):
-        print("State Overlaps")
-        print(CI_overlap)
-
-    print("States")
-    print(wavefunctions)
-
-    print("State Energies")
-    print(energies)
+    printf.NOCI(settings, CI_matrix, CI_overlap, wavefunctions, energies)
 
 def biorthoginalize(state1, state2, molecule):
     # This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
@@ -184,6 +177,12 @@ def process_overlaps(reduced_overlap, zeros_list, overlaps, spin):
             zeros_list.append((i,spin))
     return reduced_overlap, zeros_list
 
+def match_orbitals(MOs1, MOs2, NElectrons, AO_overlap):
+    p_vector = make_p_vector(MOs1, MOs2, NElectrons, AO_overlap)
+    MOs1, _ = Sort_MOs(MOs1, np.zeros(NElectrons), p_vector)
+    return MOs1
+
+
 # -----------------------------------------------------------#
 #     Functions for calculating the CI matrix elements       #
 #       Note: these do not include the reduced overlap       #
@@ -215,6 +214,7 @@ def no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule):
     return elem
 
 def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
+    #print("One Overlap")
     zero_index = zero[0]
 
     # Making all the required Codensity matrices
@@ -222,20 +222,21 @@ def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
     W_beta = make_weighted_density(beta, beta_overlaps, molecule)
     P_alpha = np.outer(alpha[0][:,zero_index], alpha[1][:,zero_index])
     P_beta = np.outer(beta[0][:,zero_index], beta[1][:,zero_index])
-    P_total = P_alpha + P_beta
 
     state = CoDensity_State(W_alpha, W_beta)
     make_coulomb_exchange_matrices(molecule, state)
+
     active_exchange = state.alpha_exchange if zero[1] == "alpha" else state.beta_exchange
     P_active = P_alpha if zero[1] == "alpha" else P_beta
+    active_core = molecule.alpha_core if zero[1] == "alpha" else molecule.beta_core
 
-    #elem = inner_product(P_total, state.coulomb) + inner_product(P_total, active_exchange) + active_core[zero_index, zero_index]
-    elem = inner_product(P_total, state.coulomb) + inner_product(P_active, active_exchange)
-    elem += molecule.alpha_core[zero_index, zero_index] + molecule.beta_core[zero_index, zero_index]
+    elem = inner_product(P_active, state.coulomb) + inner_product(P_active, active_exchange)
+    elem += active_core[zero_index, zero_index]
 
     return elem
 
 def two_zeros(alpha, beta, zeros_list, molecule):
+    print("Two Overlaps")
     elem = 0
 
     [[i, spin1], [j, spin2]] = zeros_list

@@ -61,7 +61,7 @@ def HF_Loop(this, settings, cycles, dE, diis_error, final):
 
     outString = ''
     outString += "Cycle: " + str(cycles) + '\n'
-    outString += "Total  Energy: " + str(this.TotalEnergy) + '\n'
+    outString += "Total Energy: " + str(this.TotalEnergy) + '\n'
     outString += "Change in energy: " + str(dE) + '\n'
     if diis_error != None:                 #stops this from printing when DIIS is disabled
         outString += "DIIS Error: " + str(diis_error) + '\n'
@@ -95,7 +95,7 @@ def HF_Loop(this, settings, cycles, dE, diis_error, final):
     if final and this.S2 != None:
         outString += "<S^2> = %.2f\n" % this.S2
         outString += "Alpha Occupany: {}\n".format(this.AlphaOccupancy)
-        outString += "Beta Occupancy : {}\n".format(this.BetaOccupancy)
+        outString += "Beta Occupancy: {}\n".format(this.BetaOccupancy)
 
     outString += '----------------------------------------------------' + '\n'
 
@@ -121,3 +121,24 @@ def MP2_Final(settings, state_index, EMP2):
 #        outString += "Beta Overlap Vector" + '\n'
 #        outString += str(beta_overlaps)
 #        print_to_file(self.outFile, outString)
+
+def NOCI(settings, hamil, overlaps, states, energies):
+
+    outString = "\n=== NOCI Output ===\n"
+
+    if settings.NOCI.print_level > 1:
+        outString += "Hamiltonian\n{}\n".format(hamil)
+    if settings.NOCI.print_level > 2:
+        outString += "State Overlaps\n{}\n".format(overlaps)
+
+    outString += "States\n{}\n".format(states)
+    outString += "State Energies\n{}\n".format(energies)
+    print_to_file(settings.OutFile, outString)
+
+    if settings.PrintToTerminal:
+        print(outString)
+
+def printf(settings, to_print):
+    print_to_file(settings, to_print)
+    if settings.PrintToTerminal:
+        print(to_print)

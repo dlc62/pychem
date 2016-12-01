@@ -3,7 +3,7 @@ import numpy
 from numpy import dot
 
 # Custom-written data modules
-import Data.constants as c 
+import Data.constants as c
 
 # Custom-written code modules
 from Util import printf

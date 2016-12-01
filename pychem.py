@@ -43,7 +43,8 @@ def do_calculation(settings, molecule):
     printf.initialize(settings)
 
     # Do ground state calculation in the starting basis, storing MOs (and 2e ints as appropriate) as we go
-    hartree_fock.do_SCF(settings, molecule, molecule.States[0])
+    #hartree_fock.do_SCF(settings, molecule, molecule.States[0])
+    hartree_fock.do_SCF(settings, molecule)
 
     #-------------------------------------------------------------------
     # Generate starting orbital sets for each of the requested excited states and do calculation in first basis
@@ -53,13 +54,13 @@ def do_calculation(settings, molecule):
         state.Beta.MOs = util.excite(molecule.States[0].Beta.MOs, state.BetaOccupancy, molecule.NBetaElectrons)
 
     for index, state in enumerate(molecule.States[1:], start = 1):
-        hartree_fock.do_SCF(settings, molecule, state, index)
+        #hartree_fock.do_SCF(settings, molecule, state, index)
+        hartree_fock.do_SCF(settings, molecule, index)
 
     # Dump MOs to file for initial basis set, all states
     util.store('MOs', molecule.States, settings.SectionName, settings.BasisSets[0])
 
     for basis_set in settings.BasisSets[1:]:
-
         # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones
         # Or Read starting MOs from disk
         alpha_MOs = []; beta_MOs = []
@@ -84,7 +85,7 @@ def do_calculation(settings, molecule):
 
         # Iterate over the list of states doing calculations while enforcing orthogonality
         for index, state in enumerate(molecule.States):
-            hartree_fock.do_SCF(settings, molecule, state, index)
+            hartree_fock.do_SCF(settings, molecule, index)
 
         # Dump MOs to file for other basis sets, all states
         util.store('MOs', molecule.States, settings.SectionName, basis_set)
@@ -95,7 +96,7 @@ def do_calculation(settings, molecule):
             mp2.do(settings, molecule, state, index)
 
     if settings.NOCI.Use:
-        NOCI.do_NOCI(molecule, settings.NOCI)
+        NOCI.do_NOCI(molecule, settings)
 
     # Close output file
     printf.finalize(settings)
@@ -108,8 +109,6 @@ def do_calculation(settings, molecule):
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Please give an input file")
-    elif sys.argv[1] == "test":
-        util.run_tests()
     else:
         parser = ConfigParser.SafeConfigParser()
         has_read_data = parser.read(sys.argv[1])

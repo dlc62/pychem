@@ -3,6 +3,7 @@ from copy import deepcopy
 import pickle
 import numpy
 import scipy
+import os
 
 # --------------------- Helpful subroutines ---------------------------#
 
@@ -24,10 +25,10 @@ def excite(matrix, occupancy, NElectrons):
         new_matrix[:,[frm[i],to[i]]] = new_matrix[:,[to[i],frm[i]]]
     return new_matrix
 
-
-# Used everywhere
-
 def store(data_type_suffix, data, section_name, basis_set=None):
+    # Check if the storage dirrectry exists and make it if it doesn't
+    if not os.path.isdir("./Store"):
+        os.makedirs("./Store")
     if basis_set == None:
        # will only store data for current basis set, overwriting previous data
        section_name = section_name + '.'
@@ -35,14 +36,14 @@ def store(data_type_suffix, data, section_name, basis_set=None):
        # store data for all basis sets
        section_name = section_name + '_'
        basis_set = basis_set + '.'
-    pickle.dump(data, open(section_name + basis_set + data_type_suffix,'wb'))
+    pickle.dump(data, open("./Store/" + section_name + basis_set + data_type_suffix,'wb'))
 
 def fetch(data_type_suffix, section_name, basis_set=None):
     if basis_set == None:
-       section_name = section_name.upper() + '.'
+       section_name = section_name + '.'
     else:
-       section_name = section_name.upper() + '_'
-    data = pickle.load(open(section_name + basis_set + "." + data_type_suffix,'rb'))
+       section_name = section_name + '_'
+    data = pickle.load(open( "./Store/" + section_name + basis_set + "." + data_type_suffix,'rb'))
     return data
 
 # Used in inputs_structures.py

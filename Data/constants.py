@@ -31,9 +31,13 @@ lQuanta = {0:[[0,0,0]],
               [2,0,3],[2,2,1],[2,1,2],[1,4,0],[1,0,4],[1,3,1],[1,1,3],
               [1,2,2],[0,5,0],[0,4,1],[0,3,2],[0,2,3],[0,1,4],[0,0,5]]}
 integral_threshold = -1.e-10
-energy_convergence = 1.e-7
-energy_convergence_final = 1e-7
+energy_convergence = 1.e-6
+energy_convergence_final = 1e-6
 density_convergence = 1.e-6
 DIIS_convergence = 1.e-5
 DIIS_max_condition = 1e6
 NOCI_Thresh = 1e-10
+
+# Max deviation from an occupany of 0 or 1 before an orbital will
+# be included in the CUHF active space
+CUHF_thresh = 0.1

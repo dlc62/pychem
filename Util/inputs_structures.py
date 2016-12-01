@@ -9,7 +9,7 @@ import ast
 import numpy
 import math
 import copy
-# Custom-written data modules
+# Custom-written data module
 from Data import basis
 import Data.constants as c
 # Custom-written code modules
@@ -163,7 +163,7 @@ class Set_SCF:
             self.Guess = inputs("SCF_Guess")
             assert(self.Guess in available_guesses)
         except:
-#            print("Could not identify SCF guess keyword, defaulting to core guess")
+            print("Could not identify SCF guess keyword, defaulting to core guess")
             self.Guess = "CORE"
         if self.Guess == "READ":
             try:
@@ -172,7 +172,6 @@ class Set_SCF:
             except:
                 print("Must give appropriate details of file to read MOs from, using keywords MO_Read_Name and MO_Read_Basis")
                 sys.exit()
-            configparser.NoOptionError
         if self.Guess == "CORE":
             try:
                 self.Guess_Mix = inputs("SCF_Guess_Mix")
@@ -539,6 +538,7 @@ class Molecule:
     def update_basis(self,basis_set,Store2eInts):
         # update variables then structures
         self.NOrbitals = 0
+        self.Basis = basis_set
         for atom in self.Atoms:
             atom.update_atomic_basis(basis_set)
             self.NOrbitals += atom.NFunctions

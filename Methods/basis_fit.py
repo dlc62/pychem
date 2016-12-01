@@ -7,7 +7,7 @@ from Data import basis
 def do(molecule, MOs, new_basis):
     #iterating over each MO in the old basis
     for MO in range(len(MOs)):
-        old_coeffs = numpy.ndarray.tolist(MOs[:,MO])      # pulling out the MO coefficents associated with a single state
+        old_coeffs = numpy.ndarray.tolist(MOs[:,MO])      # pulling out the MO coefficents associated with a single MO
         new_MO = []                                       # single column in the eventual MO matrix
         cgto_count = 0
         for atom in molecule.Atoms:
@@ -91,7 +91,7 @@ def Basis_Fit_Ang(atom, old_set, MOs, cgto_count, new_ang_set):    #Take all the
     old_set = copy.deepcopy(ang_set)
     for cgto in range(len(old_set)):
         for prim in old_set[cgto]:
-            prim[1] *= MOs[cgto_count]
+            prim[1] *=  MOs[cgto_count]
         cgto_count += (2*Ang + 1)
 
     #Finding the overlap of the new functions with the old
@@ -106,3 +106,5 @@ def Basis_Fit_Ang(atom, old_set, MOs, cgto_count, new_ang_set):    #Take all the
 
     new_MOs = numpy.linalg.solve(S,T)
     return numpy.ndarray.tolist(new_MOs)
+
+#def get_ang_functions(ground_state, excited_state, molecule, basis_set):
