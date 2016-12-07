@@ -101,6 +101,10 @@ def do_calculation(settings, molecule):
     # Close output file
     printf.finalize(settings)
 
+    distances = util.distance_matrix(molecule)
+
+    print(distances)
+
 #======================================================================#
 # __main__: Process input file, loop over sections, set up data        #
 #           inputs_structures and call do_calculation                  #

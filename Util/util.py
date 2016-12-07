@@ -108,9 +108,24 @@ def distance(density1, density2, molecule):
     den_prod, _ = scipy.linalg.sqrtm(density1.dot(co_density), disp=False)       # Note the sqrtm which isn't in the paper
     return molecule.NElectrons - numpy.real(numpy.trace(den_prod))     # Imaginary part is a machine precision error
 
+def distance_matrix(molecule):
+    """ Calculates the distances between all the calculates states using
+        the above distance metric """
+    distances = [[distance(state1.Total.Density, state2.Total.Density, molecule)
+                    for state1 in molecule.States] for state2 in molecule.States]
+    return numpy.array(distances)
+
 def randU(n):
     """ Generates a random n x n unitary matrix """
     X = numpy.random.randn(n,n)
     q, r = numpy.linalg.qr(X)
     R = numpy.diag(numpy.sign(numpy.diag(r)))
     return q.dot(R)
+
+def sort_MOs(state, molecule):
+    N = sum(state.Occupancy)
+    occupied_MOs = state.MOs[:,:N]
+    occupied_energies = state.Energies[:N]
+    indices = occupied_energies[:N].argsort()
+    state.MOs[:,:N] = occupied_MOs[:,indices]
+    state.Energies[:N] = occupied_energies[indices]

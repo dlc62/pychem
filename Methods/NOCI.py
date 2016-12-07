@@ -177,12 +177,6 @@ def process_overlaps(reduced_overlap, zeros_list, overlaps, spin):
             zeros_list.append((i,spin))
     return reduced_overlap, zeros_list
 
-def match_orbitals(MOs1, MOs2, NElectrons, AO_overlap):
-    p_vector = make_p_vector(MOs1, MOs2, NElectrons, AO_overlap)
-    MOs1, _ = Sort_MOs(MOs1, np.zeros(NElectrons), p_vector)
-    return MOs1
-
-
 # -----------------------------------------------------------#
 #     Functions for calculating the CI matrix elements       #
 #       Note: these do not include the reduced overlap       #

@@ -52,9 +52,9 @@ def diis(residual, fock, DIIS, settings, state_index, molecule):
         if len(DIIS.Residuals) > 1:
             make_diis_matrix(DIIS,settings)
             reduce_space(DIIS,settings)
-            #add_distance(DIIS, molecule, state_index)
             coeffs = get_coeffs(DIIS,settings)
-            fock = make_fock_matrix(DIIS,coeffs)
+            if not check_coeffs(coeffs):
+                fock = make_fock_matrix(DIIS,coeffs)
     return fock
 
 #======================================================================#
@@ -127,7 +127,7 @@ def get_C1_coeffs(matrix):
     DIIS_vector = numpy.zeros([len(matrix),1])
     DIIS_vector[-1] = -1.0
     coeffs = numpy.linalg.solve(matrix, DIIS_vector)
-    return coeffs[:-1]    # not returning the lagrange multiplier
+    return coeffs[:-1][:,0]    # not returning the lagrange multiplier
 
 def get_C2_coeffs(matrix, residuals):
     eigvals, vects = numpy.linalg.eigh(matrix)
@@ -163,15 +163,8 @@ def reset_diis(DIIS):
     DIIS.Matrix = [[None]]
     DIIS.OldFocks = []
 
-def add_distance(DIIS, molecule, state_index):
-    density = molecule.States[state_index].Total.Density     # The current density matrix
-
-    # Evaluate the distance of the current state from each of the optimized states
-    if state_index != 0:
-        dist = 0
-        for i, state in enumerate(molecule.States[0:state_index]):
-            if i != state_index:
-                dist += util.distance(density, state.Total.Density, molecule)
-        bias = numpy.exp(-dist)
-        DIIS.Matrix[0:-1,-2] /= bias
-        DIIS.Matrix[-2:0:-2] /= bias
+def check_coeffs(coeffs):
+    if len(coeffs) is 1:
+        return False
+    else:
+        return coeffs[-2] < 1.1 and coeffs[-2] > 0.9

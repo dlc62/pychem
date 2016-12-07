@@ -28,20 +28,20 @@ def do(molecule, this, state_index, ref_MOs):
 
     # Calculate the overlap with just the orbtials that differ between each state
     # Should add to code to try and stop comparison with collapsed states
-        #else:
-        #    alpha_state_overlaps += compare_states(this.Alpha, state.Alpha, molecule.Overlap)
-        #    beta_state_overlaps += compare_states(this.Beta, state.Beta, molecule.Overlap)
-        #    NStates += 1
+        else:
+            alpha_state_overlaps -= compare_states(this.Alpha, state.Alpha, molecule.Overlap)
+            beta_state_overlaps -= compare_states(this.Beta, state.Beta, molecule.Overlap)
+            NStates += 1
 
     # Take average of the state overlaps and subtract from the overlap
     # with the reference orbitals
 
-    #if NStates is not 0:
-    #    alpha_state_overlaps /= NStates    # Use 'NStates' for now to keep track of how the divisor chanages
-    #    beta_state_overlaps /= NStates     # depending on whether the unoptimized states are used or not
+    if NStates is not 0:
+        alpha_state_overlaps /= NStates    # Use 'NStates' for now to keep track of how the divisor chanages
+        beta_state_overlaps /= NStates     # depending on whether the unoptimized states are used or not
 
-    #    alpha_p_vector += alpha_state_overlaps
-    #    beta_p_vector += beta_state_overlaps
+        alpha_p_vector += alpha_state_overlaps
+        beta_p_vector += beta_state_overlaps
 
     # Sort MOs according to p vector ordering
     this.Alpha.MOs, this.Alpha.Energies = Sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector)
@@ -76,7 +76,7 @@ def compare_states(new_state, old_state, overlap_matrix):
 def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
     """ Calculates the overlap vector between two sets of MOs """
     # MO_overlap = <ref|new>
-    C_dagger = other_MOs[:,:NElectrons].T   
+    C_dagger = other_MOs[:,:NElectrons].T
     MO_overlap = C_dagger.dot(overlap_matrix).dot(new_MOs)
     p_vector = numpy.add.reduce(MO_overlap)
     return numpy.abs(p_vector)

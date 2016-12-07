@@ -112,7 +112,7 @@ class Settings:
            print('Error: must include Basis_Sets keyword followed by at least one basis set in a list')
            sys.exit()
         #---------------------- Print Settings -----------------------#
-        available_print_levels = ['MINIMAL','BASIC','VERBOSE','DEBUG']
+        available_print_levels = ['MINIMAL','BASIC','VERBOSE','DEBUG', 'FINAL']
         available_custom_print_options = ['MOM','DIIS']
         try:
            self.PrintLevel = inputs("Print_Level")
