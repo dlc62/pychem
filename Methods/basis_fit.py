@@ -25,10 +25,6 @@ def do(molecule, MOs, new_basis):
 
 def Get_Overlap(prim1, prim2, l):
     gamma = prim1[0] + prim2[0]
-#    Don't need this assuming the AOs are already normalized
-#    fact = factorial2(2*l-1,exact = True)
-#    norm = ((2 ** l) * (prim1[0]*prim2[0])**(3./4 + l/2.)) / (pi**3./2 * fact)
-#    integral = (pi / gamma)**(3./2) * (fact/(2*gamma)**l) * norm * prim1[1] * prim2[1]
     norm = (prim1[0]*prim2[0])**(3./4 + l/2.)
     integral = (1 / gamma)**(3./2) * (1/(2*gamma)**l) * norm * prim1[1] * prim2[1]
     return integral
@@ -64,7 +60,6 @@ def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis):
             if cgto[0] > atom.MaxAng:
                 atom_coeffs += [0.0] *  (2 * cgto[0] + 1)
                 cgto_count += 2 * cgto[0] + 1
-
     return atom_coeffs
 
 #---------------------------------------------------------------------------------------
@@ -100,11 +95,7 @@ def Basis_Fit_Ang(atom, old_set, MOs, cgto_count, new_ang_set):    #Take all the
         for orb2 in range(len(old_set)):     #iterating over old functions
             for prim1 in new_ang_set[orb1]:
                 for prim2 in old_set[orb2]:
-                    #norm = (4 * (prim1[0] * prim2[0]) / pi**2)**(3./4)
-                    #T[orb1] += prim1[1] * prim2[1] * (pi/(prim1[0] + prim2[0]))**(3./2) * norm
                     T[orb1] += Get_Overlap(prim1,prim2,Ang)
 
     new_MOs = numpy.linalg.solve(S,T)
     return numpy.ndarray.tolist(new_MOs)
-
-#def get_ang_functions(ground_state, excited_state, molecule, basis_set):

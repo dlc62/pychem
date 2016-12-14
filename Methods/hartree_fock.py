@@ -62,17 +62,13 @@ def do_SCF(settings, molecule, state_index = 0):
     num_iterations = 0
     final_loop = False
     diis_error = None
-    old_alpha = copy.deepcopy(state.Alpha.MOs)
 
-    if settings.SCF.Guess == "SAD" and state_index is 0:                # Case where there are no MOs at this point
-        diis_error_vec = "commute"
-    elif numpy.allclose(state.Alpha.MOs, state.Beta.MOs, atol=1e-5) or settings.SCF.Reference == "UHF":
-        diis_error_vec = "commute"
+    diis_error_vec = "commute"
+
+    if molecule.Basis == settings.BasisSets[-1]:
+        energy_convergence = c.energy_convergence_final
     else:
-        diis_error_vec = "diff"
-    #diis_error_vec = "commute"
-
-    energy_convergence = c.energy_convergence
+        energy_convergence = c.energy_convergence
 
     while energy_convergence < abs(dE):
         num_iterations += 1
@@ -83,17 +79,24 @@ def do_SCF(settings, molecule, state_index = 0):
         initialize_fock_matrices(molecule.Core, state)
         make_coulomb_exchange_matrices(molecule, state, settings.SCF.Ints_Handling, num_iterations)
 
-        if settings.SCF.Reference == "CUHF":# and num_iterations > 1:
-            constrain_UHF(molecule, state, state_index)
         #-------------------------------------------#
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
 
+        if num_iterations is 25:
+            settings.DIIS.Use = False
+            diis.reset_diis(state.AlphaDIIS)
+            diis.reset_diis(state.BetaDIIS)
+        if num_iterations is 34:
+            settings.DIIS.Use = True
 
         # DIIS
         if settings.DIIS.Use:
-            diis.do(molecule, state, settings, diis_error_vec, state_index)
+            diis.do(molecule, state, settings, diis_error_vec)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
+
+        if settings.SCF.Reference == "CUHF":# and num_iterations > 1:
+            constrain_UHF(molecule, state, state_index)
 
         make_MOs(molecule, state)
 
@@ -104,20 +107,12 @@ def do_SCF(settings, molecule, state_index = 0):
                 reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
         #-------------------------------------------#
 
-        # Sort the occupied MOs by energy
         util.sort_MOs(state.Alpha, molecule)
         util.sort_MOs(state.Beta, molecule)
 
-        if num_iterations <= 40 and state_index != 0 and settings.SCF.Guess == "CORE":
-            old_occ = molecule.States[0].Alpha.Occupancy
-            new_occ = state.Alpha.Occupancy
-            mask = [n for n in range(len(old_occ)) if (old_occ[n] is 1 and new_occ[n] is 0)]
-            state.Alpha.MOs[:,mask] = old_alpha[:,mask]
-
+        print(state.Alpha.MOs)
 
         make_density_matrices(molecule,state)
-
-        print(state.Alpha.Fock.dot(state.Alpha.Density).dot(molecule.S) - molecule.S.dot(state.Alpha.Density).dot(state.Alpha.Fock))
 
         old_energy = state.Energy
         calculate_energy(molecule, state)
@@ -134,8 +129,6 @@ def do_SCF(settings, molecule, state_index = 0):
             print("SCF not converging")
             break
 
-    #if state_index is not 0:
-    #    plot(energies)
     molecule.States[state_index] = state
     printf.HF_Final(settings)
 

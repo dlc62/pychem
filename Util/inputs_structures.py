@@ -641,6 +641,7 @@ class Matrices:
 class StoreDIIS:
     def __init__(self):
         self.OldFocks = []
+        self.OldDensities = []
         self.Residuals = []
         self.Matrix = [[None]]
         self.Error = 1

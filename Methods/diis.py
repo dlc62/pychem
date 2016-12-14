@@ -22,12 +22,12 @@ from Util import util
 #                           Entry Point                                #
 #----------------------------------------------------------------------#
 
-def do(molecule, this, settings, error_vec, state_index):
+def do(molecule, this, settings, error_vec):
 
     # Set up error estimates
     if error_vec == "commute":
-        alpha_residual = get_residual_com(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.X, molecule.Xt)
-        beta_residual = get_residual_com(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.X, molecule.Xt)
+        alpha_residual = get_residual_com(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.Xt, molecule.X)
+        beta_residual = get_residual_com(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.Xt, molecule.X)
     else:
         alpha_residual = get_residual_diff(this.AlphaDIIS.pre_DIIS_fock, this.Alpha.Fock)
         beta_residual = get_residual_diff(this.BetaDIIS.pre_DIIS_fock, this.Beta.Fock)
@@ -36,26 +36,35 @@ def do(molecule, this, settings, error_vec, state_index):
     this.BetaDIIS.Error = beta_residual.max()
     settings.DIIS.Threshold = -0.1 * this.Energy
 
-    # Perform DIIS procedure
-    this.Alpha.Fock = diis(alpha_residual, this.Alpha.Fock, this.AlphaDIIS, settings, state_index, molecule)
-    this.Beta.Fock = diis(beta_residual, this.Beta.Fock, this.BetaDIIS, settings, state_index, molecule)
+    # Get Coordinates
+    alpha_coeffs = get_coeffs(alpha_residual, this.Alpha.Fock, this.Alpha.Density, this.AlphaDIIS, settings, molecule)
+    beta_coeffs = get_coeffs(beta_residual, this.Beta.Fock, this.Beta.Density, this.BetaDIIS, settings, molecule)
+
+    # update the matrices
+    if alpha_coeffs[0] != None and max(alpha_coeffs) < 3:
+        this.Alpha.Fock = extrapolate_matrices(this.AlphaDIIS.OldFocks, alpha_coeffs)
+        this.Alpha.Density = extrapolate_matrices(this.AlphaDIIS.OldDensities, alpha_coeffs)
+    if beta_coeffs[0] != None and max(beta_coeffs) < 3:
+        this.Beta.Fock = extrapolate_matrices(this.BetaDIIS.OldFocks, beta_coeffs)
+        this.Beta.Density = extrapolate_matrices(this.BetaDIIS.OldDensities, beta_coeffs)
+    this.Total.Density = this.Alpha.Density + this.Beta.Density
 
 #----------------------------------------------------------------------#
 #                           DIIS Procedure                             #
 #----------------------------------------------------------------------#
 
-def diis(residual, fock, DIIS, settings, state_index, molecule):
+def get_coeffs(residual, fock, density, DIIS, settings, molecule):
     DIIS.pre_DIIS_fock = fock
     if residual.max() < settings.DIIS.Threshold:
         DIIS.Residuals.append(residual)
         DIIS.OldFocks.append(fock)
+        DIIS.OldDensities.append(density)
         if len(DIIS.Residuals) > 1:
             make_diis_matrix(DIIS,settings)
             reduce_space(DIIS,settings)
-            coeffs = get_coeffs(DIIS,settings)
-            if not check_coeffs(coeffs):
-                fock = make_fock_matrix(DIIS,coeffs)
-    return fock
+            coeffs = solve_coeffs(DIIS,settings)
+            return coeffs
+    return [None]
 
 #======================================================================#
 #                             SUBROUTINES                              #
@@ -112,11 +121,12 @@ def reduce_space(DIIS, settings):
         DIIS.Matrix = numpy.delete(DIIS.Matrix,0,1)
         DIIS.Residuals.pop(0)
         DIIS.OldFocks.pop(0)
+        DIIS.OldDensities.pop(0)
         condition = util.eigenvalue_condition_number(DIIS.Matrix)
 
 #----------------------------------------------------------------------#
 
-def get_coeffs(DIIS, settings):
+def solve_coeffs(DIIS, settings):
     if settings.DIIS.Type == 'C1':
         coeffs = get_C1_coeffs(DIIS.Matrix)
     elif settings.DIIS.Type == 'C2':
@@ -135,7 +145,7 @@ def get_C2_coeffs(matrix, residuals):
     best_vect = None
     for vect in vects:
         vect /= sum(vect)         # renormalization
-        if abs(max(vect)) < 10:  # exluding vectors with large non-linearities
+        if abs(max(vect)) < 10:   # exluding vectors with large non-linearities
             error = estimate_error(vect, residuals)
             error_val = numpy.linalg.norm(error)
             if error_val < min_error:
@@ -150,11 +160,11 @@ def estimate_error(coeffs, residuals):
 
 #----------------------------------------------------------------------#
 
-def make_fock_matrix(DIIS, coeffs):
-    new_fock = numpy.zeros(numpy.shape(DIIS.Residuals[0]))
+def extrapolate_matrices(matrices, coeffs):
+    new_matrix = numpy.zeros(numpy.shape(matrices[0]))
     for i in range(len(coeffs)):
-        new_fock += coeffs[i] * DIIS.OldFocks[i]
-    return new_fock
+        new_matrix += coeffs[i] * matrices[i]
+    return new_matrix
 
 #----------------------------------------------------------------------#
 

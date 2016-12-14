@@ -75,7 +75,7 @@ def do_calculation(settings, molecule):
                 if settings.SCF.Guess != "READ":
                     alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
                     beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
-
+         
         Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
         molecule.update_basis(basis_set, Store2eInts)
 
