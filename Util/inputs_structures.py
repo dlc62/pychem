@@ -588,7 +588,6 @@ class ContractedGaussian:
         self.NPrimitives = len(self.Primitives)
         self.NFunctions = self.AngularMomentum * self.NAngMom
 
-
 #=====================================================================#
 #               MOLECULE SUBCLASS - ELECTRONIC STATE                  #
 #=====================================================================#

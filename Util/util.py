@@ -129,3 +129,26 @@ def sort_MOs(state, molecule):
     indices = occupied_energies[:N].argsort()
     state.MOs[:,:N] = occupied_MOs[:,indices]
     state.Energies[:N] = occupied_energies[indices]
+
+def visualize_MOs(MOs, basis_set, molecule):
+    from Data.basis import get
+    ang_labels = {0: ["s"], 1: ["px", "py", "pz"]}
+
+    # collect the anular momenytum labels of the various cgtos
+    atoms = [atom.Label for atom in molecule.Atoms]
+    funcs = []; orb_atoms = []
+    for atom in atoms:
+        cgtos = get[basis_set][atom]
+        if len(atom) is 2:
+            atom = atom[0] + atom[1].lower()
+        for cgto in cgtos:
+            funcs += ang_labels[cgto[0]]
+            orb_atoms += [atom] * (cgto[0] * 2 + 1)
+
+    # Ensure that the size of the basis matches the size of the MOs
+    assert len(funcs) is len(MOs), "Incorect Basis Set For MOs"
+
+    print('')
+    for i, orb in enumerate(funcs):
+        print("{:>4} {:>3}: {}".format(orb_atoms[i], orb, MOs[i,:]))
+    print('')
