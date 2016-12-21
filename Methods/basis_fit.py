@@ -4,7 +4,7 @@ import copy
 from scipy.misc import factorial2
 # Custom-written data modules
 from Data import basis
-from Data.constants import lQuanta
+from Data.constants import lQuanta, nAngMomFunctions
 
 def do(molecule, MOs, new_basis):
 
@@ -13,12 +13,12 @@ def do(molecule, MOs, new_basis):
         if MO is not 0 and MO is size:
             break
         #old_coeffs = numpy.ndarray.tolist(MOs[:,MO])      # pulling out the MO coefficents associated with a single MO
-        old_ceoffs = MOs[:,MOs]                           # Does this work when not a list
-        new_MO = []                                       # single column in the eventual MO matrix
+        old_coeffs = MOs[:,MO]
+        new_MO = numpy.array([])                                        # single column in the eventual MO matrix
         cgto_count = 0
         for atom in molecule.Atoms:
             coeffs = Basis_Fit_Atom(atom, old_coeffs, cgto_count, new_basis, molecule.Basis)
-            new_MO += coeffs
+            new_MO = numpy.append(new_MO, coeffs)
             cgto_count += atom.NFunctions                 # keeps track of the index to fit next
         #initializing matrix to store the coeffs once its size is known
         if MO == 0:
@@ -41,12 +41,13 @@ def Get_Overlap(prim1, prim2, l, m=0):
 #---------------------------------------------------------------------------------------
 
 def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis, old_basis):
-    atom_coeffs = []
     new_cgtos = basis.get[new_basis][atom.Label]
     old_ang_indices = get_ang_indices(atom, basis.get[old_basis][atom.Label])
     new_ang_indices = get_ang_indices(atom, new_cgtos)
+    size = sum([len(l) for l in new_ang_indices])                 # getting the number of cgtos centered on this atom in the new basis
+    atom_coeffs = numpy.zeros(size)
     for Ang in range(atom.MaxAng+1):    #iterating over angular momentum quantum numbers
-        degen = 2*Ang + 1
+        degen = nAngMomFunctions[Ang]
         old_idx = old_ang_indices[Ang]
         new_idx = new_ang_indices[Ang]
         ang_set = [cgto for cgto in atom.Basis if cgto.AngularMomentum is Ang]
@@ -58,16 +59,9 @@ def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis, old_basis):
                 m_coeffs = Basis_Fit_Ang(atom, ang_set, MOs[old_idx], NewFunctions, m)
                 for i in range(len(m_coeffs)):
                     coeffs[i*degen + m] = m_coeffs[i]
-        atom_coeffs += coeffs                               # building up the vec of coeffs
+        atom_coeffs[new_idx] = coeffs                               # building up the vec of coeffs
         cgto_count += len(ang_set) * degen
 
-    #Adding on coefficents of 0 for polarizing functions in the new basis
-    newMaxAng = max([cgto[0] for cgto in basis.get[new_basis][atom.Label]])
-    if newMaxAng > atom.MaxAng:
-        for cgto in basis.get[new_basis][atom.Label]:
-            if cgto[0] > atom.MaxAng:
-                atom_coeffs += [0.0] *  (2 * cgto[0] + 1)
-                cgto_count += 2 * cgto[0] + 1
     return atom_coeffs
 
 #---------------------------------------------------------------------------------------
@@ -113,7 +107,7 @@ def get_ang_indices(atom, cgtos):
     index_count = 0
     for cgto in cgtos:
         ang = cgto[0]
-        degen = 2*ang+1
+        degen = nAngMomFunctions[ang]
         indices[ang] += range(index_count, index_count+degen)
         index_count += degen
     return indices
