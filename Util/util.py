@@ -104,9 +104,9 @@ def occupied(matrices):
 def distance(density1, density2, molecule):
     """ Calculatest he distance between two sets of MOs using the metric
         from Phys. Rev. Lett. 101 193001 """
-    co_density = molecule.Overlap.dot(density2).dot(molecule.Overlap)  # Calculating the covarient density matrix
+    co_density = molecule.Overlap.dot(density2).dot(molecule.Overlap)            # Calculating the covarient density matrix
     den_prod, _ = scipy.linalg.sqrtm(density1.dot(co_density), disp=False)       # Note the sqrtm which isn't in the paper
-    return molecule.NElectrons - numpy.real(numpy.trace(den_prod))     # Imaginary part is a machine precision error
+    return molecule.NElectrons - numpy.real(numpy.trace(den_prod))               # Imaginary part is a machine precision error from sqrtm
 
 def distance_matrix(molecule):
     """ Calculates the distances between all the calculates states using

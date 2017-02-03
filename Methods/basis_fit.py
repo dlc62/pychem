@@ -42,7 +42,7 @@ def Get_Overlap(prim1, prim2, l, m=0):
 
 def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis, old_basis):
     new_cgtos = basis.get[new_basis][atom.Label]
-    old_ang_indices = get_ang_indices(atom, basis.get[old_basis][atom.Label])
+    old_ang_indices = get_ang_indices(atom, basis.get[old_basis][atom.Label], cgto_count)
     new_ang_indices = get_ang_indices(atom, new_cgtos)
     size = sum([len(l) for l in new_ang_indices])                 # getting the number of cgtos centered on this atom in the new basis
     atom_coeffs = numpy.zeros(size)
@@ -100,11 +100,11 @@ def Basis_Fit_Ang(atom, old_set, MOs, new_ang_set, m):    #Take all the MO coeff
     new_MOs = numpy.linalg.solve(S,T)
     return numpy.ndarray.tolist(new_MOs)
 
-def get_ang_indices(atom, cgtos):
+def get_ang_indices(atom, cgtos, start=0):
     """ Gets the indices of the MO coefficents associated with each l value
         for the atom """
     indices = [[] for l in range(atom.MaxAng+1)]
-    index_count = 0
+    index_count = start
     for cgto in cgtos:
         ang = cgto[0]
         degen = nAngMomFunctions[ang]

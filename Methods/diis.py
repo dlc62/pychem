@@ -128,15 +128,17 @@ def reduce_space(DIIS, settings):
 
 def solve_coeffs(DIIS, settings):
     if settings.DIIS.Type == 'C1':
-        coeffs = get_C1_coeffs(DIIS.Matrix)
+        coeffs = get_C1_coeffs(DIIS.Matrix, settings.DIIS.Damping)
     elif settings.DIIS.Type == 'C2':
         coeffs = get_C2_coeffs(DIIS.Matrix, DIIS.Residuals)
     return coeffs
 
-def get_C1_coeffs(matrix):
+def get_C1_coeffs(matrix, damping):
     DIIS_vector = numpy.zeros([len(matrix),1])
     DIIS_vector[-1] = -1.0
-    coeffs = numpy.linalg.solve(matrix, DIIS_vector)
+    damped_matrix = copy.deepcopy(matrix)
+    damped_matrix[numpy.diag_indices(len(damped_matrix))] *= (1.0 + damping)
+    coeffs = numpy.linalg.solve(damped_matrix, DIIS_vector)
     return coeffs[:-1][:,0]    # not returning the lagrange multiplier
 
 def get_C2_coeffs(matrix, residuals):

@@ -28,10 +28,10 @@ def do(molecule, this, state_index, ref_MOs):
 
     # Calculate the overlap with just the orbtials that differ between each state
     # Should add to code to try and stop comparison with collapsed states
-        else:
-            alpha_state_overlaps -= compare_states(this.Alpha, state.Alpha, molecule.Overlap)
-            beta_state_overlaps -= compare_states(this.Beta, state.Beta, molecule.Overlap)
-            NStates += 1
+    #    else:
+    #        alpha_state_overlaps -= compare_states(this.Alpha, state.Alpha, molecule.Overlap)
+    #        beta_state_overlaps -= compare_states(this.Beta, state.Beta, molecule.Overlap)
+    #        NStates += 1
 
     # Take average of the state overlaps and subtract from the overlap
     # with the reference orbitals
@@ -84,7 +84,23 @@ def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
 def Sort_MOs(MOs, energies, p):
     """Sorts MOs and energies in decending order
     based on a vector p (the overlap vector)"""
-    indexes = p.argsort()[::-1]
-    new_MOs = MOs[:,indexes]
-    new_energies = energies[indexes]
+    indices = p.argsort()[::-1]
+    #new_MOs, new_energies = mix_MOs(MOs, energies, indices)
+    new_MOs = MOs[:,indices]
+    new_energies = energies[indices]
     return new_MOs, new_energies
+
+def mix_MOs(MOs, energies, indices):
+    """ Takes a sorted list of indices """
+
+    mix = 0.5     # mix = 1 corresponds to normal MOM
+    U = numpy.zeros((len(indices), len(indices)))
+
+    for i,j in enumerate(indices):
+        # i represents the index of the old MO
+        # j represents the index of the new MO to mix with
+        U[i,i] = 1 - mix
+        U[j,i] = mix
+    MOs = MOs.dot(U)
+    energies = energies.dot(U)
+    return MOs, energies

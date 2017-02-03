@@ -76,8 +76,8 @@ def do_NOCI(molecule, settings):
     # Solve the generalized eigenvalue problem
     try:
         energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
-    except numpy.linalg.linalg.LinAlgError:
-        printf.printf(settings, """Could not solve NOCI equations, this suggest two MOM calculations converged to the same state""")
+    except np.linalg.linalg.LinAlgError:
+        printf.printf(settings, """Could not solve NOCI equations, this suggests two MOM calculations converged to the same state""")
         energies = "ERROR"
         wavefunctions = "ERROR"
 
@@ -245,14 +245,14 @@ def two_zeros(alpha, beta, zeros_list, molecule):
             elem += wCa[a,i] * wCb[b,j] * xCa[c,i] * xCb[d,i] * molecule.CoulombIntegrals[a,b,c,d]
             elem += wCa[a,i] * wCb[b,j] * xCa[c,i] * xCb[d,j] * molecule.ExchangeIntegrals[a,b,d,c]
 
-    """
-    for (i, spin) in zeros_list:
-        P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
-        P_beta = np.outer(beta[0][:,i], beta[1][:,i])
-        state = CoDensity_State(P_alpha, P_beta)
-        make_coulomb_exchange_matrices(molecule, state)
-        active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
-        active_P = P_alpha if spin == "alpha" else P_beta
-        elem += 0.5 * inner_product(state.total, state.coulomb) + inner_product(active_P, active_exhange)
-    """
+
+    #for (i, spin) in zeros_list:
+    #    P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
+    #    P_beta = np.outer(beta[0][:,i], beta[1][:,i])
+    #    state = CoDensity_State(P_alpha, P_beta)
+    #    make_coulomb_exchange_matrices(molecule, state)
+    #    active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
+    #    active_P = P_alpha if spin == "alpha" else P_beta
+    #    elem += 0.5 * inner_product(state.total, state.coulomb) + inner_product(active_P, active_exhange)
+
     return elem

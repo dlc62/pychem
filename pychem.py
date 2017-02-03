@@ -75,7 +75,7 @@ def do_calculation(settings, molecule):
                 if settings.SCF.Guess != "READ":
                     alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
                     beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
-         
+
         Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
         molecule.update_basis(basis_set, Store2eInts)
 
@@ -96,6 +96,7 @@ def do_calculation(settings, molecule):
             mp2.do(settings, molecule, state, index)
 
     if settings.NOCI.Use:
+        print("Starting NOCI")
         NOCI.do_NOCI(molecule, settings)
 
     # Close output file
@@ -120,7 +121,7 @@ if __name__ == "__main__":
             print("Could not open input file, check you have typed the name correctly")
             sys.exit()
         if len(parser.sections()) == 0:
-            print("Input file has no recognisable section headings, format [section_heading]")
+            print("Input file has no recognisable section headings, format: [section_heading]")
             sys.exit()
         for section in parser.sections():
             molecule,settings = inputs_structures.process_input(section, parser)

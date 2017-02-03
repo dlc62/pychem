@@ -83,13 +83,6 @@ def do_SCF(settings, molecule, state_index = 0):
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
 
-        if num_iterations is 25:
-            settings.DIIS.Use = False
-            diis.reset_diis(state.AlphaDIIS)
-            diis.reset_diis(state.BetaDIIS)
-        if num_iterations is 34:
-            settings.DIIS.Use = True
-
         # DIIS
         if settings.DIIS.Use:
             diis.do(molecule, state, settings, diis_error_vec)
@@ -110,8 +103,6 @@ def do_SCF(settings, molecule, state_index = 0):
         util.sort_MOs(state.Alpha, molecule)
         util.sort_MOs(state.Beta, molecule)
 
-        print(state.Alpha.MOs)
-
         make_density_matrices(molecule,state)
 
         old_energy = state.Energy
@@ -124,6 +115,7 @@ def do_SCF(settings, molecule, state_index = 0):
             final_loop = True
 
         printf.HF_Loop(state, settings, num_iterations, dE, diis_error, final_loop)
+        #util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
 
         if num_iterations >= settings.SCF.MaxIter:
             print("SCF not converging")
@@ -131,6 +123,12 @@ def do_SCF(settings, molecule, state_index = 0):
 
     molecule.States[state_index] = state
     printf.HF_Final(settings)
+    if molecule.Basis == "321G":
+        print("\nAlpha MOs")
+        util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
+        print("\nBeta MOs")
+        util.visualize_MOs(state.Beta.MOs, molecule.Basis, molecule)
+        input("\n\nPress Enter to Continue")
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #

@@ -4,14 +4,17 @@
 
 # Run the tests with python3 -m unittest basis_fitting.tests
 
-# Note the example MOs don't have involve addinf polarizing functions
+# Note the example MOs don't have involve adding polarizing functions
 
 import unittest
 import numpy as np
 import configparser
 
+import numpy
+
 from Methods import basis_fit
 from Util import inputs_structures, util
+from Data import basis
 
 
 # Converged STO3G alpha orbitals for the ground state of LiH at 1.8A
@@ -24,21 +27,23 @@ LiH_MOs = np.array([[ -9.91372e-01,   1.56976e-01,   2.12299e-01,  -3.64763e-17,
                     [ -9.56834e-04,  -5.63445e-01,   1.58278e-01,  -5.72359e-17,  -1.48825e-16,  -1.08581e+00]])
 
 # The above orbitals fit to 321G
-LiH_MOs_321G = np.array([[ -9.89609e-01,   1.29589e-01,   1.66182e-01,  -2.38676e-17,  -8.59919e-17,  -7.33893e-02,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -4.65651e-02,  -3.27376e-01,  -5.54862e-01,   1.53188e-16,   3.52075e-16,   4.37717e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -1.27198e-03,  -1.59907e-01,  -2.69885e-01,   7.40415e-17,   1.70835e-16,   2.11676e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -6.10099e-18,  -5.38248e-17,  -2.23611e-16,   6.65537e-01,  -6.37604e-01,   9.28709e-17,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -5.27051e-17,   2.41607e-16,  -4.03331e-16,  -6.37604e-01,  -6.65537e-01,   2.37723e-16,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [  4.79649e-03,  -3.12380e-01,   5.59628e-01,  -9.84497e-17,  -2.18455e-16,   8.51398e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -7.77004e-19,  -6.85497e-18,  -2.84785e-17,   8.47609e-02,  -8.12035e-02,   1.18278e-17,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -6.71237e-18,   3.07703e-17,  -5.13671e-17,  -8.12035e-02,  -8.47609e-02,   3.02757e-17,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [  6.10867e-04,  -3.97839e-02,   7.12727e-02,  -1.25383e-17,  -2.78218e-17,   1.08432e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -5.46895e-04,  -3.22047e-01,   9.04664e-02,  -3.27141e-17,  -8.50634e-17,  -6.20615e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
-                         [ -5.07394e-04,  -2.98786e-01,   8.39323e-02,  -3.03513e-17,  -7.89195e-17,  -5.75790e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00]])
+LiH_MOs_321G = np.array([[ -1.00228e+00,   1.57718e-01,   2.12973e-01,  -3.64219e-17,  -1.15361e-16,  -1.09348e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -3.64789e-02,  -3.74580e-01,  -6.33976e-01,   1.74663e-16,   4.01951e-16,   4.99166e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -6.18446e-18,  -5.45612e-17,  -2.26671e-16,   6.74643e-01,  -6.46328e-01,   9.41411e-17,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -5.34262e-17,   2.44912e-16,  -4.08849e-16,  -6.46328e-01,  -6.74643e-01,   2.40976e-16,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [  4.86212e-03,  -3.16654e-01,   5.67285e-01,  -9.97963e-17,  -2.21444e-16,   8.63047e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -7.11693e-03,  -1.25447e-01,  -2.12049e-01,   5.83087e-17,   1.34344e-16,   1.66666e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -7.69573e-19,  -6.78941e-18,  -2.82061e-17,   8.39502e-02,  -8.04268e-02,   1.17146e-17,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -6.64816e-18,   3.04760e-17,  -5.08758e-17,  -8.04268e-02,  -8.39502e-02,   2.99862e-17,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [  6.05025e-04,  -3.94033e-02,   7.05909e-02,  -1.24183e-17,  -2.75557e-17,   1.07394e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -5.62609e-04,  -3.31300e-01,   9.30659e-02,  -3.36541e-17,  -8.75076e-17,  -6.38446e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00],
+                         [ -5.00092e-04,  -2.94486e-01,   8.27245e-02,  -2.99145e-17,  -7.77839e-17,  -5.67502e-01,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00,   0.00000e+00]])
+
+# making assert_allclose behave more like numpy's allclose function
+assert_allclose = (lambda x,y: numpy.testing.assert_allclose(x,y, rtol=1e-05, atol=1e-08))
 
 class BasisFitTests(unittest.TestCase):
 
-    # Test the idempotence of fitting a set onto itself
     def setUp(self):
         """ Create a molecule object """
         parser = configparser.ConfigParser()
@@ -47,8 +52,7 @@ class BasisFitTests(unittest.TestCase):
 
     def test_idem(self):
         """ Test the idempotence of the method """
-        equal = np.allclose(basis_fit.do(self.molecule, LiH_MOs, "STO3G"), LiH_MOs)
-        self.assertTrue(equal)
+        assert_allclose(basis_fit.do(self.molecule, LiH_MOs, "STO3G"), LiH_MOs)
 
     def test_overall(self):
         """ Test the method as a whole works """
@@ -57,30 +61,23 @@ class BasisFitTests(unittest.TestCase):
 
     def test_atom(self):
         """ test the basis_fit atom function """
-        atom_coeffs = basis_fit.Basis_Fit_Atom(self.molecule.Atoms[0], list(LiH_MOs[:,0]), 0, '321G')
-        equal = np.allclose(atom_coeffs, list(LiH_MOs_321G[:9,0]))
-        self.assertTrue(equal)
+        atom_coeffs = basis_fit.Basis_Fit_Atom(self.molecule.Atoms[1], LiH_MOs[:,0], 5, '321G', 'STO3G')
+        assert_allclose(atom_coeffs, list(LiH_MOs_321G[9:,0]))
 
     def test_ang(self):
         """ test the fit angular momentum function """
         atom = self.molecule.Atoms[0]
         old_ang_set = atom.Basis[:2]
-        MOs = list(LiH_MOs[:,0])
+        MOs = LiH_MOs[:,0]
         new_ang_set = [[[36.8382, 0.0696686], [5.48172, 0.381346], [1.11327, 0.681702]], [[0.540205, -0.263127], [0.102255, 1.14339]], [[0.028565, 1.0]]]
-        ang_coeffs = basis_fit.Basis_Fit_Ang(atom, old_ang_set, MOs, 0, new_ang_set, 0)
-        equal = np.allclose(ang_coeffs, LiH_MOs_321G[:3,0])
-        self.assertTrue(equal)
+        ang_coeffs = basis_fit.Basis_Fit_Ang(atom, old_ang_set, MOs[[0,1]], new_ang_set, 0)
+        assert_allclose(ang_coeffs, LiH_MOs_321G[[0,1,5],0])
 
-    def _test_back(self):
-        """Testing fitting a larger set onto a smaller one"""
-        print(LiH_MOs_321G)
-        print('')
+
+    def test_back(self):
+        """Testing fitting a larger set onto a smaller one. Currently this just checks there
+           are no exceptions thrown"""
         result = basis_fit.do(self.molecule, LiH_MOs_321G, "STO3G")
-        print(result)
-        print('')
-        result2 = basis_fit.do(self.molecule, result, "321G")
-        print(result2)
-        print('')
 
 class SubFunctionTests(unittest.TestCase):
 
@@ -89,24 +86,26 @@ class SubFunctionTests(unittest.TestCase):
         parser = configparser.ConfigParser()
         parser.read("Tests/Basis_Fitting_Test_Example.py")
         self.molecule, _ = inputs_structures.process_input(parser.sections()[0], parser)
-        import pdb; pdb.set_trace()
 
     def test_get_indices(self):
         expected_result = [[0,1,5], [2,3,4,6,7,8]]
-        result = basis_fit.get_ang_indices(self.molecule.Atoms[0], "321G")
+        cgtos = basis.get["321G"]["LI"]
+        result = basis_fit.get_ang_indices(self.molecule.Atoms[0], cgtos)
         self.assertEqual(result, expected_result)
+
 
 parser = configparser.ConfigParser()
 parser.read("Tests/Basis_Fitting_Test_Example.py")
 molecule, _ = inputs_structures.process_input(parser.sections()[0], parser)
 result = basis_fit.do(molecule, LiH_MOs, "321G")
 
-print("Original STO3G MOs")
-util.visualize_MOs(LiH_MOs, "STO3G", molecule)
-print("Basis Fit 321G MOs")
-util.visualize_MOs(LiH_MOs_321G, "321G", molecule)
-print("Basis Fit 321G MOs")
-util.visualize_MOs(result, "321G", molecule)
+#print("Original STO3G MOs")
+#util.visualize_MOs(LiH_MOs, "STO3G", molecule)
+#print("Basis Fit 321G MOs")
+#util.visualize_MOs(LiH_MOs_321G, "321G", molecule)
+#print("Basis Fit 321G MOs")
+#util.visualize_MOs(result, "321G", molecule)
+
 
 #suite = unittest.TestLoader().loadTestsFromTestCase(SubFunctionTests)
 #unittest.TextTestRunner(verbosity=1).run(suite)

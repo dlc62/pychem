@@ -14,7 +14,7 @@ def initialize(settings, method = None):
            os.remove(settings.OutFileName)
         except:
            pass
-        settings.OutFile = open(settings.OutFileName,'a')
+    settings.OutFile = open(settings.OutFileName,'a')
 
 def finalize(settings, method = None):
     settings.OutFile.close()

@@ -181,7 +181,7 @@ class Set_SCF:
         try:
             self.MaxIter = inputs("Max_SCF_Iterations")
         except:
-            self.MaxIter = 25
+            self.MaxIter = 80
         #------------------- Basis Fitting Switch --------------------#
         try:
            self.BasisFit = inputs("Basis_Fit")
@@ -230,6 +230,10 @@ class Set_DIIS:
             self.MaxCondition = inputs("DIIS_Max_Condition")
         except:
             self.MaxCondition = c.DIIS_max_condition
+        try:
+            self.Damping = inputs("DIIS_Damping")
+        except:
+            self.Damping = 0.02
         self.Threshold = 0.0
 
 #---------------------------------------------------------------------#
@@ -465,7 +469,7 @@ class Molecule:
         alpha_occupancy = alpha_occupied + alpha_unoccupied
         beta_occupancy = beta_occupied + beta_unoccupied
         # Instantiate ElectronicState for ground state
-        self.States = [ElectronicState(alpha_occupancy,beta_occupancy,self.NOrbitals)]
+        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
         # Generate occupancy lists and ElectronicState instances for excited states
         if self.ExcitationType is not None:
            self.States = self.make_excitations()
@@ -479,11 +483,9 @@ class Molecule:
             if alpha_excitation != []:
                alpha_occupied = self.do_excitation(alpha_ground, alpha_excitation)
             else:
-               if self.ExcitationType == 'CUSTOM-PAIRED':
+               if self.ExcitationType == 'CUSTOM-PAIRED':    # Maunually specifying both alpha and beta excitations
                   alpha_occupied = alpha_ground
                   beta_occupied = self.do_excitation(beta_ground, self.BetaExcitations[i])
-               else:
-                  break
             if (self.ExcitationType == 'SINGLE') or (self.ExcitationType == 'HOMO-LUMO'):
                beta_occupied = beta_ground
             if self.ExcitationType == 'DOUBLE-PAIRED':
@@ -508,7 +510,6 @@ class Molecule:
                      self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
                   else:
                      break
-
         return self.States
 
     def do_excitation(self, ground_occ, excitation):
