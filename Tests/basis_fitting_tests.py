@@ -2,7 +2,7 @@
 
 # Regression tests for the basis fitting code
 
-# Run the tests with python3 -m unittest basis_fitting.tests
+# Run the tests with python3 -m unittest Tests.basis_fitting_tests
 
 # Note the example MOs don't have involve adding polarizing functions
 
@@ -46,7 +46,7 @@ class BasisFitTests(unittest.TestCase):
 
     def setUp(self):
         """ Create a molecule object """
-        parser = configparser.ConfigParser()
+        parser = configparser.SafeConfigParser()
         parser.read("Tests/Basis_Fitting_Test_Example.py")
         self.molecule, _ = inputs_structures.process_input(parser.sections()[0], parser)
 

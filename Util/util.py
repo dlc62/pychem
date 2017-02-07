@@ -52,16 +52,36 @@ def remove_punctuation(basis_set):
     basis_set = basis_set.replace('*','s').replace('-','').replace('(','').replace(')','').replace(',','').upper()
     return basis_set
 
-def single_excitations(occ_start, occ_stop, virt_start, virt_stop):
+def single_excitations(ground_occ):
     excitations = []
-    for i in range(occ_start, occ_stop):
-        for j in range(virt_start, virt_stop):
+    occ_stop = sum(ground_occ)        # last occupied orbital
+    for i in range(0, occ_stop):
+        for j in range(occ_stop, len(ground_occ)):
             excitations.append([i,j])
     return excitations
 
-def make_length_equal(list1, list2, place_holder = []):
+def double_paired_excitations(ground):
+    excitations = []
+    for (i, orb1) in enumerate(zip(ground.AlphaOccupancy, ground.BetaOccupancy)):
+        if orb1 == (1,1):
+            for (j, orb2) in enumerate(zip(ground.AlphaOccupancy, ground.BetaOccupancy)):
+                if orb2 == (0,0):
+                    excitations.append([i,j])
+    return excitations, excitations
+
+def double_excitations(ground):
+    alpha_excitations = []; beta_excitations = []
+    alpha_singles = single_excitations(ground.AlphaOccupancy)
+    beta_singles = single_excitations(ground.BetaOccupancy)
+    for excite1 in alpha_singles:
+        for excite2 in beta_singles:
+            alpha_excitations.append(excite1)      # Will this give mutiple identical
+            beta_excitations.append(excite2)       # excitations in some cases?
+    return alpha_excitations, beta_excitations
+
+def make_length_equal(list1, list2, placeholder = []):
     diff = len(list1) - len(list2)
-    extra = [place_holder for i in range(abs(diff))]
+    extra = [placeholder for i in range(abs(diff))]
     if diff > 0:
         list2 += extra
     elif diff < 0:

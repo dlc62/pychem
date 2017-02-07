@@ -26,9 +26,12 @@ def process_input(section, parser):
     return molecule,settings
 
 def inputs_return_function(section, parser):
-    def inputs(var_name):
-        var = parser.get(section,var_name)
-        var = ast.literal_eval(var)
+    def inputs(var_name, default=...):
+        var = parser[section].get(var_name, default)
+        if var is ...:                                              # Using Ellsis (...) as it's something that will
+            raise(ConfigParser.NoOptionError(var_name, section))    # never be used as an input value
+        elif var != default:
+            var = ast.literal_eval(var)
         if isinstance(var, str):
             var = var.upper()
         return var
@@ -149,7 +152,7 @@ class Set_SCF:
         available_references = ['RHF','UHF','CUHF']
         try:
            self.Reference = inputs("Reference")
-        except:
+        except ConfigParser.NoOptionError:
            print('Reference not specified, defaulting to UHF')
            self.Reference = "UHF"
         try:
@@ -354,6 +357,10 @@ class Molecule:
             self.Atoms.append(atom)
             self.NOrbitals += atom.NFunctions
             index += 1
+        # Creating the ground state
+        alpha_occupancy = [1] * self.NAlphaElectrons + [0] * (self.NOrbitals-self.NAlphaElectrons)
+        beta_occupancy = [1] * self.NBetaElectrons + [0] * (self.NOrbitals-self.NBetaElectrons)
+        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
         #---------- SCF structures - common to all states ------------#
         #          contains ShellPair -> Shell subclasses             #
         #-------------------------------------------------------------#
@@ -392,133 +399,51 @@ class Molecule:
                     shell_pairs.append(shell_pair)
         self.ShellPairs = shell_pairs
 
-    #=================================================================#
     def set_excitations(self, inputs):
-        #------------- Excited state specifications ------------------#
-        #      contains ElectronicState -> Matrices subclasses        #
-        #-------------------------------------------------------------#
-        available_excitation_types = ['SINGLE', 'DOUBLE', 'HOMO-LUMO', 'DOUBLE-PAIRED', 'CUSTOM-SINGLE','CUSTOM-PAIRED']
+        # Look for keywords excitation
+        availible_keywords = ["SINGLE", "DOUBLE", "HOMO-LUMO", "DOUBLE-PAIRED"]
         try:
-           excitation_type = inputs("Excitations")
+            excitation_type = inputs("Excitations")
+            if excitation_type in availible_keywords:
+                alpha_excitations, beta_excitations = self.make_keyword_excitations(excitation_type)
+            else:
+                print("Availible excitation keywords are: " + str(availible_keywords))
+                sys.exit()
+        # Else get explicit excitations
         except ConfigParser.NoOptionError:
-           try:
-              alpha_excitations = inputs("Alpha_Excitations")
-           except ConfigParser.NoOptionError:
-              alpha_excitations = [[]]
-           try:
-              beta_excitations = inputs("Beta_Excitations")
-           except ConfigParser.NoOptionError:
-              beta_excitations = [[]]
-           if (alpha_excitations == [[]]) and (beta_excitations == [[]]):
-              excitation_type = None
-           elif (alpha_excitations != [[]]) and (beta_excitations != [[]]):
-              try:
-                 assert len(alpha_excitations) == len(beta_excitations)
-                 excitation_type = 'CUSTOM-PAIRED'
-              except AssertionError:
-                 print("""Alpha_Excitations and Beta_Excitations lists must be equal in length if both keywords present,
-                          blank sub-lists can be used as placeholders""")
-                 sys.exit()
-           else:
-              excitation_type = 'CUSTOM-SINGLE'
+            alpha_excitations = inputs("Alpha_Excitations", default = [])
+            beta_excitations = inputs("Beta_Excitations", default = [])
+        util.make_length_equal(alpha_excitations, beta_excitations, placeholder=[])
 
-        # Check that excitations were given in the correct format
-        try:
-           assert excitation_type in available_excitation_types
-        except:
-           print("""Excitations can be specified by keyword as Excitations = 'Single, 'Double', 'Homo-Lumo' or 'Double-Paired'""")
-           sys.exit()
-
-        if (excitation_type is 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'):
-           try:
-              assert type(alpha_excitations) is list
-              for alpha_excitation in alpha_excitations:
-                 assert type(alpha_excitation) is list
-              assert type(beta_excitations) is list
-              for beta_excitation in beta_excitations:
-                 assert type(beta_excitation) is list
-           except AssertionError:
-              print("""Custom excitations specified as Alpha_Excitations or Beta_Excitations lists of [from,to] orbital pairs""")
-              sys.exit()
-
-        # Make excitation lists for corresponding keywords
-        if (excitation_type == 'SINGLE') or (excitation_type == 'DOUBLE'):
-           self.AlphaExcitations = util.single_excitations(self.NCoreOrbitals, self.NAlphaElectrons, self.NAlphaElectrons, self.NOrbitals)
-           self.BetaExcitations = util.single_excitations(self.NCoreOrbitals, self.NBetaElectrons, self.NBetaElectrons, self.NOrbitals)
-        if (excitation_type == 'DOUBLE-PAIRED'):
-           self.AlphaExcitations = util.single_excitations(self.NCoreOrbitals, self.NBetaElectrons, self.NAlphaElectrons, self.NOrbitals)
-        if (excitation_type == 'HOMO-LUMO'):
-           self.AlphaExcitations = util.single_excitations(self.NAlphaElectrons-1, self.NAlphaElectrons, self.NAlphaElectrons, self.NAlphaElectrons+1)
-        if (excitation_type == 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'):
-           self.AlphaExcitations = alpha_excitations
-           self.BetaExcitations = beta_excitations
-        self.ExcitationType = excitation_type
-
-        #-------------------------------------------------------------#
-        #   Generate excited states, each an ElectronicState object   #
-        #-------------------------------------------------------------#
-        self.generate_excited_states()
+        for alpha, beta in zip(alpha_excitations, beta_excitations):
+            alpha_occ = self.do_excitation(self.States[0].AlphaOccupancy, alpha)
+            beta_occ = self.do_excitation(self.States[0].BetaOccupancy, beta)
+            self.States.append(ElectronicState(alpha_occ, beta_occ, self.NOrbitals))
         self.NStates = len(self.States)
 
-    def generate_excited_states(self):
-        # Make occupancy lists for the ground state
-        alpha_occupied = [1 for i in range(0,self.NAlphaElectrons)]
-        beta_occupied = [1 for i in range(0,self.NBetaElectrons)]
-        alpha_unoccupied = [0 for i in range(0,self.NOrbitals-self.NAlphaElectrons)]
-        beta_unoccupied = [0 for i in range(0,self.NOrbitals-self.NBetaElectrons)]
-        alpha_occupancy = alpha_occupied + alpha_unoccupied
-        beta_occupancy = beta_occupied + beta_unoccupied
-        # Instantiate ElectronicState for ground state
-        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
-        # Generate occupancy lists and ElectronicState instances for excited states
-        if self.ExcitationType is not None:
-           self.States = self.make_excitations()
+    def make_keyword_excitations(self, keyword):
+        ground = self.States[0]
+        beta_excitations = []
+        if keyword == "SINGLE":
+            alpha_excitations = util.single_excitations(ground.AlphaOccupancy)
+            if self.Multiplicity is not 1:
+                beta_excitations = [[]] * len(alpha_excitations) + util.single_excitations(ground.BetaOccupancy)
+        if keyword == "HOMO-LUMO":
+            alpha_excitations = [[self.NAlphaElectrons-1, self.NAlphaElectrons]]
+        if keyword == "DOUBLE-PAIRED":
+            alpha_excitations, beta_excitations = util.double_paired_excitations(ground)
+        if keyword == "DOUBLE":
+            alpha_excitations, beta_excitations = util.double_excitations(ground)
 
-    def make_excitations(self):
-        alpha_ground = self.States[0].AlphaOccupancy
-        beta_ground = self.States[0].BetaOccupancy
+        return alpha_excitations, beta_excitations
 
-        # Common loop to make the excitations for all cases except single beta excitations
-        for (i,alpha_excitation) in enumerate(self.AlphaExcitations):
-            if alpha_excitation != []:
-               alpha_occupied = self.do_excitation(alpha_ground, alpha_excitation)
-            else:
-               if self.ExcitationType == 'CUSTOM-PAIRED':    # Maunually specifying both alpha and beta excitations
-                  alpha_occupied = alpha_ground
-                  beta_occupied = self.do_excitation(beta_ground, self.BetaExcitations[i])
-            if (self.ExcitationType == 'SINGLE') or (self.ExcitationType == 'HOMO-LUMO'):
-               beta_occupied = beta_ground
-            if self.ExcitationType == 'DOUBLE-PAIRED':
-               beta_occupied = alpha_occupied[:]
-            if self.ExcitationType == 'DOUBLE':
-               for beta_excitation in BetaExcitations:
-                  beta_occupied = self.do_excitation(beta_ground, beta_excitation)
-                  self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-            else:
-               beta_occupied = beta_ground
-               self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-
-        # Do single beta excitations separately
-        if (self.ExcitationType == 'SINGLE') or (self.ExcitationType == 'CUSTOM-SINGLE'):
-            alpha_occupied = alpha_ground
-            if ((self.ExcitationType == 'SINGLE') and (self.Multiplicity == 1) and (self.AlphaExcitations != [[]])):
-               pass
-            else:
-               for beta_excitation in self.BetaExcitations:
-                  if beta_excitation != []:
-                     beta_occupied = self.do_excitation(beta_ground, beta_excitation)
-                     self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-                  else:
-                     break
-        return self.States
+    #=================================================================#
 
     def do_excitation(self, ground_occ, excitation):
         occupied = copy.deepcopy(ground_occ)
         if excitation != []:
             occupied[excitation[0]] = 0
             occupied[excitation[1]] = 1
-        else:
-            print("""Warning: shouldn't be calling do_excitation without a specified excitation pair""")
         return occupied
 
     #=================================================================#
