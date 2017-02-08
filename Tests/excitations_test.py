@@ -22,7 +22,7 @@ def setup_test(input_excitations):
         parser = configparser.ConfigParser()
         parser.read(input_filepath)
         molecule, _ = inputs_structures.process_input(parser.sections()[0], parser)
-        #remove(input_filepath)
+        remove(input_filepath)
         return molecule
 
 class ExcitationsTest(unittest.TestCase):
@@ -35,6 +35,7 @@ class ExcitationsTest(unittest.TestCase):
             beta_states = [state.BetaOccupancy for state in molecule.States]
 
             # Gather up the generated excitations ignoring the ground state
+            # Not worrying about order
             self.assertCountEqual(expected_output["alpha"], alpha_states[1:])
             self.assertCountEqual(expected_output["beta"], beta_states[1:])
 
@@ -65,25 +66,25 @@ class ExcitationsTest(unittest.TestCase):
                            "beta": []})
 
 
-    #### Keywords
+    ###### Keywords ######
 
     # Single
-    test_single = make_test({'Excitations': "'SINGLE'"},
+    test_single = make_test({"Excitations": "'SINGLE'"},
                             {"alpha": [[0,1,1], [1,0,1], [1,1,0], [1,1,0]],
                              "beta":  [[1,0,0], [1,0,0], [0,0,1], [0,1,0]]})
 
     # HOMO-LUMO Excitations
-    test_HOMO_LUMO = make_test({'Excitations': "'HOMO-LUMO'"},
+    test_HOMO_LUMO = make_test({"Excitations": "'HOMO-LUMO'"},
                                {"alpha": [[1,0,1]],
                                 "beta": [[1,0,0]]})
 
     # Double paired
-    test_double_paired = make_test({'Excitations': "'DOUBLE-PAIRED'"},
+    test_double_paired = make_test({"Excitations": "'DOUBLE-PAIRED'"},
                                    {"alpha": [[0,1,1]],
                                     "beta": [[0,0,1]]})
 
     ## All Double
-    test_double = make_test({'Excitations': "'DOUBLE'"},
+    test_double = make_test({"Excitations": "'DOUBLE'"},
                             {"alpha": [[1,0,1], [1,0,1], [0,1,1], [0,1,1]],
                              "beta": [[0,1,0], [0,1,0], [0,0,1], [0,0,1]]})
 

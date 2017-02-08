@@ -63,7 +63,6 @@ def do_NOCI(molecule, settings):
             elif num_zeros is 1:
                 elem = one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zeros_list[0], molecule)
             elif num_zeros is 2:
-                print("Warning: determinats with two othroginal orbitals not yet tested")
                 elem = two_zeros(alpha, beta, zeros_list, molecule)
             else:  # num_zeros > 2
                 elem = 0
@@ -230,29 +229,15 @@ def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
     return elem
 
 def two_zeros(alpha, beta, zeros_list, molecule):
-    print("Two Overlaps")
     elem = 0
 
-    [[i, spin1], [j, spin2]] = zeros_list
-
-    wCa = alpha[0]; xCa = alpha[1]
-    wCb = beta[0]; xCb = beta[1]
-
-    for a in range(molecule.NOrbitals):
-      for b in range(molecule.NOrbitals):
-        for c in range(molecule.NOrbitals):
-          for d in range(molecule.NOrbitals):
-            elem += wCa[a,i] * wCb[b,j] * xCa[c,i] * xCb[d,i] * molecule.CoulombIntegrals[a,b,c,d]
-            elem += wCa[a,i] * wCb[b,j] * xCa[c,i] * xCb[d,j] * molecule.ExchangeIntegrals[a,b,d,c]
-
-
-    #for (i, spin) in zeros_list:
-    #    P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
-    #    P_beta = np.outer(beta[0][:,i], beta[1][:,i])
-    #    state = CoDensity_State(P_alpha, P_beta)
-    #    make_coulomb_exchange_matrices(molecule, state)
-    #    active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
-    #    active_P = P_alpha if spin == "alpha" else P_beta
-    #    elem += 0.5 * inner_product(state.total, state.coulomb) + inner_product(active_P, active_exhange)
+    for (i, spin) in zeros_list:
+        P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
+        P_beta = np.outer(beta[0][:,i], beta[1][:,i])
+        state = CoDensity_State(P_alpha, P_beta)
+        make_coulomb_exchange_matrices(molecule, state)
+        active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
+        active_P = P_alpha if spin == "alpha" else P_beta
+        elem += inner_product(active_P, state.coulomb) + inner_product(active_P, active_exhange)
 
     return elem
