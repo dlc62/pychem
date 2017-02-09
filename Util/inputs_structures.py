@@ -442,6 +442,10 @@ class Molecule:
     def do_excitation(self, ground_occ, excitation):
         occupied = copy.deepcopy(ground_occ)
         if excitation != []:
+            # Check that the excitation is valid
+            if occupied[excitation[0]] is 0 or occupied[excitation[1]] is 1:
+                print("Invalid Excitation: {}".format(excitation))
+                sys.exit()
             occupied[excitation[0]] = 0
             occupied[excitation[1]] = 1
         return occupied

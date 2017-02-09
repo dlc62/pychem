@@ -46,7 +46,7 @@ class BasisFitTests(unittest.TestCase):
 
     def setUp(self):
         """ Create a molecule object """
-        parser = configparser.SafeConfigParser()
+        parser = configparser.ConfigParser()
         parser.read("Tests/Basis_Fitting_Test_Example.py")
         self.molecule, _ = inputs_structures.process_input(parser.sections()[0], parser)
 

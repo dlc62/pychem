@@ -70,6 +70,8 @@ def do_SCF(settings, molecule, state_index = 0):
     else:
         energy_convergence = c.energy_convergence
 
+    #util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
+    #util.visualize_MOs(state.Beta.MOs, molecule.Basis, molecule)
     while energy_convergence < abs(dE):
         num_iterations += 1
 
@@ -123,12 +125,6 @@ def do_SCF(settings, molecule, state_index = 0):
 
     molecule.States[state_index] = state
     printf.HF_Final(settings)
-    if molecule.Basis == "321G":
-        print("\nAlpha MOs")
-        util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
-        print("\nBeta MOs")
-        util.visualize_MOs(state.Beta.MOs, molecule.Basis, molecule)
-        input("\n\nPress Enter to Continue")
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #
