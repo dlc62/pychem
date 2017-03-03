@@ -34,7 +34,7 @@ def do(molecule, this, settings, error_vec):
 
     this.AlphaDIIS.Error = alpha_residual.max()
     this.BetaDIIS.Error = beta_residual.max()
-    settings.DIIS.Threshold = -0.1 * this.Energy
+    settings.DIIS.Threshold = abs(0.2 * this.Energy)
 
     # Get Coordinates
     alpha_coeffs = get_coeffs(alpha_residual, this.Alpha.Fock, this.Alpha.Density, this.AlphaDIIS, settings, molecule)
@@ -55,7 +55,7 @@ def do(molecule, this, settings, error_vec):
 
 def get_coeffs(residual, fock, density, DIIS, settings, molecule):
     DIIS.pre_DIIS_fock = fock
-    if residual.max() < settings.DIIS.Threshold:
+    if abs(residual).max() < settings.DIIS.Threshold:
         DIIS.Residuals.append(residual)
         DIIS.OldFocks.append(fock)
         DIIS.OldDensities.append(density)
@@ -64,7 +64,7 @@ def get_coeffs(residual, fock, density, DIIS, settings, molecule):
             reduce_space(DIIS,settings)
             coeffs = solve_coeffs(DIIS,settings)
             return coeffs
-    return [None]
+    return [None]    # Return None to indicate residual was too large
 
 #======================================================================#
 #                             SUBROUTINES                              #
@@ -127,18 +127,22 @@ def reduce_space(DIIS, settings):
 #----------------------------------------------------------------------#
 
 def solve_coeffs(DIIS, settings):
+    matrix = damp_matrix(DIIS.Matrix, settings.DIIS.Damping)
     if settings.DIIS.Type == 'C1':
-        coeffs = get_C1_coeffs(DIIS.Matrix, settings.DIIS.Damping)
+        coeffs = get_C1_coeffs(matrix)
     elif settings.DIIS.Type == 'C2':
-        coeffs = get_C2_coeffs(DIIS.Matrix, DIIS.Residuals)
+        coeffs = get_C2_coeffs(matrix, DIIS.Residuals)
     return coeffs
 
-def get_C1_coeffs(matrix, damping):
-    DIIS_vector = numpy.zeros([len(matrix),1])
-    DIIS_vector[-1] = -1.0
+def damp_matrix(matrix, damping):
     damped_matrix = copy.deepcopy(matrix)
     damped_matrix[numpy.diag_indices(len(damped_matrix))] *= (1.0 + damping)
-    coeffs = numpy.linalg.solve(damped_matrix, DIIS_vector)
+    return damped_matrix
+
+def get_C1_coeffs(matrix):
+    DIIS_vector = numpy.zeros([len(matrix),1])
+    DIIS_vector[-1] = -1.0
+    coeffs = numpy.linalg.solve(matrix, DIIS_vector)
     return coeffs[:-1][:,0]    # not returning the lagrange multiplier
 
 def get_C2_coeffs(matrix, residuals):
@@ -174,6 +178,7 @@ def reset_diis(DIIS):
     DIIS.Residuals = []
     DIIS.Matrix = [[None]]
     DIIS.OldFocks = []
+    DIIS.OldDensities = []
 
 def check_coeffs(coeffs):
     if len(coeffs) is 1:

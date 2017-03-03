@@ -441,13 +441,22 @@ class Molecule:
 
     def do_excitation(self, ground_occ, excitation):
         occupied = copy.deepcopy(ground_occ)
+        nExcite = len(excitation)   # Number of excitations
         if excitation != []:
-            # Check that the excitation is valid
-            if occupied[excitation[0]] is 0 or occupied[excitation[1]] is 1:
-                print("Invalid Excitation: {}".format(excitation))
+            if nExcite % 2 is not 0:
+                print("Excitations must be specifed in pairs")
                 sys.exit()
-            occupied[excitation[0]] = 0
-            occupied[excitation[1]] = 1
+            pairs = [(excitation[i],excitation[j]) for i,j in zip(range(0,nExcite,2), range(1,nExcite,2))]
+            for pair in pairs:
+                # Check that the excitation is valid
+                if pair[0] < 0 or pair[1] > len(ground_occ):
+                    print("Excitation {} is out of range".format(pair))
+                    sys.exit()
+                elif occupied[pair[0]] is 0 or occupied[pair[1]] is 1:
+                    print("Invalid Excitation: {}".format(excitation))
+                    sys.exit()
+                occupied[pair[0]] = 0
+                occupied[pair[1]] = 1
         return occupied
 
     #=================================================================#

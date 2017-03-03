@@ -65,6 +65,11 @@ class ExcitationsTest(unittest.TestCase):
                           {"alpha": [],
                            "beta": []})
 
+    # Multiple excitations
+    test_multiple = make_test({"alpha_excitations": [[1,2,0,1]]},
+                              {"alpha": [[0,1,1]],
+                               "beta": [[1,0,0]]})
+
 
     ###### Keywords ######
 

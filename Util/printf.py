@@ -1,9 +1,16 @@
+
+# Rewrite this to avoid so much string concatenation and also to
+# get more flexible writing to particular locations, look at the io
+# module in stdlib
+
 # System libraries
 from __future__ import print_function
 import os
 import numpy
 # Custom-written data modules
 import Data.constants as c
+import Util.util
+from Data.constants import energy_convergence_final
 
 # pretty printing to the terminal for numpy arrays
 numpy.set_printoptions(precision=5, linewidth=300)
@@ -52,7 +59,7 @@ def HF_Initial(molecule, this, settings):
             print(outString)
 
 #Possibly need to allow this to print the coulomb and exchange matrices (if PrintLevel == VERBOSE)
-def HF_Loop(this, settings, cycles, dE, diis_error, final):
+def HF_Loop(this, settings, cycles, diis_error, final):
 
     #testing to see if the alpha and beta orbital energies are the same
     #equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
@@ -62,7 +69,7 @@ def HF_Loop(this, settings, cycles, dE, diis_error, final):
     outString = ''
     outString += "Cycle: " + str(cycles) + '\n'
     outString += "Total Energy: " + str(this.TotalEnergy) + '\n'
-    outString += "Change in energy: " + str(dE) + '\n'
+    outString += "Change in energy: " + str(this.dE) + '\n'
     if diis_error != None:                 #stops this from printing when DIIS is disabled
         outString += "DIIS Error: " + str(diis_error) + '\n'
 
@@ -98,11 +105,29 @@ def HF_Loop(this, settings, cycles, dE, diis_error, final):
         outString += "Alpha Occupany: {}\n".format(this.AlphaOccupancy)
         outString += "Beta Occupancy: {}\n".format(this.BetaOccupancy)
 
-    outString += '----------------------------------------------------' + '\n'
+    outString += '----------------------------------------------------'# + '\n'
 
     if settings.PrintToTerminal:
         print(outString)
-    print_to_file(settings.OutFile, outString)
+    print_to_file(settings.OutFile, outString + '\n')
+
+def HF_Summary(settings, molecule):
+    outString = "MOM Calculation Summary\n"
+    outString += "HF State Energies: {}\n".format([state.TotalEnergy for state in molecule.States])
+
+    distances = Util.util.distance_matrix(molecule)
+    not_converged = ""; collapsed = ""
+    for i, state1 in enumerate(molecule.States):
+        if abs(state1.dE) > energy_convergence_final:
+            not_converged += "Calculation {} did not converge, final dE was: {}\n".format(i+1, state1.dE)
+        for j, state2 in enumerate(molecule.States[:i]):
+            if distances[i,j] < 0.1 and numpy.isclose(state1.TotalEnergy, state2.TotalEnergy):
+                collapsed += "Calculations {} and {} have found the same state\n".format(j+1, i+1)
+    outString += not_converged + collapsed
+    outString += '----------------------------------------------------'
+    if settings.PrintToTerminal:
+        print(outString)
+    print_to_file(settings.OutFile, outString + '\n')
 
 def HF_Final(settings):
     outString =  '                       End                          ' + '\n'
@@ -133,7 +158,7 @@ def NOCI(settings, hamil, overlaps, states, energies):
         outString += "State Overlaps\n{}\n".format(overlaps)
 
     outString += "States\n{}\n".format(states)
-    outString += "State Energies\n{}\n".format(energies)
+    outString += "NOCI Energies\n{}\n".format(energies)
     print_to_file(settings.OutFile, outString)
 
     if settings.PrintToTerminal:

@@ -89,22 +89,20 @@ def do_calculation(settings, molecule):
 
         # Dump MOs to file for other basis sets, all states
         util.store('MOs', molecule.States, settings.SectionName, basis_set)
+    if molecule.NStates > 1:
+        printf.HF_Summary(settings, molecule)
     #-------------------------------------------------------------------
     # Do state-specific MP2 in final basis only
     if settings.Method == 'MP2':
         for index, state in enumerate(molecule.States):
             mp2.do(settings, molecule, state, index)
 
-    if settings.NOCI.Use:
+    if settings.NOCI.Use and molecule.NStates > 1:
         print("Starting NOCI")
         NOCI.do_NOCI(molecule, settings)
 
     # Close output file
     printf.finalize(settings)
-
-    distances = util.distance_matrix(molecule)
-
-    print(distances)
 
 #======================================================================#
 # __main__: Process input file, loop over sections, set up data        #

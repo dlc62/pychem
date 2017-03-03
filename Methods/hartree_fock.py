@@ -50,7 +50,7 @@ def do_SCF(settings, molecule, state_index = 0):
 
     # Calculate initial energy
     calculate_energy(molecule, state)
-    dE = state.Energy
+    state.dE = state.Energy
     energies = []
 
     # Print initial
@@ -72,7 +72,9 @@ def do_SCF(settings, molecule, state_index = 0):
 
     #util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
     #util.visualize_MOs(state.Beta.MOs, molecule.Basis, molecule)
-    while energy_convergence < abs(dE):
+    #if molecule.Basis == "321G":
+    settings.DIIS.Size = 4
+    while energy_convergence < abs(state.dE):
         num_iterations += 1
 
         #-------------------------------------------#
@@ -90,8 +92,9 @@ def do_SCF(settings, molecule, state_index = 0):
             diis.do(molecule, state, settings, diis_error_vec)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
-        if settings.SCF.Reference == "CUHF":# and num_iterations > 1:
+        if settings.SCF.Reference == "CUHF":
             constrain_UHF(molecule, state, state_index)
+        calc_spin(molecule, state)
 
         make_MOs(molecule, state)
 
@@ -109,15 +112,14 @@ def do_SCF(settings, molecule, state_index = 0):
 
         old_energy = state.Energy
         calculate_energy(molecule, state)
-        dE = state.Energy - old_energy
+        state.dE = state.Energy - old_energy
         state.TotalEnergy = state.Energy + molecule.NuclearRepulsion
         energies.append(state.TotalEnergy)
 
-        if abs(dE) < energy_convergence or num_iterations >= settings.SCF.MaxIter:
+        if abs(state.dE) < energy_convergence or num_iterations >= settings.SCF.MaxIter:
             final_loop = True
 
-        printf.HF_Loop(state, settings, num_iterations, dE, diis_error, final_loop)
-        #util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
+        printf.HF_Loop(state, settings, num_iterations, diis_error, final_loop)
 
         if num_iterations >= settings.SCF.MaxIter:
             print("SCF not converging")
@@ -263,10 +265,6 @@ def constrain_UHF(molecule, this, state_index):
     core_space = [i for i, occ in enumerate(NO_vals) if occ >= (1 - c.CUHF_thresh)]
     valence_space = [i for i, occ in enumerate(NO_vals) if occ <= c.CUHF_thresh]
 
-    # Calculate the expectation value of the spin operator
-    # Note the factor of 2 rather than 0.5 before the sum, this accounts for using half densities
-    this.S2 = N*(N+4)/4. - Nab - 2 * sum([x ** 2 for x in NO_vals])   # Using formula from J. Chem. Phys. 88, 4926
-
     delta = (this.Alpha.Fock - this.Beta.Fock) / 2
     delta = NO_coeffs.T.dot(delta).dot(NO_coeffs)    # Transforming delta into the NO basis
     lambda_matrix = numpy.zeros(numpy.shape(delta))
@@ -279,6 +277,14 @@ def constrain_UHF(molecule, this, state_index):
     this.Alpha.Fock = this.Alpha.Fock + lambda_matrix
     this.Beta.Fock = this.Beta.Fock - lambda_matrix
 
+def calc_spin(molecule, state):
+    Na = molecule.NAlphaElectrons; Nb = molecule.NBetaElectrons
+    S_RHF = 0.25 * (Na - Nb) * (Na - Nb + 2)
+    overlap = state.Alpha.MOs[:,:Na].T.dot(molecule.Overlap).dot(state.Beta.MOs [:,:Nb])
+    contamination = Nb - numpy.square(overlap).sum()
+    S_UHF = S_RHF + contamination
+    state.S2 = S_UHF
+
 #----------------------------------------------------------------------
 
 def mix_orbitals(MOs, occupancy, mix_coeff):
@@ -288,17 +294,14 @@ def mix_orbitals(MOs, occupancy, mix_coeff):
     MOs[:,HOMO] = MOs[:,HOMO] * (1 - mix_coeff) + MOs[:,HOMO+1] * mix_coeff
 #-----------------------------------------------------------------
 
-def precondition(molecule, settings, state):
-    no_read = settings.SCF.Guess != "READ"
-    first_basis = molecule
-
-def plot(energies):
+def plot(energies, start=1):
     import matplotlib.pyplot as plt
+    x = range(start,len(energies)+1)
+    energies = energies[start-1:]
     #energies = [e * 2625.5 for e in energies] # Convert to kJ/mol
-    x = range(1,len(energies)+1)
     plt.plot(x, energies, marker='o')
     #plt.ylim((-3600, -3900))
-    plt.ylabel("Energies (kJ/mol)")
+    plt.ylabel("Energies (Hartrees)")
     plt.xlabel("SCF Iterations")
     plt.show()
 
