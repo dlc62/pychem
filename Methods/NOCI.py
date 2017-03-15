@@ -207,7 +207,6 @@ def no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule):
     return elem
 
 def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
-    #print("One Overlap")
     zero_index = zero[0]
 
     # Making all the required Codensity matrices
@@ -231,13 +230,16 @@ def one_zero(alpha, beta, alpha_overlaps, beta_overlaps, zero, molecule):
 def two_zeros(alpha, beta, zeros_list, molecule):
     elem = 0
 
-    for (i, spin) in zeros_list:
-        P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
-        P_beta = np.outer(beta[0][:,i], beta[1][:,i])
-        state = CoDensity_State(P_alpha, P_beta)
-        make_coulomb_exchange_matrices(molecule, state)
-        active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
-        active_P = P_alpha if spin == "alpha" else P_beta
-        elem += inner_product(active_P, state.coulomb) + inner_product(active_P, active_exhange)
+    # This actually seems to only need one of the zeros
+    i = zeros_list[0][0]
+    spin = zeros_list[0][1]
+
+    P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
+    P_beta = np.outer(beta[0][:,i], beta[1][:,i])
+    state = CoDensity_State(P_alpha, P_beta)
+    make_coulomb_exchange_matrices(molecule, state)
+    active_exhange = state.alpha_exchange if spin == 'alpha' else state.beta_exchange
+    active_P = P_alpha if spin == "alpha" else P_beta
+    elem += inner_product(active_P, state.coulomb) + inner_product(active_P, active_exhange)
 
     return elem

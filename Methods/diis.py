@@ -55,7 +55,9 @@ def do(molecule, this, settings, error_vec):
 
 def get_coeffs(residual, fock, density, DIIS, settings, molecule):
     DIIS.pre_DIIS_fock = fock
-    if abs(residual).max() < settings.DIIS.Threshold:
+    under_thresh = abs(residual).max() < settings.DIIS.Threshold  # Check the matrix is good enoght to start DIIS
+    non_zero = residual.any()                                     # check the residual is non_zero
+    if under_thresh and non_zero:
         DIIS.Residuals.append(residual)
         DIIS.OldFocks.append(fock)
         DIIS.OldDensities.append(density)
@@ -63,7 +65,6 @@ def get_coeffs(residual, fock, density, DIIS, settings, molecule):
             make_diis_matrix(DIIS,settings)
             reduce_space(DIIS,settings)
             coeffs = solve_coeffs(DIIS,settings)
-            return coeffs
     return [None]    # Return None to indicate residual was too large
 
 #======================================================================#

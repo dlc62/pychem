@@ -262,8 +262,13 @@ def constrain_UHF(molecule, this, state_index):
     back_trans = numpy.linalg.inv(NO_coeffs)
 
     # Selecting the various spaces based on natural orbital occupancy
-    core_space = [i for i, occ in enumerate(NO_vals) if occ >= (1 - c.CUHF_thresh)]
-    valence_space = [i for i, occ in enumerate(NO_vals) if occ <= c.CUHF_thresh]
+    #core_space = [i for i, occ in enumerate(NO_vals) if occ >= (1 - c.CUHF_thresh)]
+    #valence_space = [i for i, occ in enumerate(NO_vals) if occ <= c.CUHF_thresh]
+
+    # Selecting the spaces based on occupany vecors
+    total_occ = [x[0] + x[1] for x in zip(this.AlphaOccupancy, this.BetaOccupancy)]
+    core_space = range(molecule.NOrbitals)[-total_occ.count(2):]
+    valence_space = range(molecule.NOrbitals)[:total_occ.count(0)]
 
     delta = (this.Alpha.Fock - this.Beta.Fock) / 2
     delta = NO_coeffs.T.dot(delta).dot(NO_coeffs)    # Transforming delta into the NO basis
