@@ -63,8 +63,6 @@ def do_SCF(settings, molecule, state_index = 0):
     final_loop = False
     diis_error = None
 
-    diis_error_vec = "commute"
-
     if molecule.Basis == settings.BasisSets[-1]:
         energy_convergence = c.energy_convergence_final
     else:
@@ -73,7 +71,6 @@ def do_SCF(settings, molecule, state_index = 0):
     #util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
     #util.visualize_MOs(state.Beta.MOs, molecule.Basis, molecule)
     #if molecule.Basis == "321G":
-    settings.DIIS.Size = 4
     while energy_convergence < abs(state.dE):
         num_iterations += 1
 
@@ -89,7 +86,7 @@ def do_SCF(settings, molecule, state_index = 0):
 
         # DIIS
         if settings.DIIS.Use:
-            diis.do(molecule, state, settings, diis_error_vec)
+            diis.do(molecule, state, settings)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
         if settings.SCF.Reference == "CUHF":
@@ -127,6 +124,7 @@ def do_SCF(settings, molecule, state_index = 0):
 
     molecule.States[state_index] = state
     printf.HF_Final(settings)
+    #import pdb; pdb.set_trace()
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #
@@ -265,7 +263,7 @@ def constrain_UHF(molecule, this, state_index):
     #core_space = [i for i, occ in enumerate(NO_vals) if occ >= (1 - c.CUHF_thresh)]
     #valence_space = [i for i, occ in enumerate(NO_vals) if occ <= c.CUHF_thresh]
 
-    # Selecting the spaces based on occupany vecors
+    # Selecting the spaces based on occupany vectors
     total_occ = [x[0] + x[1] for x in zip(this.AlphaOccupancy, this.BetaOccupancy)]
     core_space = range(molecule.NOrbitals)[-total_occ.count(2):]
     valence_space = range(molecule.NOrbitals)[:total_occ.count(0)]
@@ -278,6 +276,12 @@ def constrain_UHF(molecule, this, state_index):
             lambda_matrix[i,j] = -delta[i,j]
             lambda_matrix[j,i] = -delta[j,i]
     lambda_matrix = back_trans.T.dot(lambda_matrix).dot(back_trans)  # Transforming lambda back to the AO basis
+
+    # Need to zero out the small elements of the lambda matrix otherwise lose of significant
+    # figures in the small elements of the Beta Fock matrix can cause difference in calculations
+    # with spin symmetric excitations
+    small_lambda_values = abs(lambda_matrix) < c.lambda_zero_thresh
+    lambda_matrix[small_lambda_values] = 0.0
 
     this.Alpha.Fock = this.Alpha.Fock + lambda_matrix
     this.Beta.Fock = this.Beta.Fock - lambda_matrix

@@ -121,7 +121,10 @@ def HF_Summary(settings, molecule):
         if abs(state1.dE) > energy_convergence_final:
             not_converged += "Calculation {} did not converge, final dE was: {}\n".format(i+1, state1.dE)
         for j, state2 in enumerate(molecule.States[:i]):
-            if distances[i,j] < 0.1 and numpy.isclose(state1.TotalEnergy, state2.TotalEnergy):
+            distance_close = distances[i,j] < 0.1
+            energy_close = numpy.isclose(state1.TotalEnergy, state2.TotalEnergy)
+            spin_sym = state1.AlphaOccupancy == state2.BetaOccupancy and state1.BetaOccupancy == state2.AlphaOccupancy
+            if distance_close and energy_close and not spin_sym:
                 collapsed += "Calculations {} and {} have found the same state\n".format(j+1, i+1)
     outString += not_converged + collapsed
     outString += '----------------------------------------------------'

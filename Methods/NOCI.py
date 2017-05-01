@@ -58,6 +58,7 @@ def do_NOCI(molecule, settings):
             num_zeros = len(zeros_list)
 
         # Calculated the element of the Hamiltonian matrix
+            #print("Num Zeros: {} || States: {}, {}".format(num_zeros, i, j))
             if num_zeros is 0:
                 elem = no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule)
             elif num_zeros is 1:
@@ -79,6 +80,12 @@ def do_NOCI(molecule, settings):
         printf.printf(settings, """Could not solve NOCI equations, this suggests two MOM calculations converged to the same state""")
         energies = "ERROR"
         wavefunctions = "ERROR"
+
+    # Check the CI wavefunction is properly normalized
+    try:
+        assert np.allclose(wavefunctions.T.dot(CI_overlap).dot(wavefunctions), np.eye(dims))
+    except:
+        print("CI WAVEFUNCTION NOT NORMALIZED")
 
     printf.NOCI(settings, CI_matrix, CI_overlap, wavefunctions, energies)
 
@@ -202,7 +209,6 @@ def no_zeros(alpha, beta, alpha_overlaps, beta_overlaps, molecule):
     for i in range(molecule.NBetaElectrons):
         if beta_overlaps[i] > THRESH:
              elem += molecule.beta_core[i,i] / beta_overlaps[i]
-
 
     return elem
 

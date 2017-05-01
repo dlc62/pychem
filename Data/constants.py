@@ -37,6 +37,7 @@ density_convergence = 1.e-6
 DIIS_convergence = 1.e-5
 DIIS_max_condition = 1e100
 NOCI_Thresh = 1e-10
+lambda_zero_thresh = 1e-10
 
 # Max deviation from an occupany of 0 or 1 before an orbital will
 # be included in the CUHF active space

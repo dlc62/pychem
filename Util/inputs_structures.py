@@ -237,6 +237,10 @@ class Set_DIIS:
             self.Damping = inputs("DIIS_Damping")
         except:
             self.Damping = 0.02
+        try:
+            self.error_vec = inputs("DIIS_Error_Vector")
+        except:
+            self.ErrorVec = "commute"
         self.Threshold = 0.0
 
 #---------------------------------------------------------------------#

@@ -150,9 +150,12 @@ def sort_MOs(state, molecule):
     state.MOs[:,:N] = occupied_MOs[:,indices]
     state.Energies[:N] = occupied_energies[indices]
 
-def visualize_MOs(MOs, basis_set, molecule):
+#def visualize_MOs(MOs, basis_set, molecule):
+def visualize_MOs(MOs, molecule, basis_set=None):
     from Data.basis import get
     ang_labels = {0: ["s"], 1: ["px", "py", "pz"]}
+    if basis_set is None:
+        basis_set = molecule.Basis
 
     # collect the anular momenytum labels of the various cgtos
     atoms = [atom.Label for atom in molecule.Atoms]

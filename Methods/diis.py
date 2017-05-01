@@ -12,8 +12,8 @@ import Data.constants as c
 from Util import util
 
 # The argument 'error_vec' determins which of the two possible residual vectors are used
-# error_vec = 'commute' uses the commutator of the fock and density matrices - this works best for ground states
-# error_vec = 'diff' uses the difference between sucessive fock matrices - this works best for excited states
+# error_vec = 'commute' ses the commutator of the fock and density matrices - this works best in most cases
+# error_vec = 'diff' uses the difference between sucessive fock matrices
 
 #======================================================================#
 #                           MAIN ROUTINES                              #
@@ -22,10 +22,10 @@ from Util import util
 #                           Entry Point                                #
 #----------------------------------------------------------------------#
 
-def do(molecule, this, settings, error_vec):
+def do(molecule, this, settings):
 
     # Set up error estimates
-    if error_vec == "commute":
+    if settings.DIIS.ErrorVec == "commute":
         alpha_residual = get_residual_com(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.Xt, molecule.X)
         beta_residual = get_residual_com(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.Xt, molecule.X)
     else:
@@ -129,6 +129,7 @@ def reduce_space(DIIS, settings):
 #----------------------------------------------------------------------#
 
 def solve_coeffs(DIIS, settings):
+    # Can I avoid doing this allocation
     matrix = damp_matrix(DIIS.Matrix, settings.DIIS.Damping)
     if settings.DIIS.Type == 'C1':
         coeffs = get_C1_coeffs(matrix)
