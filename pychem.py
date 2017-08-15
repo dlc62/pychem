@@ -64,7 +64,7 @@ def do_calculation(settings, molecule):
         # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones
         # Or Read starting MOs from disk
         alpha_MOs = []; beta_MOs = []
-        if settings.SCF.Guess == "READ":
+        if settings.SCF.Guess == "READ" and False:
             try:
                 molecule.States = util.fetch('MOs',settings.SCF.MOReadName,settings.SCF.MOReadBasis)
                 assert (molecule.States[0].Alpha.MOs) != []
@@ -72,9 +72,9 @@ def do_calculation(settings, molecule):
                 pass
         else:
             for state in molecule.States:
-                if settings.SCF.Guess != "READ":
-                    alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
-                    beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
+                #if settings.SCF.Guess != "READ":
+                alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
+                beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
 
         Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
         molecule.update_basis(basis_set, Store2eInts)

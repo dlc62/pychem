@@ -28,9 +28,10 @@ def do_SCF(settings, molecule, state_index = 0):
     initialize_fock_matrices(molecule.Core, state)
 
     # Generate initial orbitals and/or density matrices
-    if settings.SCF.Guess == "READ":
+    if settings.SCF.Guess == "READ" and molecule.Basis == settings.BasisSets[0]:
         try:
-            state = util.fetch("MOs", settings.SCF.MOReadName, settings.SCF.MOReadBasis)[state_index]
+            states = util.fetch("MOs", settings.SCF.MOReadName, settings.SCF.MOReadBasis)
+            state = states[state_index]
             assert len(state.Alpha.MOs) == molecule.NOrbitals
             reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
             diis.reset_diis(state.AlphaDIIS)    # Throwing out diis information from the
@@ -68,9 +69,6 @@ def do_SCF(settings, molecule, state_index = 0):
     else:
         energy_convergence = c.energy_convergence
 
-    #util.visualize_MOs(state.Alpha.MOs, molecule.Basis, molecule)
-    #util.visualize_MOs(state.Beta.MOs, molecule.Basis, molecule)
-    #if molecule.Basis == "321G":
     while energy_convergence < abs(state.dE):
         num_iterations += 1
 
@@ -78,6 +76,12 @@ def do_SCF(settings, molecule, state_index = 0):
         #               Main SCF step               #
         #-------------------------------------------#
         initialize_fock_matrices(molecule.Core, state)
+
+        # Average the density marices for RHF
+        if settings.SCF.Reference == "RHF":
+            state.Alpha.Density = numpy.mean([state.Alpha.Density, state.Beta.Density], axis=0)
+            state.Beta.Density = copy.copy(state.Alpha.Density)
+
         make_coulomb_exchange_matrices(molecule, state, settings.SCF.Ints_Handling, num_iterations)
 
         #-------------------------------------------#
@@ -86,12 +90,15 @@ def do_SCF(settings, molecule, state_index = 0):
 
         # DIIS
         if settings.DIIS.Use:
+            if state_index != 0:
+                settings.DIIS.Damp = True
             diis.do(molecule, state, settings)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
         if settings.SCF.Reference == "CUHF":
             constrain_UHF(molecule, state, state_index)
         calc_spin(molecule, state)
+
 
         make_MOs(molecule, state)
 
@@ -102,6 +109,7 @@ def do_SCF(settings, molecule, state_index = 0):
                 reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
         #-------------------------------------------#
 
+        # Sort the occupied MOs by energy
         util.sort_MOs(state.Alpha, molecule)
         util.sort_MOs(state.Beta, molecule)
 
@@ -124,7 +132,6 @@ def do_SCF(settings, molecule, state_index = 0):
 
     molecule.States[state_index] = state
     printf.HF_Final(settings)
-    #import pdb; pdb.set_trace()
 
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #

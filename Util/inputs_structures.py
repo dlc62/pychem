@@ -588,6 +588,7 @@ class StoreDIIS:
         self.Matrix = [[None]]
         self.Error = 1
         self.pre_DIIS_fock = [[None]]
+        self.Damp = False
 
 #=====================================================================#
 #                  MOLECULE SUBCLASS - SHELLPAIR                      #

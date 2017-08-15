@@ -130,7 +130,7 @@ def reduce_space(DIIS, settings):
 
 def solve_coeffs(DIIS, settings):
     # Can I avoid doing this allocation
-    matrix = damp_matrix(DIIS.Matrix, settings.DIIS.Damping)
+    matrix = damp_matrix(DIIS.Matrix, settings.DIIS.Damping) if DIIS.Damp else DIIS.Matrix
     if settings.DIIS.Type == 'C1':
         coeffs = get_C1_coeffs(matrix)
     elif settings.DIIS.Type == 'C2':
@@ -182,6 +182,7 @@ def reset_diis(DIIS):
     DIIS.Matrix = [[None]]
     DIIS.OldFocks = []
     DIIS.OldDensities = []
+    DIIS.Damp = False
 
 def check_coeffs(coeffs):
     if len(coeffs) is 1:
