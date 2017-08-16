@@ -337,12 +337,9 @@ class Molecule:
             self.NElectrons += c.nElectrons[label.upper()]
             self.NCoreOrbitals += c.nCoreOrbitals[label.upper()]
         self.NElectrons = self.NElectrons - self.Charge
-        try:
-            self.NAlphaElectrons = int((self.NElectrons + (self.Multiplicity-1))/2)
-            self.NBetaElectrons = int((self.NElectrons - (self.Multiplicity-1))/2)
-        except:
-            print('Error: charge and multiplicity inconsistent with specified molecule')
-            sys.exit()
+
+        self.NAlphaElectrons = int((self.NElectrons + (self.Multiplicity-1))/2)
+        self.NBetaElectrons = int((self.NElectrons - (self.Multiplicity-1))/2)
 
     #=================================================================#
     def set_initial(self, inputs, settings):

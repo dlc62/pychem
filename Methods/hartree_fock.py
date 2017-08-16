@@ -20,6 +20,27 @@ from Methods import integrals, diis, mom
 
 def do_SCF(settings, molecule, state_index = 0):
     state = molecule.States[state_index]
+
+    # Check if this state is just the result of swapping the spin labels from a
+    # previouly calculated state and if so return
+    # TODO move this to its own function
+    is_swap, state = check_swapped_spin(molecule, state, state_index, settings)
+    if is_swap:
+        molecule.States[state_index] = state
+        return 0
+#    is_swapped = check_swap(molecule, state, state_index)
+#    if is_swapped:
+#        return 0
+#    swapped_state, state_num = check_swapped_spin(molecule, state, state_index)
+#    if swapped_state:
+#        state = copy.deepcopy(swapped_state)
+#        state.Alpha, state.Beta = state.Beta, state.Alpha
+#        print_message = "Constructed from state {}".format(state_num)
+#        printf.HF_Loop(state, settings, print_message, print_message, True)
+#        molecule.States[state_index] = state
+#        printf.HF_Final(settings)
+#        return 0
+
     # Calculate values that are constant throughout the calculation
     molecule.NuclearRepulsion = integrals.nuclear_repulsion(molecule)
     make_core_matrices(molecule)
@@ -28,6 +49,7 @@ def do_SCF(settings, molecule, state_index = 0):
     initialize_fock_matrices(molecule.Core, state)
 
     # Generate initial orbitals and/or density matrices
+    # TODO pull this into its own function
     if settings.SCF.Guess == "READ" and molecule.Basis == settings.BasisSets[0]:
         try:
             states = util.fetch("MOs", settings.SCF.MOReadName, settings.SCF.MOReadBasis)
@@ -333,3 +355,19 @@ def eigenspace_update(spin):
     delta = spin.MOs.T.dot(spin.Fock).dot(spin.MOs)
     spin.Energies, U = numpy.linalg.eigh(delta)
     spin.MOs = spin.MOs.dot(U)
+    
+def check_swapped_spin(molecule, state, state_index, settings):
+    """ Looks a state that resemble the target state with spin labels swapped and
+        - if found constructs the state and prints the HF output before returning
+        true, if no matching state is found it returns false """
+    for (i, old_state) in enumerate(molecule.States[:state_index]):
+        alpha_match = old_state.AlphaOccupancy == state.BetaOccupancy
+        beta_match = old_state.BetaOccupancy == state.AlphaOccupancy
+        if alpha_match and beta_match:
+            state = copy.deepcopy(old_state)
+            state.Alpha, state.Beta = state.Beta, state.Alpha
+            print_message = "Constructed from state {}".format(i)
+            printf.HF_Loop(state, settings, print_message, print_message, True)
+            printf.HF_Final(settings)
+            return True, state
+    return False, state
