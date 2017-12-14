@@ -36,7 +36,7 @@ def do(molecule, this, state_index, ref_MOs):
     # Take average of the state overlaps and subtract from the overlap
     # with the reference orbitals
 
-    if NStates is not 0:
+    if NStates != 0:
         alpha_state_overlaps /= NStates    # Use 'NStates' for now to keep track of how the divisor chanages
         beta_state_overlaps /= NStates     # depending on whether the unoptimized states are used or not
 

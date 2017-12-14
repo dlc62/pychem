@@ -23,10 +23,11 @@ def do_NOCI(molecule, settings):
 
             # For the diagonal elements the energy is just
             # the state energy and the overlap is 1
-            if i == j:
-                CI_matrix[i,i] = state1.TotalEnergy
-                CI_overlap[i,i] = 1
-                continue
+            # This doesn't seem to be true for spin flip calculations
+            #if i == j:
+            #    CI_matrix[i,i] = state1.TotalEnergy
+            #    CI_overlap[i,i] = 1
+            #    continue
 
             # Biorthoginalize the occupied MOs
             alpha = biorthoginalize(state1.Alpha, state2.Alpha, molecule)
@@ -90,9 +91,9 @@ def do_NOCI(molecule, settings):
     printf.NOCI(settings, CI_matrix, CI_overlap, wavefunctions, energies)
 
 def biorthoginalize(state1, state2, molecule):
-    # This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
-    # using a singular value decomposition, as in J. Chem. Phys. 140, 114103
-    # Note this only returns the MO coeffs corresponding to the occupied MOs """
+   #  This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
+   #  using a singular value decomposition, as in J. Chem. Phys. 140, 114103
+   #  Note this only returns the MO coeffs corresponding to the occupied MOs 
 
     # Finding the overlap of the occupied MOs
     MOs1 = occupied(state1);     MOs2 = occupied(state2)

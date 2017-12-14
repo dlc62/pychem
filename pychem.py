@@ -38,7 +38,6 @@ from Util import inputs_structures
 #======================================================================#
 
 def do_calculation(settings, molecule):
-
     # Open output file
     printf.initialize(settings)
 
@@ -102,19 +101,25 @@ def do_calculation(settings, molecule):
 #           inputs_structures and call do_calculation                  #
 #======================================================================#
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
+#if __name__ == "__main__":
+def run_calc(argv):
+    if len(argv) != 2:
         print("Please give an input file")
+        return -1
     else:
         parser = ConfigParser.SafeConfigParser()
-        has_read_data = parser.read(sys.argv[1])
+        has_read_data = parser.read(argv[1])
         if not has_read_data:
             print("Could not open input file, check you have typed the name correctly")
-            sys.exit()
+            return -1
         if len(parser.sections()) == 0:
             print("Input file has no recognisable section headings, format: [section_heading]")
-            sys.exit()
+            return -1
         for section in parser.sections():
             molecule,settings = inputs_structures.process_input(section, parser)
             settings.set_outfile(section)
             do_calculation(settings, molecule)
+        return molecule
+
+if __name__ == "__main__":
+    run_calc(sys.argv)

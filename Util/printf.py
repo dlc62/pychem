@@ -7,6 +7,7 @@
 from __future__ import print_function
 import os
 import numpy
+import sys
 # Custom-written data modules
 import Data.constants as c
 import Util.util
@@ -22,6 +23,12 @@ def initialize(settings, method = None):
         except:
            pass
     settings.OutFile = open(settings.OutFileName,'a')
+    if settings.LogInput:
+        with open(sys.argv[1], 'r') as f:
+            text = f.read()
+            settings.OutFile.write("{0}   Input File\n{0}".format(32 * "*" + '\n'))
+            settings.OutFile.write(text)
+            settings.OutFile.write("{0}   End of Input File\n{0}\n".format(32 * "*" + '\n'))
 
 def finalize(settings, method = None):
     settings.OutFile.close()
@@ -168,6 +175,7 @@ def NOCI(settings, hamil, overlaps, states, energies):
         print(outString)
 
 def printf(settings, to_print):
+    """ A General logging function """
     print_to_file(settings, to_print)
     if settings.PrintToTerminal:
         print(to_print)

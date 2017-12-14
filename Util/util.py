@@ -107,7 +107,7 @@ def resize_array(src, dest, fill=0):
      for projecting a vector into a vector or a matrix into a matrix """
     old_shape = numpy.shape(src)
     new_array = numpy.full_like(dest, fill)
-    if len(old_shape) is 2:              # Matrix
+    if len(old_shape) == 2:              # Matrix
         height, width = old_shape
         new_array[:height, :width] = src
     else:                                # Vector
@@ -142,13 +142,14 @@ def randU(n):
     R = numpy.diag(numpy.sign(numpy.diag(r)))
     return q.dot(R)
 
-def sort_MOs(state, molecule):
-    N = sum(state.Occupancy)
-    occupied_MOs = state.MOs[:,:N]
-    occupied_energies = state.Energies[:N]
-    indices = occupied_energies[:N].argsort()
-    state.MOs[:,:N] = occupied_MOs[:,indices]
-    state.Energies[:N] = occupied_energies[indices]
+def sort_MOs(state, molecule, only_occupied=True):
+    """ Sort ths MOs, if only_occupied is True sort just the occupied ones """
+    N  = sum(state.Occupancy) if only_occupied else molecule.NOrbitals
+    MOs_to_sort = state.MOs[:,:N]
+    energies_to_sort = state.Energies[:N]
+    indices = energies_to_sort[:N].argsort()
+    state.MOs[:,:N] = MOs_to_sort[:,indices]
+    state.Energies[:N] = energies_to_sort[indices]
 
 #def visualize_MOs(MOs, basis_set, molecule):
 def visualize_MOs(MOs, molecule, basis_set=None):
@@ -162,14 +163,14 @@ def visualize_MOs(MOs, molecule, basis_set=None):
     funcs = []; orb_atoms = []
     for atom in atoms:
         cgtos = get[basis_set][atom]
-        if len(atom) is 2:
+        if len(atom) == 2:
             atom = atom[0] + atom[1].lower()
         for cgto in cgtos:
             funcs += ang_labels[cgto[0]]
             orb_atoms += [atom] * (cgto[0] * 2 + 1)
 
     # Ensure that the size of the basis matches the size of the MOs
-    assert len(funcs) is len(MOs), "Incorect Basis Set For MOs"
+    assert len(funcs) == len(MOs), "Incorect Basis Set For MOs"
 
     print('')
     for i, orb in enumerate(funcs):

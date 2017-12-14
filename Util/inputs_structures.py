@@ -1,7 +1,7 @@
 # System libraries
 from __future__ import print_function
 import sys
-if sys.version_info.major is 2:
+if sys.version_info.major == 2:
   import ConfigParser
 else:
   import configparser as ConfigParser
@@ -27,8 +27,8 @@ def process_input(section, parser):
 
 def inputs_return_function(section, parser):
     def inputs(var_name, default=...):
-        var = parser[section].get(var_name, default)
-        if var is ...:                                              # Using Ellsis (...) as it's something that will
+        var = parser[section].get(var_name, default)                # Throw error if no default is provided and no value is found
+        if var == ...:                                              # Using Ellsis (...) as it's something that will
             raise(ConfigParser.NoOptionError(var_name, section))    # never be used as an input value
         elif var != default:
             var = ast.literal_eval(var)
@@ -134,6 +134,10 @@ class Settings:
             assert(isinstance(self.PrintToTerminal, bool))
         except:
             self.PrintToTerminal = False
+        try:
+            self.LogInput = inputs("Log_Input")
+        except:
+            self.LogInput = False
 
     #=================================================================#
     #                 Set output file from pychem.py                  #
@@ -198,6 +202,18 @@ class Set_SCF:
         except AssertionError:
             print('Error: Basis_Fit must be set to True/False')
             sys.exit()
+        #------------------- Basis Fitting Switch --------------------#
+        # TODO Add error checking more spin flip - ensure that the excitations
+        # are not too high and the every beta excitation has a corresponding
+        # alpha excitation
+        try:
+            self.spin_flip = inputs("Spin_Flip")
+            assert (type(self.spin_flip) is bool)
+        except AssertionError:
+            print('Error: Basis_Fit must be set to True/False')
+            sys.exit()
+        except:
+            self.spin_flip = False
         #-------------- 2 Electron Integral Storage ------------------#
         available_handling_options = ['DIRECT','INCORE','ONDISK']
         try:

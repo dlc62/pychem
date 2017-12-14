@@ -19,57 +19,28 @@ from Methods import integrals, diis, mom
 #=================================================================#
 
 def do_SCF(settings, molecule, state_index = 0):
-    state = molecule.States[state_index]
-
+    state = copy.deepcopy(molecule.States[state_index])
     # Check if this state is just the result of swapping the spin labels from a
     # previouly calculated state and if so return
-    # TODO move this to its own function
+
     is_swap, state = check_swapped_spin(molecule, state, state_index, settings)
     if is_swap:
         molecule.States[state_index] = state
         return 0
-#    is_swapped = check_swap(molecule, state, state_index)
-#    if is_swapped:
-#        return 0
-#    swapped_state, state_num = check_swapped_spin(molecule, state, state_index)
-#    if swapped_state:
-#        state = copy.deepcopy(swapped_state)
-#        state.Alpha, state.Beta = state.Beta, state.Alpha
-#        print_message = "Constructed from state {}".format(state_num)
-#        printf.HF_Loop(state, settings, print_message, print_message, True)
-#        molecule.States[state_index] = state
-#        printf.HF_Final(settings)
-#        return 0
 
     # Calculate values that are constant throughout the calculation
     molecule.NuclearRepulsion = integrals.nuclear_repulsion(molecule)
     make_core_matrices(molecule)
 
+    # Permute the occupancy and set new number of alpha and beta
+    # Electrons if doing a spin flip calculation
+    if settings.SCF.spin_flip:
+        do_spin_flip(molecule,state)
+
     # Set up for SCF calculation
     initialize_fock_matrices(molecule.Core, state)
-
-    # Generate initial orbitals and/or density matrices
-    # TODO pull this into its own function
-    if settings.SCF.Guess == "READ" and molecule.Basis == settings.BasisSets[0]:
-        try:
-            states = util.fetch("MOs", settings.SCF.MOReadName, settings.SCF.MOReadBasis)
-            state = states[state_index]
-            assert len(state.Alpha.MOs) == molecule.NOrbitals
-            reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
-            diis.reset_diis(state.AlphaDIIS)    # Throwing out diis information from the
-            diis.reset_diis(state.BetaDIIS)     # previous calculation
-        except:
-            print("Could not read MOs from file")
-            import sys; sys.exit()
-    elif state.Alpha.MOs != []:
-        reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
-    elif settings.SCF.Guess == "CORE":
-        make_MOs(molecule, state)
-        if settings.SCF.Guess_Mix != 0:
-            mix_orbitals(state.Alpha.MOs, state.AlphaOccupancy, settings.SCF.Guess_Mix)
-        reference_orbitals = None
-
-    make_density_matrices(molecule, state)
+    reference_orbitals = load_reference_orbitals(settings, state)
+    init_density_and_MOs(state, molecule, settings, state_index)
 
     # Calculate initial energy
     calculate_energy(molecule, state)
@@ -91,7 +62,8 @@ def do_SCF(settings, molecule, state_index = 0):
     else:
         energy_convergence = c.energy_convergence
 
-    while energy_convergence < abs(state.dE):
+    #while energy_convergence < abs(state.dE):
+    while not final_loop:
         num_iterations += 1
 
         #-------------------------------------------#
@@ -112,20 +84,20 @@ def do_SCF(settings, molecule, state_index = 0):
 
         # DIIS
         if settings.DIIS.Use:
-            if state_index != 0:
+            if state_index != 0 or not settings.SCF.spin_flip:
                 settings.DIIS.Damp = True
             diis.do(molecule, state, settings)
             diis_error = max(state.AlphaDIIS.Error, state.BetaDIIS.Error)
 
         if settings.SCF.Reference == "CUHF":
             constrain_UHF(molecule, state, state_index)
-        calc_spin(molecule, state)
-
 
         make_MOs(molecule, state)
 
+        calc_spin(molecule, state)
+
         # Optionally, use MOM to reorder MOs
-        if settings.MOM.Use is True and reference_orbitals != None:
+        if settings.MOM.Use and reference_orbitals:
             mom.do(molecule, state, state_index, reference_orbitals)
             if settings.MOM.Reference == 'MUTABLE':
                 reference_orbitals = [state.Alpha.MOs, state.Beta.MOs]
@@ -134,7 +106,6 @@ def do_SCF(settings, molecule, state_index = 0):
         # Sort the occupied MOs by energy
         util.sort_MOs(state.Alpha, molecule)
         util.sort_MOs(state.Beta, molecule)
-
         make_density_matrices(molecule,state)
 
         old_energy = state.Energy
@@ -145,6 +116,8 @@ def do_SCF(settings, molecule, state_index = 0):
 
         if abs(state.dE) < energy_convergence or num_iterations >= settings.SCF.MaxIter:
             final_loop = True
+            if settings.SCF.spin_flip:
+                undo_spin_flip(molecule, state, state_index)
 
         printf.HF_Loop(state, settings, num_iterations, diis_error, final_loop)
 
@@ -154,7 +127,6 @@ def do_SCF(settings, molecule, state_index = 0):
 
     molecule.States[state_index] = state
     printf.HF_Final(settings)
-
 #---------------------------------------------------------------------------#
 #            Basic HF subroutines, this = this electronic state             #
 #---------------------------------------------------------------------------#
@@ -174,6 +146,41 @@ def make_MOs(molecule,this):
     this.Beta.Energies,Cb = numpy.linalg.eigh(Xt.dot(this.Beta.Fock).dot(X))
     this.Alpha.MOs = numpy.dot(X,Ca)
     this.Beta.MOs = numpy.dot(X,Cb)
+
+#----------------------------------------------------------------------
+
+def load_reference_orbitals(settings, state):
+    reference_exists = state.Alpha.MOs != []
+    if reference_exists and not settings.SCF.spin_flip:
+        return [state.Alpha.MOs, state.Beta.MOs]
+    else:
+        return None
+
+#----------------------------------------------------------------------
+
+def init_density_and_MOs(state, molecule, settings, state_index):
+    # Read MOs from file
+    if settings.SCF.Guess == "READ" and molecule.Basis == settings.BasisSets[0]:
+        try:
+            states = util.fetch("MOs", settings.SCF.MOReadName, settings.SCF.MOReadBasis)
+            state = states[state_index]
+            assert len(state.Alpha.MOs) == molecule.NOrbitals
+            diis.reset_diis(state.AlphaDIIS)    # Throwing out diis information from the
+            diis.reset_diis(state.BetaDIIS)     # previous calculation
+        except:
+            print("Could not read MOs from file")
+            import sys; sys.exit()
+    # Make completly new MOs
+    elif state.Alpha.MOs == []:
+        make_MOs(molecule, state)
+        if settings.SCF.Guess_Mix != 0:
+            mix_orbitals(state.Alpha.MOs, state.AlphaOccupancy, settings.SCF.Guess_Mix)
+        reference_orbitals = None
+
+    #if settings.SCF.spin_flip:
+    #    do_spin_flip(molecule,state)
+
+    make_density_matrices(molecule, state)
 
 #----------------------------------------------------------------------
 
@@ -355,7 +362,9 @@ def eigenspace_update(spin):
     delta = spin.MOs.T.dot(spin.Fock).dot(spin.MOs)
     spin.Energies, U = numpy.linalg.eigh(delta)
     spin.MOs = spin.MOs.dot(U)
-    
+
+# Possibly break this into two functions, 1 that looks for two matching states
+# and returns their indices if found and another that does the actual swap
 def check_swapped_spin(molecule, state, state_index, settings):
     """ Looks a state that resemble the target state with spin labels swapped and
         - if found constructs the state and prints the HF output before returning
@@ -371,3 +380,58 @@ def check_swapped_spin(molecule, state, state_index, settings):
             printf.HF_Final(settings)
             return True, state
     return False, state
+
+def do_spin_flip(molecule, state):
+    """ Permuting the occupancy vectors and the the number of electrons of each
+    spin in the copied state instance (not in molecule.States[state_index])"""
+    # Number of alpha electrons in the spin flipped configuration
+    n_alpha = [i for (i,occ) in enumerate(state.AlphaOccupancy) if occ][-1] + 1
+    new_alpha = [1] * n_alpha + [0] * (len(state.AlphaOccupancy) - n_alpha)
+    n_alpha = sum(new_alpha)
+    n_beta = molecule.NElectrons - n_alpha
+    new_beta = [1] * n_beta + [0] * (len(state.BetaOccupancy) - n_beta)
+
+    state.AlphaOccupancy, state.BetaOccupancy = new_alpha, new_beta
+    molecule.NAlphaElectrons, molecule.NBetaElectrons = n_alpha, n_beta
+
+def undo_spin_flip(molecule, state, state_index):
+
+    # Ensure the alpha and beta orbitals are in phase
+    MO1_overlap = state.Alpha.MOs[:,0].dot(molecule.Overlap).dot(state.Beta.MOs[:,0])
+    if MO1_overlap < 0:
+        state.Beta.MOs *= -1
+
+    # Sort all the beta orbitals by energy then replace every unoccupied (unoptimized)
+    # with it's alpha counterpart if that is occupied (optimized)
+    util.sort_MOs(state.Alpha, molecule)
+    for i in range(molecule.NOrbitals):
+        if state.AlphaOccupancy[i] and not state.BetaOccupancy[i]:
+            state.Beta.MOs[:,i] = state.Alpha.MOs[:,i]
+            state.Beta.Energies[i] = state.Alpha.Energies[i]
+        elif state.AlphaOccupancy[i] and state.BetaOccupancy[i]:
+            average_MO = (state.Alpha.MOs[:,i] + state.Beta.MOs[:,i]) / 2
+            state.Alpha.MOs[:,i] = average_MO
+            state.Beta.MOs[:,i] = average_MO
+
+    # Reload the occupancy information from the unflipped state instance
+    # stored in 'molecule'
+    state.AlphaOccupancy = molecule.States[state_index].AlphaOccupancy
+    state.BetaOccupancy = molecule.States[state_index].BetaOccupancy
+    molecule.NAlphaElectrons = sum(state.AlphaOccupancy)
+    molecule.NBetaElectrons = sum(state.BetaOccupancy)
+
+    # Ensure that the orbitals are ordered correctly
+    # Finding the arrangement of indexes to ensure the occupied orbitals are
+    # in the first coloums of the array
+    alpha_idx = (-1 * numpy.array(state.AlphaOccupancy)).argsort(kind="mergesort")    # Using mergesort for sorting stability
+    state.Alpha.MOs = state.Alpha.MOs[:,alpha_idx]
+    state.Alpha.Energies = state.Alpha.Energies[alpha_idx]
+    beta_idx = (-1 * numpy.array(state.BetaOccupancy)).argsort(kind="mergesort")      # Using mergesort for sorting stability
+    state.Beta.MOs = state.Beta.MOs[:,beta_idx]
+    state.Beta.Energies = state.Beta.Energies[beta_idx]
+
+    make_density_matrices(molecule, state)
+    calculate_energy(molecule, state)
+    state.TotalEnergy = state.Energy + molecule.NuclearRepulsion
+    calc_spin(molecule,state)
+    return state

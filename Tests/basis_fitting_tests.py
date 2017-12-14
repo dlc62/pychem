@@ -51,7 +51,7 @@ class BasisFitTests(unittest.TestCase):
         self.molecule, _ = inputs_structures.process_input(parser.sections()[0], parser)
 
     def test_idem(self):
-        """ Test the idempotence of the method """
+        """ Test that fitting orbitals onto the same basis returns the original orbitals"""
         assert_allclose(basis_fit.do(self.molecule, LiH_MOs, "STO3G"), LiH_MOs)
 
     def test_overall(self):

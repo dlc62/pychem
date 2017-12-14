@@ -10,11 +10,10 @@ def do(molecule, MOs, new_basis):
 
     #iterating over each MO in the old basis
     for MO in range(len(MOs)):
-        if MO is not 0 and MO is size:
+        if MO != 0 and MO == size:
             break
-        #old_coeffs = numpy.ndarray.tolist(MOs[:,MO])      # pulling out the MO coefficents associated with a single MO
         old_coeffs = MOs[:,MO]
-        new_MO = numpy.array([])                                        # single column in the eventual MO matrix
+        new_MO = numpy.array([])                  # single column in the eventual MO matrix
         cgto_count = 0
         for atom in molecule.Atoms:
             coeffs = Basis_Fit_Atom(atom, old_coeffs, cgto_count, new_basis, molecule.Basis)
@@ -50,9 +49,9 @@ def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis, old_basis):
         degen = nAngMomFunctions[Ang]
         old_idx = old_ang_indices[Ang]
         new_idx = new_ang_indices[Ang]
-        ang_set = [cgto for cgto in atom.Basis if cgto.AngularMomentum is Ang]
+        ang_set = [cgto for cgto in atom.Basis if cgto.AngularMomentum == Ang]
         #Getting the list of new functions of the correct angular momentum
-        NewFunctions = [cgto[1:] for cgto in new_cgtos if cgto[0] is Ang]
+        NewFunctions = [cgto[1:] for cgto in new_cgtos if cgto[0] == Ang]
         if ang_set != []:
             coeffs = [0.0] * len(NewFunctions) * degen
             for m in range(degen):                                  # iterating over magnetic quantum numbers
@@ -91,8 +90,8 @@ def Basis_Fit_Ang(atom, old_set, MOs, new_ang_set, m):    #Take all the MO coeff
 
     #Finding the overlap of the new functions with the old
     T = numpy.array([0.0 for i in funcs])
-    for orb1 in funcs:                       #iterating over new functions
-        for orb2 in range(len(old_set)):     #iterating over old functions
+    for orb1 in funcs:                         #iterating over new functions
+        for orb2 in range(len(old_set)):       #iterating over old functions
             for prim1 in new_ang_set[orb1]:
                 for prim2 in old_set[orb2]:
                     T[orb1] += Get_Overlap(prim1,prim2,Ang, m)
