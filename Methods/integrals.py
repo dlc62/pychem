@@ -1,149 +1,162 @@
-
+# System libraries
 import sys
-from math import pi
-from math import sqrt
-from math import exp
-import Data.constants as c
-import copy
-import itertools
-from scipy.special import gamma
-from scipy.special import gammainc
-from scipy.misc import factorial
+import numpy
+from copy import copy
+import itertools as it
+# C modules
+import _c_ints
+# Python modules
+from Data import constants as c
 
 if sys.version_info.major is 2:
-    zip = itertools.izip
+    zip = it.izip
 
-# ================================================================================================ #
-#  STRUCTURES REQUIRED FOR ONE-ELECTRON INTEGRAL EVALUATION                                        #
-# ================================================================================================ #
-
+# =================================================================================== #
+#  STRUCTURES REQUIRED FOR ONE- AND TWO-ELECTRON INTEGRAL EVALUATION                  #
+# =================================================================================== #
 class SetRR1:
-    def __init__(self,l1,l2):
-       HRR = [[l1,l2]]; VRR = []
+    def __init__(self,la,lb,inttype):
+
+       i0 = 0; i1 = 1 
+
+       # Set final integral class, and work backwards through RRs to generate terms
+       HRR = [[la,lb]]; VRR = []
        HRR_terms = []; VRR_terms = []
+
+       # Generate unique HRR terms
        index = 0
        while index < len(HRR):
-          if HRR[index][1] != 0:
-             generate_HRR_terms(HRR,index,0,1,True)
+          if HRR[index][i1] != 0:
+             generate_HRR_terms(HRR,index,0,1,unique=True)
              HRR_terms.append(HRR[index])
           else:
              VRR.append([HRR[index],0])
           index += 1
+       HRR_target = list(reversed(HRR_terms))
+
+       # Generate unique VRR terms
        index = 0
        while index < len(VRR):
-          if VRR[index][0][0] != 0:
-             generate_VRR_terms(VRR,index,0,1)
+          if VRR[index][0][i0] != 0:
+             generate_VRR_terms(VRR,index,0,1,inttype,unique=True)
              VRR_terms.append(VRR[index])
           index += 1
-       self.hrr = list(reversed(HRR_terms))
-       self.vrr = list(reversed(VRR_terms))
+       VRR_target = list(reversed(VRR_terms))
 
-# ================================================================================================ #
-#  STRUCTURES REQUIRED FOR TWO-ELECTRON INTEGRAL EVALUATION                                        #
-# ================================================================================================ #
+       # Generate HRR base integral classes
+       HRR_base = [];
+       for index in range(0,len(HRR_target)):
+          HRR_base.append(generate_HRR_terms(HRR_target,index,0,1,unique=False))
 
-class ShellQuartet:
-    def __init__(self,centreA,centreB,centreC,centreD,primA,primB,primC,primD):
-       [self.alpha,self.cA] = primA
-       [self.beta,self.cB] = primB
-       [self.gamma,self.cC] = primC
-       [self.delta,self.cD] = primD
-       self.rA = centreA.Coords
-       self.rB = centreB.Coords
-       self.rC = centreC.Coords
-       self.rD = centreD.Coords
-       self.lA = centreA.Cgtf.AngularMomentum
-       self.lB = centreB.Cgtf.AngularMomentum
-       self.lC = centreC.Cgtf.AngularMomentum
-       self.lD = centreD.Cgtf.AngularMomentum
-       self.zeta = self.alpha+self.beta
-       self.eta = self.gamma+self.delta
-       self.Gab = exp(-self.alpha*self.beta/self.zeta*distance(self.rA,self.rB))
-       self.Gcd = exp(-self.gamma*self.delta/self.eta*distance(self.rC,self.rD))
-       self.Pab = [(self.alpha*a+self.beta*b)/self.zeta for (a,b) in zip(self.rA,self.rB)]
-       self.Pcd = [(self.gamma*c+self.delta*d)/self.eta for (c,d) in zip(self.rC,self.rD)]
-       self.tau = self.zeta+self.eta
-       self.rho = self.zeta*self.eta/self.tau
-       self.T = self.rho*distance(self.Pab,self.Pcd)
-       self.W = [(self.zeta*pab+self.eta*pcd)/self.tau for (pab,pcd) in zip(self.Pab,self.Pcd)]
+       # Generate VRR base integral classes
+       VRR_base = [];
+       for index in range(0,len(VRR_target)): 
+          VRR_base.append(generate_VRR_terms(VRR_target,index,0,1,inttype,unique=False))
 
-class ReIndex:
-    # Re-indexes shell-quartet (sq) data for efficient RR generation,
-    # so bra carries highest angular momentum and i1,i3 point to centres
-    # of highest angular momentum in bra and ket, respectively
-    def __init__(self,sq):
-       self.W = sq.W; self.rho = sq.rho; self.tau = sq.tau
-       self.i1 = 0 ; self.i2 = 1 ; self.i3 = 2 ; self.i4 = 3
-       self.l1 = sq.lA; self.l2 = sq.lB; self.l3 = sq.lC; self.l4 = sq.lD
-       self.r1 = sq.rA; self.r2 = sq.rB; self.r3 = sq.rC; self.r4 = sq.rD
-       if sq.lB > sq.lA:
-          self.i1,self.i2 = self.i2,self.i1
-          self.l1,self.l2 = self.l2,self.l1
-          self.r1,self.r2 = self.r2,self.r1
-       if sq.lD > sq.lC:
-          self.i3,self.i4 = self.i4,self.i3
-          self.l3,self.l4 = self.l4,self.l3
-          self.r3,self.r4 = self.r4,self.r3
-       if (self.l3+self.l4) > (self.l1+self.l2):
-          # swap bra & ket
-          self.i1,self.i2,self.i3,self.i4 = self.i3,self.i4,self.i1,self.i2
-          self.l1,self.l2,self.l3,self.l4 = self.l3,self.l4,self.l1,self.l2
-          self.r1,self.r2,self.r3,self.r4 = self.r3,self.r4,self.r1,self.r2
-          self.P = sq.Pcd; self.Q = sq.Pab; self.z = sq.eta; self.e = sq.zeta
+       # Store in 'order' object 
+       # _base is list containing lists of all base integral classes required for each target integral class.
+       #  Integral classes are themselves encoded as lists of angular momentum quantum numbers
+       # _target is list of containing all target integral classes (encoded as described above)
+       # Remove auxiliary indices for overlap integrals
+       if inttype == 'overlap':
+          VRR_target_overlap = [VRR_term[0] for VRR_term in VRR_target]
+          VRR_base_overlap = []
+          for VRR_terms in VRR_base: 
+             VRR_base_overlap.append([VRR_term[0] for VRR_term in VRR_terms])
+          self.VRR_target = VRR_target_overlap; self.VRR_base = VRR_base_overlap
        else:
-          self.P = sq.Pab; self.Q = sq.Pcd; self.z = sq.zeta; self.e = sq.eta
-       self.ltot = self.l1 + self.l2 + self.l3 + self.l4
+          self.VRR_target = VRR_target; self.VRR_base = VRR_base
+       self.HRR_target = HRR_target; self.HRR_base = HRR_base
 
-class SetRR:
-    # Generate all HRR & VRR two-electron integral classes to be calculated
-    def __init__(self,bk):
-       HRR = [[bk.l1,bk.l2,bk.l3,bk.l4]]; VRR = []
-       HRR_bra_terms = []; HRR_ket_terms = [];
-       VRR_bra_terms = []; VRR_ket_terms = [];
+# ----------------------------------------------------------------------------------- #
+class SetRR2:
+    def __init__(self,la,lb,lc,ld):
+
+       # Use variable indices in case order of operations needs to change
+#       angmom = [la,lb,lc,ld]
+       i0 = 0; i1 = 1; i2 = 2; i3 = 3
+       self.Goofy_bra = False; self.Goofy_ket = False
+       if lb > la:
+          i0 = 1; i1 = 0
+          self.Goofy_bra = True
+       if ld > lc:
+          i2 = 3; i3 = 2
+          self.Goofy_ket = True
+       self.VRR1_indices = [i0,i1,i2,i3]
+       self.VRR2_indices = [i2,i3,i0,i1]
+       self.HRR1_indices = [i1,i0,i2,i3]
+       self.HRR2_indices = [i3,i2,i0,i1]
+
+       # Set final integral class, and work backwards through RRs to generate terms
+       HRR = [[la,lb,lc,ld]]; VRR = []
+       HRR1_terms = []; HRR2_terms = []
+       VRR1_terms = []; VRR2_terms = []
+
+       # Generate unique HRR terms, initial HRR term is highest VRR term
        index = 0
        while index < len(HRR):
-          if HRR[index][1] != 0:
-             generate_HRR_terms(HRR,index,0,1)
-             HRR_bra_terms.append(HRR[index])
-          elif HRR[index][3] != 0:
-             generate_HRR_terms(HRR,index,2,3)
-             HRR_ket_terms.append(HRR[index])
+          if HRR[index][i1] != 0:
+             generate_HRR_terms(HRR,index,i1-1,i1)
+             HRR1_terms.append(HRR[index])
+          elif HRR[index][i3] != 0:
+             generate_HRR_terms(HRR,index,i3-1,i3)
+             HRR2_terms.append(HRR[index])
           else:
              VRR.append([HRR[index],0])
           index += 1
+       HRR1_target = list(reversed(HRR1_terms))
+       HRR2_target = list(reversed(HRR2_terms))
+
+       # Generate unique VRR terms, terminates as [00|00]
        index = 0
        while index < len(VRR):
-          if VRR[index][0][0] != 0:
-             generate_VRR_terms(VRR,index,0,2)
-             VRR_bra_terms.append(VRR[index])
-          elif VRR[index][0][2] != 0:
-             generate_VRR_terms(VRR,index,2,0)
-             VRR_ket_terms.append(VRR[index])
+          if VRR[index][0][i0] != 0:
+             generate_VRR_terms(VRR,index,i0,i2)
+             VRR1_terms.append(VRR[index])
+          elif VRR[index][0][i2] != 0:
+             generate_VRR_terms(VRR,index,i2,i0)
+             VRR2_terms.append(VRR[index])
           index += 1
-       self.hrr_bra = list(reversed(HRR_bra_terms))
-       self.hrr_ket = list(reversed(HRR_ket_terms))
-       self.vrr_bra = list(reversed(VRR_bra_terms))
-       self.vrr_ket = list(reversed(VRR_ket_terms))
+       VRR1_target = list(reversed(VRR1_terms))
+       VRR2_target = list(reversed(VRR2_terms))
 
-# ================================================================================================ #
-#  STRUCTURES REQUIRED FOR BOTH ONE- AND TWO-ELECTRON INTEGRAL EVALUATION                                        #
-# ================================================================================================ #
+       # Generate HRR base integral classes
+       HRR1_base = []; HRR2_base = []
+       for index in range(0,len(HRR1_target)):
+          HRR1_base.append(generate_HRR_terms(HRR1_target,index,i1-1,i1,unique=False))
+       for index in range(0,len(HRR2_target)):
+          HRR2_base.append(generate_HRR_terms(HRR2_target,index,i3-1,i3,unique=False))
 
-def generate_HRR_terms(HRR,index,i0,i1,kinetic=False):
+       # Generate VRR base integral classes
+       VRR1_base = []; VRR2_base = []
+       for index in range(0,len(VRR1_target)): 
+          VRR1_base.append(generate_VRR_terms(VRR1_target,index,i0,i2,unique=False))
+       for index in range(0,len(VRR2_target)): 
+          VRR2_base.append(generate_VRR_terms(VRR2_target,index,i2,i0,unique=False))
+
+       # Store in 'order' object
+       # _base is list of lists of tuples
+       # _target is list of lists
+       self.VRR1_target = VRR1_target; self.VRR1_base = VRR1_base
+       self.VRR2_target = VRR2_target; self.VRR2_base = VRR2_base
+       self.HRR1_target = HRR1_target; self.HRR1_base = HRR1_base
+       self.HRR2_target = HRR2_target; self.HRR2_base = HRR2_base
+
+# ----------------------------------------------------------------------------------- #
+def generate_HRR_terms(HRR,index,i0,i1,unique=True):
    t1 = HRR[index][:]
    t1[i1] -= 1
    t0 = t1[:]
    t0[i0] += 1
    terms = [t0,t1]
-   if kinetic:
-      t2 = t1[:]
-      t2[i0] -= 1
-      terms.append(t2)
-   for term in terms:
-      if term not in HRR:
-         HRR.append(term)
+   if (unique):
+      for term in terms:
+         if term not in HRR:
+            HRR.append(term)
+   else:
+      return terms
 
-def generate_VRR_terms(VRR,index,i0,i2):
+def generate_VRR_terms(VRR,index,i0,i2,inttype=None,unique=True):
    t0 = VRR[index][0][:]; m0 = VRR[index][1]; m1 = m0+1
    t0[i0] -= 1
    t1 = t0[:]
@@ -151,27 +164,36 @@ def generate_VRR_terms(VRR,index,i0,i2):
    t2 = t0[:]
    t2[i2] -= 1
    terms = []
-   if t0[i0] > -1:
-      terms.append([t0,m0])
-      terms.append([t0,m1])
-   if t1[i0] > -1:
-      terms.append([t1,m0])
-      terms.append([t1,m1])
-   if t2[i2] > -1:
-      terms.append([t2,m1])
-   for term in terms:
-      if term not in VRR:
-         VRR.append(term)
+   if inttype is 'overlap':
+      if t0[i0] > -1:
+         terms.append([t0,0])
+      if t1[i0] > -1:
+         terms.append([t1,0])
+   else:
+      if t0[i0] > -1:
+         terms.append([t0,m0])
+         terms.append([t0,m1])
+      if t1[i0] > -1:
+         terms.append([t1,m0])
+         terms.append([t1,m1])
+      if t2[i2] > -1:
+         terms.append([t2,m1])
+   if (unique):
+      for term in terms:
+         if term not in VRR:
+            VRR.append(term)
+   else:
+      return terms
 
-# ================================================================================================ #
-#  NUCLEAR REPULSION ENERGY                                                                        #
-# ================================================================================================ #
+# =================================================================================== #
+#  NUCLEAR REPULSION ENERGY                                                           #
+# =================================================================================== #
 def nuclear_repulsion(molecule):
     nuclear_repulsion_energy = 0.0e0
     for (i,atom1) in enumerate(molecule.Atoms):
        for (j,atom2) in enumerate(molecule.Atoms):
           if j < i:
-             r = sqrt(distance(atom1.Coordinates,atom2.Coordinates))
+             r = distance(atom1.Coordinates,atom2.Coordinates)
              Z1 = atom1.NuclearCharge
              Z2 = atom2.NuclearCharge
              nuclear_repulsion_energy += Z1*Z2/r
@@ -179,427 +201,419 @@ def nuclear_repulsion(molecule):
              continue
     return nuclear_repulsion_energy
 
-#@profile
-# ================================================================================================ #
-#  ONE-ELECTRON INTEGRALS: KINETIC, NUCLEAR ATTRACTION, OVERLAP -> CORE FOCK MATRIX ELEMENTS       #
-# ================================================================================================ #
-def one_electron(molecule,shell_pair):
-    # VRR follows Obara & Saika, JCP, 84, 1986, 3963-3974
-    # HRR from Head-Gordon & Pople, JCP, 89, 1998, 5777-5786
-    # Set up indexing and storage for integrals in original order
-    CgtfA = shell_pair.Centre1.Cgtf; CgtfB = shell_pair.Centre2.Cgtf
-    rA = shell_pair.Centre1.Coords; rB = shell_pair.Centre2.Coords
-    lA = CgtfA.AngularMomentum; lB = CgtfB.AngularMomentum; ltot = lA+lB
-    nlA = CgtfA.NAngMom; nlB = CgtfB.NAngMom
-    row = [0.0 for i in range(0,CgtfB.NAngMom)]
-    contracted_core = [copy.deepcopy(row[:]) for i in range(0,CgtfA.NAngMom)]
-    contracted_overlap = copy.deepcopy(contracted_core)
-    contracted_kinetic = copy.deepcopy(contracted_core)
-    contracted_nuclear = copy.deepcopy(contracted_core)
-    # Determine integral construction ordering
-    Swap = False
-    if lB > lA:
-       Swap = True
-    if Swap:
-       i1 = 1; i2 = 0; r1 = rB; r2 = rA; l1 = lB; l2 = lA; order = SetRR1(lB,lA)
-    else:
-       i1 = 0; i2 = 1; r1 = rA; r2 = rB; l1 = lA; l2 = lB; order = SetRR1(lA,lB)
-    for [alpha,cA] in CgtfA.Primitives:
-       for [beta,cB] in CgtfB.Primitives:
-          zeta = alpha+beta
-          xi = alpha*beta/zeta
-          Rsq = distance(rA,rB)
-          Gab = exp(-xi*Rsq)
-          Pab = [(alpha*A + beta*B)/zeta for (A,B) in zip(rA,rB)]
-       # -------------------------------------------------------------------------------------- #
-       #                           Initialize fundamental integrals                             #
-       # -------------------------------------------------------------------------------------- #
-          overlap = {}
-          kinetic = {}
-          nuclear_auxiliary = [{} for i in range(0,ltot+1)]
-          nuclear = [copy.deepcopy(nuclear_auxiliary) for atom in molecule.Atoms]
-          lkey = (0,0,0,0,0,0)
-          overlap[lkey] = (pi/zeta)**1.5e0*Gab
-          kinetic[lkey] = xi*(3-2*xi*Rsq)*overlap[lkey]
-          for (iatom,atom) in enumerate(molecule.Atoms):
-             Rc = atom.Coordinates
-             Z = atom.NuclearCharge
-             U = zeta*distance(Pab,Rc)
-             F = F_aux(ltot,U)
-             for m in range(0,ltot+1):
-                nuclear[iatom][m][lkey] = -2*(zeta/pi)**0.5*overlap[lkey]*Z*F[m]
-       # -------------------------------------------------------------------------------------- #
-       #                                       VRR step                                         #
-       # -------------------------------------------------------------------------------------- #
-          z1 = alpha; z2 = beta
-          if Swap:
-             z1 = beta; z2 = alpha
-          index1 = 0
-          for [term,m] in order.vrr:
-             l1 = term[index1];
-             lpair = [[],[]]
-             lpair[i2] = c.lQuanta[0][0][:]
-             for qm in c.lQuanta[l1]:        # qm are angular momentum quantum numbers for each Cartesian component of a given angular momentum, l1
-                lpair[i1] = qm[:]
-                lkey = make_key(lpair)
-                for j in range(0,3):         # choose Cartesian component index to decrement
-                   if qm[j] != 0:
-                      j1 = j                 # j is Cartesian component index
-                lpair[i1][j1] -= 1           # do decrementing in-place, sequentially
-                ln1 = lpair[i1][j1]
-                lk0 = make_key(lpair)
-                lpair[i1][j1] -= 1
-                lk1 = make_key(lpair)
-                overlap[lkey] =   (Pab[j1]-r1[j1])*get(overlap,lk0) \
-                                 + ln1*get(overlap,lk1)/(2*zeta)
-                kinetic[lkey] =   (Pab[j1]-r1[j1])*get(kinetic,lk0)+2*xi*get(overlap,lkey) \
-                                 + ln1*(get(kinetic,lk1)/(2*zeta)-2*xi*get(overlap,lk1)/(2*z1))
-                for (iatom,atom) in enumerate(molecule.Atoms):
-                   Rc = atom.Coordinates
-                   nuclear[iatom][m][lkey] =   (Pab[j1]-r1[j1])*get(nuclear[iatom][m],lk0) \
-                                             - (Pab[j1]-Rc[j1])*get(nuclear[iatom][m+1],lk0) \
-                                             + ln1*(get(nuclear[iatom][m],lk1)-get(nuclear[iatom][m+1],lk1))/(2*zeta)
-       # -------------------------------------------------------------------------------------- #
-       #                                       HRR step                                         #
-       # -------------------------------------------------------------------------------------- #
-          index1 = 0; index2 = 1;
-          for term in order.hrr:
-             l1 = term[index1];
-             l2 = term[index2];
-             for qm in c.lQuanta[l1]:
-                for qn in c.lQuanta[l2]:
-                   lpair[i1] = qm[:]
-                   lpair[i2] = qn[:]
-                   lkey = make_key(lpair)
-                   for j in range(0,3):      # choose Cartesian component index to decrement (i2) or increment (i1)
-                      if qn[j] != 0:
-                         j2 = j
-                   lpair[i2][j2] -= 1
-                   lk0 = make_key(lpair)
-                   lna = lpair[i1][j2]
-                   lnb = lpair[i2][j2]
-                   lpair[i1][j2] += 1
-                   lk1 = make_key(lpair)
-                   lpair[i1][j2] -= 2
-                   lka = make_key(lpair)
-                   lpair[i1][j2] += 2
-                   lpair[i2][j2] -= 1
-                   lkb = make_key(lpair)
-                   overlap[lkey] = (r1[j2]-r2[j2])*get(overlap,lk0) + get(overlap,lk1)
-                   kinetic[lkey] = (r1[j2]-r2[j2])*get(kinetic,lk0) + get(kinetic,lk1) + \
-                                   2*xi*((r1[j2]-r2[j2])*get(overlap,lk0) + lna*get(overlap,lka)/(2*z1) - lnb*get(overlap,lkb)/(2*z2))
-                   for iatom in range(0,molecule.NAtom):
-                      nuclear[iatom][0][lkey] = (r1[j2]-r2[j2])*get(nuclear[iatom][0],lk0) + get(nuclear[iatom][0],lk1)
-       # -------------------------------------------------------------------------------------- #
-       #                           Contraction step and screening                               #
-       # -------------------------------------------------------------------------------------- #
-#          normalized_contraction_coeffs = copy.deepcopy(contracted_core)
-          for (ilA,qA) in enumerate(c.lQuanta[lA]):
-             for (ilB,qB) in enumerate(c.lQuanta[lB]):
-                lkey = make_key([qA,qB])
-                nA = normalize(alpha,qA)
-                nB = normalize(beta,qB)
-                cc = nA*nB*cA*cB
-#                normalized_contraction_coeffs[ilA][ilB] = cc
-                contracted_overlap[ilA][ilB] += cc*overlap[lkey]
-                contracted_kinetic[ilA][ilB] += cc*kinetic[lkey]
-                for iatom in range(0,molecule.NAtom):
-                   contracted_nuclear[ilA][ilB] += cc*nuclear[iatom][0][lkey]
-    for ilA in range(0,nlA):
-       for ilB in range(0,nlB):
-          contracted_core[ilA][ilB] = contracted_kinetic[ilA][ilB] + contracted_nuclear[ilA][ilB]
-    return contracted_core,contracted_overlap
-
-#@profile
-# ================================================================================================ #
-#  TWO-ELECTRON REPULSION INTEGRALS                                                                #
-# ================================================================================================ #
-def two_electron(shell_pair1,shell_pair2):
-    s = [0.0e0 for i in range(0,shell_pair2.Centre2.Cgtf.NAngMom)]
-    ls = [copy.deepcopy(s) for i in range(0,shell_pair2.Centre1.Cgtf.NAngMom)]
-    nls = [copy.deepcopy(ls) for i in range(0,shell_pair1.Centre2.Cgtf.NAngMom)]
-    mnls = [copy.deepcopy(nls) for i in range(0,shell_pair1.Centre1.Cgtf.NAngMom)]
-    n = [0.0e0 for i in range(0,shell_pair1.Centre2.Cgtf.NAngMom)]
-    ln = [copy.deepcopy(n) for i in range(0,shell_pair2.Centre1.Cgtf.NAngMom)]
-    sln = [copy.deepcopy(ln) for i in range(0,shell_pair2.Centre2.Cgtf.NAngMom)]
-    msln = [copy.deepcopy(sln) for i in range(0,shell_pair1.Centre1.Cgtf.NAngMom)]
-    contracted_coulomb = mnls
-    contracted_exchange = msln
-    ms = [copy.deepcopy(s) for i in range(0,shell_pair1.Centre1.Cgtf.NAngMom)]
-    mn = [copy.deepcopy(n) for i in range(0,shell_pair1.Centre1.Cgtf.NAngMom)]
-    # -------------------------------------------------------------------------------- #
-    #   Loop over primitives in each CGTF, with no screening for now                   #
-    # -------------------------------------------------------------------------------- #
-    A = shell_pair1.Centre1
-    B = shell_pair1.Centre2
-    C = shell_pair2.Centre1
-    D = shell_pair2.Centre2
-    # Evaluate Schwarz bound quantities - should be able to do this more efficiently than through the 2e- integral code but it will do for now
-    for primA in A.Cgtf.Primitives:
-       for primB in B.Cgtf.Primitives:
-          shell_quartet = ShellQuartet(A,B,A,B,primA,primB,primA,primB)
-          evaluate_2e_integrals(shell_quartet,mn,do_schwarz=True)
-    for primC in C.Cgtf.Primitives:
-       for primD in D.Cgtf.Primitives:
-          shell_quartet = ShellQuartet(C,D,C,D,primC,primD,primC,primD)
-          evaluate_2e_integrals(shell_quartet,ls,do_schwarz=True)
-    for primA in A.Cgtf.Primitives:
-       for primD in D.Cgtf.Primitives:
-          shell_quartet = ShellQuartet(A,D,A,D,primA,primD,primA,primD)
-          evaluate_2e_integrals(shell_quartet,ms,do_schwarz=True)
-    for primC in C.Cgtf.Primitives:
-       for primB in B.Cgtf.Primitives:
-          shell_quartet = ShellQuartet(C,B,C,B,primC,primB,primC,primB)
-          evaluate_2e_integrals(shell_quartet,ln,do_schwarz=True)
-    # Evaluate bounds for all integrals in this class: [ssss],[psss],etc
-    coulomb_bound_max = 0.0e0
-    exchange_bound_max = 0.0e0
-    for i in range(0,shell_pair1.Centre1.Cgtf.NAngMom):
-       for j in range(0,shell_pair1.Centre2.Cgtf.NAngMom):
-          for k in range(0,shell_pair2.Centre1.Cgtf.NAngMom):
-             for l in range(0,shell_pair2.Centre2.Cgtf.NAngMom):
-                coulomb_bound = sqrt(mn[i][j])*sqrt(ls[k][l])
-                exchange_bound =  sqrt(ms[i][l])*sqrt(ln[k][j])
-                if coulomb_bound > coulomb_bound_max:
-                   coulomb_bound_max = coulomb_bound
-                if exchange_bound > exchange_bound_max:
-                   exchange_bound_max = exchange_bound
-    # If no integral exceeds the threshold, skip calculation of class entirely
-    # Otherwise, evaluate entire class (even if most of them are negligible/zero by symmetry)
-    # If mn=ls or ms=ln, populate two electron integrals from pre-evaluated quantities - Worth the accounting effort?
-    if coulomb_bound_max > c.integral_threshold:
-       for primA in A.Cgtf.Primitives:
-          for primB in B.Cgtf.Primitives:
-             for primC in C.Cgtf.Primitives:
-                for primD in D.Cgtf.Primitives:
-                   coulomb_shell_quartet = ShellQuartet(A,B,C,D,primA,primB,primC,primD)
-                   evaluate_2e_integrals(coulomb_shell_quartet,contracted_coulomb)
-#    else:
-#       print('coulomb integral screened, integral < ', coulomb_bound_max) if exchange_bound_max > c.integral_threshold:
-       for primA in A.Cgtf.Primitives:
-          for primB in B.Cgtf.Primitives:
-             for primC in C.Cgtf.Primitives:
-                for primD in D.Cgtf.Primitives:
-                   exchange_shell_quartet = ShellQuartet(A,D,C,B,primA,primD,primC,primB)
-                   evaluate_2e_integrals(exchange_shell_quartet,contracted_exchange)
-#    else:
-#       print('exchange integral screened, integral < ', exchange_bound_max)
-    return contracted_coulomb,contracted_exchange
-
-#@profile
-# ================================================================================================ #
-#  TWO-ELECTRON REPULSION INTEGRALS - MAIN SUBROUTINE                                              #
-# ================================================================================================ #
-def evaluate_2e_integrals(shell_quartet,contracted_coulomb,do_schwarz=False):
- # -------------------------------------------------------------------------------- #
- #           Set up HRR & VRR indices and intermediates for bra and ket             #
- # -------------------------------------------------------------------------------- #
-    bra_ket = ReIndex(shell_quartet)
-    order = SetRR(bra_ket)
- # -------------------------------------------------------------------------------- #
- #                        Initialize fundamental integrals                          #
- # -------------------------------------------------------------------------------- #
-#    print('bra_ket.ltot',bra_ket.ltot)
-#    print('bra_ket ang mom',bra_ket.l1,bra_ket.l2,bra_ket.l3,bra_ket.l4)
-    coulomb = [{} for i in range(0,bra_ket.ltot+1)]
-    lkey = (0,0,0,0,0,0,0,0,0,0,0,0)
-    Gab = shell_quartet.Gab; Gcd = shell_quartet.Gcd; T = shell_quartet.T
-    zeta = shell_quartet.zeta; eta = shell_quartet.eta; tau = shell_quartet.tau
-    F = F_aux(bra_ket.ltot,T)
-#    print('zeta,eta,tau,Gab,Gcd,T,rho,P,Q,W,rA,rB,rC,rD,lA,lB,lC,lD')
-#    print(shell_quartet.zeta,shell_quartet.eta,shell_quartet.tau,shell_quartet.Gab,shell_quartet.Gcd,\
-#          shell_quartet.T,shell_quartet.rho,shell_quartet.Pab,shell_quartet.Pcd,\
-#          shell_quartet.W,shell_quartet.rA,shell_quartet.rB,shell_quartet.rC,shell_quartet.rD,\
-#          shell_quartet.lA,shell_quartet.lB,shell_quartet.lC,shell_quartet.lD)
-    for m in range(0,bra_ket.ltot+1):
-       coulomb[m][lkey] = Gab*Gcd*2*pi**2.5e0*F[m]/(zeta*eta*sqrt(tau))
- # -------------------------------------------------------------------------------- #
- #          VRR for ket, on centre with highest angular momentum function           #
- # -------------------------------------------------------------------------------- #
-    coulomb = vrr(coulomb,bra_ket,order.vrr_ket,'ket')
- # -------------------------------------------------------------------------------- #
- #          VRR for bra, on centre with highest angular momentum function           #
- # -------------------------------------------------------------------------------- #
-    coulomb = vrr(coulomb,bra_ket,order.vrr_bra,'bra')
- # -------------------------------------------------------------------------------- #
- #                      HRR for ket and then HRR for bra                            #
- # -------------------------------------------------------------------------------- #
-    coulomb = hrr(coulomb,bra_ket,order.hrr_ket,'ket')
-    coulomb = hrr(coulomb,bra_ket,order.hrr_bra,'bra')
- # -------------------------------------------------------------------------------- #
- #                              Contraction                                         #
- # -------------------------------------------------------------------------------- #
-    lA = shell_quartet.lA; lB = shell_quartet.lB
-    lC = shell_quartet.lC; lD = shell_quartet.lD
-    cA = shell_quartet.cA; cB = shell_quartet.cB
-    cC = shell_quartet.cC; cD = shell_quartet.cD
-    alpha = shell_quartet.alpha; beta = shell_quartet.beta
-    gamma = shell_quartet.gamma; delta = shell_quartet.delta
-    # print(lA,lB,lC,lD,bra.ltot1,ket.ltot1)
-    # print('two-electron integrals', coulomb)
-#    print('contracted_coulomb',contracted_coulomb)
-    if do_schwarz:
-       for (ilA,qA) in enumerate(c.lQuanta[lA]):
-          for (ilB,qB) in enumerate(c.lQuanta[lB]):
-             nA = normalize(alpha,qA)
-             nB = normalize(beta,qB)
-             lkey = make_key([qA,qB,qA,qB])
-             cc = nA*nB*nA*nB*cA*cB*cA*cB
-             contracted_coulomb[ilA][ilB] += cc*coulomb[0][lkey]
-    else:
-       for (ilA,qA) in enumerate(c.lQuanta[lA]):
-          for (ilB,qB) in enumerate(c.lQuanta[lB]):
-             for (ilC,qC) in enumerate(c.lQuanta[lC]):
-                for (ilD,qD) in enumerate(c.lQuanta[lD]):
-                   nA = normalize(alpha,qA)
-                   nB = normalize(beta,qB)
-                   nC = normalize(gamma,qC)
-                   nD = normalize(delta,qD)
-                   lkey = make_key([qA,qB,qC,qD])
-#                   if lA == lB == lC == lD == 1:
-#                      print(lkey,coulomb[0][lkey])
-                   cc = nA*nB*nC*nD*cA*cB*cC*cD
-                   contracted_coulomb[ilA][ilB][ilC][ilD] += cc*coulomb[0][lkey]
-#                   print(ilA,ilB,ilC,ilD, lkey,coulomb[0][lkey], contracted_coulomb[ilA],contracted_coulomb[ilA][ilB][ilC][ilD])
-#    print('contracted_coulomb',contracted_coulomb)
-    return
-
-# ================================================================================================ #
-#  TWO-ELECTRON REPULSION INTEGRALS - VRR AND HRR SUBROUTINES                                      #
-# ================================================================================================ #
-def vrr(coulomb,bk,order,mode):
-#    print('vrr')
-    if mode == 'bra':
-       i1 = bk.i1; i2 = bk.i2; i3 = bk.i3; i4 = bk.i4 # i1 & i3 are pointers to centres with highest angular momentum in bra and ket
-       r = bk.r1; z = bk.z; P = bk.P
-       index1 = 0; index3 = 2
-    elif mode == 'ket':
-       i1 = bk.i3; i2 = bk.i4; i3 = bk.i1; i4 = bk.i2
-       r = bk.r3; z = bk.e; P = bk.Q
-       index1 = 2; index3 = 0
-    else:
-       print('Error: mode for VRR must be bra or ket')
-    tau = bk.tau; W = bk.W; rho = bk.rho
-    for [term,m] in order:
-       l1 = term[index1]; l3 = term[index3]
-       lquartet = [[],[],[],[]]
-       for qm in c.lQuanta[l1]:                       # qm are angular momentum quantum numbers for each Cartesian component of a given angular momentum, l1
-          for ql in c.lQuanta[l3]:                    # ql are angular momentum quantum numbers for each Cartesian component of a given angular momentum, l3
-             lquartet[i1] = qm[:]
-             lquartet[i2] = c.lQuanta[0][0][:]        # q0 by definition for VRR
-             lquartet[i3] = ql[:]
-             lquartet[i4] = c.lQuanta[0][0][:]        # q0 by definition for VRR
-             lkey = make_key(lquartet)
-             for j in range(0,3):                     # choose Cartesian component index to decrement
-                if qm[j] != 0:
-                   j1 = j                             # j is Cartesian component index
-             lquartet[i1][j1] -= 1                    # do decrementing in-place, sequentially
-             ln1 = lquartet[i1][j1]
-             ln3 = lquartet[i3][j1]
-             lk0 = make_key(lquartet)
-             lquartet[i1][j1] -= 1
-             lk1 = make_key(lquartet)
-             lquartet[i1][j1] += 1
-             lquartet[i3][j1] -= 1
-             lk3 = make_key(lquartet)
-             coulomb[m][lkey] = (P[j1]-r[j1])*get(coulomb[m],lk0) \
-                              + (W[j1]-P[j1])*get(coulomb[m+1],lk0)
-             if ln1 > 0:
-                coulomb[m][lkey] += ln1*(get(coulomb[m],lk1)-rho*get(coulomb[m+1],lk1)/z)/(2*z)
-             if ln3 > 0:
-                coulomb[m][lkey] += ln3*(get(coulomb[m+1],lk3))/(2*tau) \
-             # print('lkey vrr',lkey)
-             # print('vrr', lkey, P, r, W, rho, tau, z, coulomb[m][lkey])
-    return coulomb
-
-def hrr(coulomb,bk,order,mode):
-#    print('hrr')
-    if mode == 'bra':
-       i1 = bk.i1; i2 = bk.i2; i3 = bk.i3; i4 = bk.i4
-       r1 = bk.r1; r2 = bk.r2; r3 = bk.r3; r4 = bk.r4
-       index1 = 0; index2 = 1; index3 = 2; index4 = 3
-    elif mode == 'ket':
-       i1 = bk.i3; i2 = bk.i4; i3 = bk.i1; i4 = bk.i2
-       r1 = bk.r3; r2 = bk.r4; r3 = bk.r1; r4 = bk.r2
-       index1 = 2; index2 = 3; index3 = 0; index4 = 1
-    else:
-       print('Error: mode for HRR must be bra or ket')
-    for term in order:
-       l1 = term[index1]; l2 = term[index2]; l3 = term[index3]; l4 = term[index4]
-       lquartet = [[],[],[],[]]
-       for qm in c.lQuanta[l1]:
-          for qn in c.lQuanta[l2]:
-             for ql in c.lQuanta[l3]:
-                for qs in c.lQuanta[l4]:
-                   lquartet[i1] = qm[:]
-                   lquartet[i2] = qn[:]
-                   lquartet[i3] = ql[:]
-                   lquartet[i4] = qs[:]
-                   lkey = make_key(lquartet)
-                   for j in range(0,3):
-                      if qn[j] != 0:
-                         j2 = j
-                   lquartet[i2][j2] -= 1
-                   lk0 = make_key(lquartet)
-                   lquartet[i1][j2] += 1
-                   lk1 = make_key(lquartet)
-                   coulomb[0][lkey] = (r1[j2]-r2[j2])*get(coulomb[0],lk0) + get(coulomb[0],lk1)
-                   # print('lkey hrr',lkey)
-                   # print('hrr', lkey, r1, r2, lk0, lk1, coulomb[0][lkey])
-    return coulomb
-
-# ================================================================================================ #
-#  USEFUL SUBROUTINES
-# ================================================================================================ #
-
-def make_key(llists):
-    lkey = tuple(itertools.chain.from_iterable(llists))
-    return lkey
-
 def distance(v1,v2):
     [x1,y1,z1] = v1
     [x2,y2,z2] = v2
-    rsq = (x1-x2)**2+(y1-y2)**2+(z1-z2)**2
-    return rsq
+    r = ((x1-x2)**2+(y1-y2)**2+(z1-z2)**2)**0.5
+    return r
 
-def F_aux(m,U):
-    eps = 1.e-15
-    F = [0.0 for i in range(0,m+1)]
-    # compute F for maximum value of m then use downward recurrence relation
-    # F_m[U] = (exp(-U)+2*U*F_(m+1)[U])/(2m+1)
-    mm = m+0.5
-    mm2 = 2*mm
-    if abs(U) < eps:
-       f = 1/mm2
-    elif abs(U) > 10.0:
-       f = gamma(mm)/(2*U**mm)
-    else:
-       f = 0.5*(U**-mm)*gamma(mm)*gammainc(mm,U)
-#       f = 0.0
-#       for i in range(0,11):
-#          f += (-U)**i/(factorial(i)*(mm2+2*i))
-    F[m] = f
-    for i in range(0,m):
-       index = m-(i+1)
-       F[index] = (exp(-U)+2*U*F[index+1])/(2*index+1)
-#       F[index] = (exp(-U)+2*U*F[index+1])/mm2
-    return F
+#@profile
+# ==================================================================================== #
+#  ONE-ELECTRON INTEGRALS: OVERLAP, (KINETIC, NUCLEAR ATTRACTION) -> CORE FOCK         #
+# ==================================================================================== #
+def one_electron(molecule,shell_pair):
 
-def normalize(exponent,lv):
-    [lx,ly,lz] = lv
-    coeff = (2.0e0*exponent)**((float(lx+ly+lz)+1.5e0)/2.0e0)/ \
-            sqrt(gamma(lx+0.5e0)*gamma(ly+0.5e0)*gamma(lz+0.5e0))
-    return coeff
+    # -------------------------------------------------------------------------------- #
+    #  Unpack shell-pair values and quantity arrays from shell_pair objects            #
+    # -------------------------------------------------------------------------------- #
+    l_max = shell_pair.Ltot
+    m_max = l_max+1
 
-def get(integral_dict,key):
-    # get integral values from dictionary, initializing entries for keys containing negative recurrence indices as we go
+    # -------------------------------------------------------------------------------- #
+    #  Swap centres 1 and 2 if lB > lA                                                 #
+    # -------------------------------------------------------------------------------- #
+    A = shell_pair.Centre1; B = shell_pair.Centre2 
+    rAB = shell_pair.CentreDisplacement 
+    sigma_P = shell_pair.PrimitivePairSigmas
+    U_P = shell_pair.PrimitivePairOverlaps
+    P = shell_pair.PrimitivePairCentres
+    cc_P = shell_pair.ContractionCoeffs
+    nm_P = shell_pair.Normalization
+    Goofy = False
+    if B.Cgtf.AngularMomentum > A.Cgtf.AngularMomentum:
+      A, B = B, A
+      rAB = -rAB
+      sigma_P = sigma_P.transpose((1,0))
+      U_P = U_P.transpose((1,0))
+      P = P.transpose((1,0,2))
+      cc_P = cc_P.transpose((1,0))
+      nm_P = nm_P.transpose((1,0))
+      Goofy = True
+
+    lA = A.Cgtf.AngularMomentum; nlA = c.nAngMomFunctions[lA]; nA = A.Cgtf.NPrimitives; rA = A.Coords 
+    lB = B.Cgtf.AngularMomentum; nlB = c.nAngMomFunctions[lB]; nB = B.Cgtf.NPrimitives; rB = B.Coords
+    nm_P = nm_P.reshape((nlA,nlB)); exB = B.Cgtf.Exponents 
+
+    # -------------------------------------------------------------------------------- #
+    #  Set up structures required for integral evaluation                              #
+    # -------------------------------------------------------------------------------- #
+    order_nuclear = SetRR1(lA,lB,'nuclear')
+    order_overlap = SetRR1(lA,lB+2,'overlap')
+    overlap_integrals = {}; nuclear_integrals = {}
+
+    # -------------------------------------------------------------------------------- #
+    #  Compute and store primitive fundamentals                                        #
+    # -------------------------------------------------------------------------------- #
+
+    # Nuclear attraction
+    nuclear_fundamentals = numpy.zeros((m_max,nA,nB),dtype="double")
+    for (iatom,atom) in enumerate(molecule.Atoms):
+       rC = atom.Coordinates
+       Z = atom.NuclearCharge
+#_C_INTS
+       _c_ints.one_electron_fundamentals(nuclear_fundamentals, sigma_P, U_P, P, rC, Z, nA, nB, l_max) 
+#_C_INTS
+       for m in range(0,m_max):
+          nuclear_integrals[(iatom,0,0,m)] = copy(nuclear_fundamentals[m])
+#          print('c nuclear_fundamentals:', nuclear_fundamentals[m])
+       nuclear_fundamentals.fill(0.0)
+
+    # Overlap
+    overlap_integrals[(0,0)] = shell_pair.PrimitivePairOverlaps
+
+    # -------------------------------------------------------------------------------- #
+    #  Apply VRR to form uncontracted [m|Vn|0] and [m+2||0] integrals                  #
+    # -------------------------------------------------------------------------------- #
+
+    # Nuclear attraction
+    if order_nuclear.VRR_target != []:
+       for (iatom,atom) in enumerate(molecule.Atoms):
+          rC = atom.Coordinates
+          Z = atom.NuclearCharge
+          do_1e_vrr(order_nuclear, nuclear_integrals, sigma_P, P, rA, rC, nA, nB, iatom)
+
+    # Overlap
+    do_1e_vrr(order_overlap, overlap_integrals, sigma_P, P, rA, [], nA, nB, -1)
+
+    # -------------------------------------------------------------------------------- #
+    #  Apply HRR to form uncontracted [m|Vn|n] and [m||n+2] integrals                  #
+    # -------------------------------------------------------------------------------- #
+
+    # Nuclear attraction
+    for iatom in range(0,molecule.NAtom):
+       do_1e_hrr(order_nuclear, nuclear_integrals, rAB, nA, nB, iatom)
+
+    # Overlap
+    do_1e_hrr(order_overlap, overlap_integrals, rAB, nA, nB, -1)
+
+    # -------------------------------------------------------------------------------- #
+    #  Use derivative relation to form uncontracted [m|T|n] integrals directly         #
+    # -------------------------------------------------------------------------------- #
+
+    kinetic_ints = numpy.zeros((nlA*nA,nlB*nB), dtype="double") 
     try:
-       val = integral_dict[key]
+       base_ints = [copy(overlap_integrals[(lA,lB+2)]), copy(overlap_integrals[(lA,lB)]),copy(overlap_integrals[(lA,lB-2)])]
     except:
-       if -1 not in key:
-          print('ERROR: KEY NOT FOUND', key)
-          sys.exit()
+       base_ints = [copy(overlap_integrals[(lA,lB+2)]), copy(overlap_integrals[(lA,lB)])]
+#_C_INTS
+    _c_ints.one_electron_kinetic(kinetic_ints, base_ints, exB[:], len(base_ints), nA, nB, lA, lB)
+#_C_INTS
+
+    # -------------------------------------------------------------------------------- #
+    #  Compute contracted (m|O|n) integrals                                            #
+    # -------------------------------------------------------------------------------- #
+
+    # Nuclear attraction
+    summed_contracted_nuclear_ints = numpy.zeros((nlA,nlB), dtype="double")
+    for iatom in range(0,molecule.NAtom):
+       contracted_nuclear_ints = numpy.zeros((nlA,nlB), dtype="double")
+       nuclear_ints = copy(nuclear_integrals[(iatom,lA,lB,0)])
+#_C_INTS
+       _c_ints.one_electron_contract(contracted_nuclear_ints, nuclear_ints, cc_P[:,:], nA, nB, lA, lB)
+#_C_INTS
+       summed_contracted_nuclear_ints += contracted_nuclear_ints
+
+    # Kinetic and overlap (kinetic_ints from above)
+    overlap_ints = copy(overlap_integrals[(lA,lB)])
+    contracted_kinetic_ints = numpy.zeros((nlA,nlB), dtype="double")
+    contracted_overlap_ints = numpy.zeros((nlA,nlB), dtype="double")
+#_C_INTS
+    _c_ints.one_electron_contract(contracted_kinetic_ints, kinetic_ints, cc_P[:,:], nA, nB, lA, lB)
+    _c_ints.one_electron_contract(contracted_overlap_ints, overlap_ints, cc_P[:,:], nA, nB, lA, lB)
+#_C_INTS
+
+    # -------------------------------------------------------------------------------- #
+    #  Extract final target contracted (m|n) integrals                                 #
+    # -------------------------------------------------------------------------------- #
+    
+    contracted_overlap = numpy.multiply(contracted_overlap_ints,nm_P)
+    contracted_nuclear = numpy.multiply(summed_contracted_nuclear_ints,nm_P)
+    contracted_kinetic = numpy.multiply(contracted_kinetic_ints,nm_P)
+    contracted_core = numpy.multiply(summed_contracted_nuclear_ints + contracted_kinetic_ints,nm_P)
+
+    if Goofy:
+#       return contracted_kinetic.T, contracted_nuclear.T, contracted_overlap.T
+       return contracted_core.T, contracted_overlap.T
+    else:
+#       return contracted_kinetic, contracted_nuclear, contracted_overlap
+       return contracted_core, contracted_overlap
+
+# =================================================================================== #
+# iatom acts as flag to decide on whether to compute overlap integrals (iatom = -1) or nuclear attraction (otherwise)
+# =================================================================================== #
+def do_1e_vrr(order, integrals, sigma_P, P, rA, rC, nA, nB, iatom):
+
+   for (target_class, base_classes) in zip(order.VRR_target, order.VRR_base):
+
+      if iatom == -1:
+         lA = target_class[0]
+         base_ints = [copy(integrals[tuple(base_class)]) for base_class in base_classes]
+      else:
+         lA = target_class[0][0]
+         base_ints = [copy(integrals[tuple([iatom]+base_class[0]+[base_class[1]])]) for base_class in base_classes]
+
+      nlA = c.nAngMomFunctions[lA]
+      target_ints = numpy.zeros((nlA*nA,nB), dtype="double")
+#_C_INTS    
+      _c_ints.one_electron_vrr(target_ints, base_ints, sigma_P[:,:], P[:,:,:], rA[:], rC[:], iatom, len(base_ints), nA, nB, lA)
+#_C_INTS
+
+      if iatom == -1:
+         integrals[tuple(target_class)] = copy(target_ints)
+      else:
+         integrals[tuple([iatom]+target_class[0]+[target_class[1]])] = copy(target_ints)
+
+# ----------------------------------------------------------------------------------- #
+def do_1e_hrr(order, integrals, rAB, nA, nB, iatom):
+
+   for (target_class, base_classes) in zip(order.HRR_target, order.HRR_base):
+
+      if iatom == -1:
+         base_ints = [copy(integrals[tuple(base_class)]) for base_class in base_classes]
+      else:
+         base_ints = [copy(integrals[tuple([iatom]+base_class+[0])]) for base_class in base_classes]
+      
+      lA = target_class[0]; lB = target_class[1]
+      nlA = c.nAngMomFunctions[lA]; nlB = c.nAngMomFunctions[lB]
+      target_ints = numpy.zeros((nlA*nA,nlB*nB), dtype="double")
+
+#_C_INTS
+      _c_ints.one_electron_hrr(target_ints, base_ints, rAB[:], len(base_ints), nA, nB, lA, lB)
+#_C_INTS
+
+      if iatom == -1:
+         integrals[tuple(target_class)] = copy(target_ints)
+      else:
+         integrals[tuple([iatom]+target_class+[0])] = copy(target_ints)
+
+# =================================================================================== #
+
+#@profile
+# ==================================================================================== #
+#  TWO-ELECTRON REPULSION INTEGRALS - HGP ALGORITHM WITH SCHWARZ BOUND SCREENING       #
+# ==================================================================================== #
+def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
+
+#    print("c_integrals")
+    # -------------------------------------------------------------------------------- #
+    #  Swap bra and ket if lket > lbra                                                 #
+    # -------------------------------------------------------------------------------- #
+    Goofy = False
+    if shell_pair2.Ltot > shell_pair1.Ltot:
+       shell_pair1,shell_pair2 = shell_pair2,shell_pair1 
+       Goofy = True
+
+    # -------------------------------------------------------------------------------- #
+    #  Extract atom-centric data from shell-pair objects                               #
+    # -------------------------------------------------------------------------------- #
+    A = shell_pair1.Centre1; B = shell_pair1.Centre2
+    C = shell_pair2.Centre1; D = shell_pair2.Centre2
+    lA = A.Cgtf.AngularMomentum; nA = A.Cgtf.NPrimitives; nlA = A.Cgtf.NAngMom
+    lB = B.Cgtf.AngularMomentum; nB = B.Cgtf.NPrimitives; nlB = B.Cgtf.NAngMom
+    lC = C.Cgtf.AngularMomentum; nC = C.Cgtf.NPrimitives; nlC = C.Cgtf.NAngMom
+    lD = D.Cgtf.AngularMomentum; nD = D.Cgtf.NPrimitives; nlD = D.Cgtf.NAngMom
+
+#    # -------------------------------------------------------------------------------- #
+#    #  Evaluate contracted integral upper bounds, skip this shell-quartet entirely     #
+#    #  and return None if all contracted integrals in this class are negligible        #
+#    #  Skip if the entire aim is to evaluate bound integrals, replacing C_P = C_Q = [] #
+#    # -------------------------------------------------------------------------------- #
+#    C_P = shell_pair1.ContractedBoundInts; C_Q = shell_pair2.ContractedBoundInts
+#    if (C_P is None) or (C_Q is None):
+#       return None
+#    elif (C_P != []):
+##_C_INTS
+#       _c_ints.two_electron_bound(bound, C_P, C_Q, nlA, nlB, nlC, nlD)
+##_C_INTS
+#       if numpy.amax(bound) < c.integral_threshold:
+#          return None
+
+    # -------------------------------------------------------------------------------- #
+    #  Allocate numpy array to store fundamental electron repulsion integrals          #
+    #  and centres for current shell-quartet                                           #
+    # -------------------------------------------------------------------------------- #
+    lBra = shell_pair1.Ltot; lKet = shell_pair2.Ltot
+    l_max = lBra+lKet
+    m_max = l_max+1
+    fundamentals = numpy.zeros((m_max,nA*nB,nC*nD), dtype="double") 
+    R = numpy.zeros((nA*nB,nC*nD,3), dtype="double")
+
+    # -------------------------------------------------------------------------------- #
+    #  Unpack bra/ket data (shell-pair quantity arrays) from shell_pair objects        #
+    # -------------------------------------------------------------------------------- #
+    sigma_P = shell_pair1.PrimitivePairSigmas; sigma_Q = shell_pair2.PrimitivePairSigmas
+    U_P = shell_pair1.PrimitivePairOverlaps; U_Q = shell_pair2.PrimitivePairOverlaps
+    P = shell_pair1.PrimitivePairCentres; Q = shell_pair2.PrimitivePairCentres
+    zeta_P = shell_pair1.PrimitivePairHalfSigmas; zeta_Q = shell_pair2.PrimitivePairHalfSigmas
+    R_P = shell_pair1.CentreDisplacement; R_Q = shell_pair2.CentreDisplacement
+    cc_P = shell_pair1.ContractionCoeffs; cc_Q = shell_pair2.ContractionCoeffs
+    nm_P = shell_pair1.Normalization; nm_Q = shell_pair2.Normalization
+
+    # -------------------------------------------------------------------------------- #
+    #  Compute fundamentals                                                            #
+    #  ints_type: 0 = electron repulsion, 1 = scattering                               #
+    # -------------------------------------------------------------------------------- #
+#_C_INTS
+    _c_ints.two_electron_fundamentals(fundamentals, sigma_P[:,:], U_P[:,:], P[:,:,:], 
+                                      sigma_Q[:,:], U_Q[:,:], Q[:,:], R[:,:,:],
+                                      nA, nB, nC, nD, l_max, ints_type, grid_value)
+#_C_INTS
+
+    # -------------------------------------------------------------------------------- #
+    #  Set up global order class that controls all RR ordering                         #
+    # -------------------------------------------------------------------------------- #
+    order = SetRR2(lA,lB,lC,lD)
+    
+    # -------------------------------------------------------------------------------- #
+    #  Set up structures required to calculate and store primitive integrals           #
+    # -------------------------------------------------------------------------------- #
+    kappa_P = B.Cgtf.DoubleExponents
+    kappa_Q = D.Cgtf.DoubleExponents
+    if order.Goofy_bra: kappa_P = A.Cgtf.DoubleExponents
+    if order.Goofy_ket: kappa_Q = C.Cgtf.DoubleExponents
+
+    integrals = {}
+    for m in range(0,m_max):
+       integrals[(0,0,0,0,m)] = fundamentals[m,:].T
+#       print(m,fundamentals[m,:])
+
+    # -------------------------------------------------------------------------------- #
+    #  Use VRR to compute uncontracted [m0|n0] 2e- integrals for current shell-quartet #
+    # -------------------------------------------------------------------------------- #
+    do_2e_vrr(2,order,integrals,[nC,nD,nA,nB],zeta_Q,zeta_P,kappa_Q,R_Q,R.swapaxes(0,1))
+    for m in range(0,m_max):
+       integrals[(0,0,0,0,m)] = integrals[(0,0,0,0,m)].T
+    do_2e_vrr(1,order,integrals,[nA,nB,nC,nD],zeta_P,zeta_Q,kappa_P,R_P,R)
+
+    # -------------------------------------------------------------------------------- #
+    #  Compute contracted (m0|n0) two-electron integrals for current shell-quartet     #
+    #  Create contracted integrals directory for use in the next HRR steps             #
+    #  Note that bra carries the highest angular momentum, determined dynamically      #
+    # -------------------------------------------------------------------------------- #
+    contracted_integrals = {}
+    do_2e_contract(order,contracted_integrals,integrals,[nA,nB,nC,nD],cc_P,cc_Q)
+#    print('contracted integrals',contracted_integrals[tuple(order.VRR1_target[-1][0])])
+
+    # -------------------------------------------------------------------------------- #
+    #  Use HRR to compute contracted (mn|ls) 2e- integrals for current shell-quartet   #
+    #  Do exponent-dependent part of normalization in the process
+    # -------------------------------------------------------------------------------- #
+    do_2e_hrr(2,order,contracted_integrals,R_Q)
+    do_2e_hrr(1,order,contracted_integrals,R_P)
+
+    # -------------------------------------------------------------------------------- #
+    #  Finish normalizing contracted basis functions - angular momentum dependent part #
+    # -------------------------------------------------------------------------------- #
+    normalization = (nm_P.T).dot(nm_Q)
+    normalized_contracted_integrals = numpy.multiply(contracted_integrals[(lA,lB,lC,lD)],normalization)
+     
+    # -------------------------------------------------------------------------------- #
+    #  Return contracted integrals                                                     # 
+    # -------------------------------------------------------------------------------- #
+    # reshape to 4D array?
+    if Goofy:
+       return normalized_contracted_integrals.T.reshape(nlC,nlD,nlA,nlB)
+    else:
+       return normalized_contracted_integrals.reshape(nlA,nlB,nlC,nlD)
+
+# =================================================================================== #
+def do_2e_vrr(step,order,integrals,n_primitives,zeta,eta,kappa,Rx,R):
+
+    [na,nb,nc,nd] = n_primitives
+    kappa_index = 1; sign_Rx = -1
+    if step == 1:
+       targets = order.VRR1_target; bases = order.VRR1_base; sign_R = -1
+       primary_index = order.VRR1_indices[0]; secondary_index = order.VRR1_indices[2]
+       if order.Goofy_bra: kappa_index = 0; sign_Rx = 1
+    if step == 2:
+       targets = order.VRR2_target; bases = order.VRR2_base; sign_R = 1
+       primary_index = order.VRR2_indices[0]; secondary_index = order.VRR2_indices[2]
+       if order.Goofy_ket: kappa_index = 0; sign_Rx = 1
+
+    for (target_class, base_classes) in zip(targets, bases):
+       tc_key = tuple(target_class[0]+[target_class[1]])
+       base_ints = [copy(integrals[tuple(bc[0]+[bc[1]])]) for bc in base_classes]
+       lbra = target_class[0][primary_index]; nl_bra = c.nAngMomFunctions[lbra]
+       lket = target_class[0][secondary_index]; nl_ket = c.nAngMomFunctions[lket]
+       target_ints = numpy.zeros((nl_bra*na*nb,nl_ket*nc*nd), dtype="double") 
+#_C_INTS
+       _c_ints.two_electron_vrr(target_ints, base_ints, zeta[:,:], eta[:,:], kappa[:], sign_Rx*Rx[:], 
+                                sign_R*R[:,:,:], len(base_ints), na, nb, nc, nd, lbra, lket, kappa_index)
+#_C_INTS
+       integrals[tc_key] = copy(target_ints)
+
+    if step == 2:
+       for tc in targets:
+          tc_key = tuple(tc[0]+[tc[1]])
+          integrals[tc_key] = integrals[tc_key].T
+#    if step == 1:
+#       tc = targets[-1]
+#       tc_key = tuple(tc[0]+[tc[1]])
+#       print(tc_key)
+#       print(integrals[tc_key])
+       
+# ----------------------------------------------------------------------------------- #
+def do_2e_contract(order,contracted_integrals,integrals,n_primitives,cc_bra,cc_ket):
+
+    if order.VRR1_target == []:
+       if order.VRR2_target != []:
+          order.VRR1_target.append(VRR2_target[-1])
        else:
-#          print 'Initializing RR for key', key
-          val = 0.0e0
-    return val
+          order.VRR1_target.append([[0,0,0,0],0])
+
+    [na,nb,nc,nd] = n_primitives
+
+    for target_class in order.VRR1_target:
+       if target_class[-1] == 0:
+          tc_key_prim = tuple(target_class[0]+[0])
+          tc_key_cont = tuple(target_class[0])
+          lbra = target_class[0][order.VRR1_indices[0]]
+          lket = target_class[0][order.VRR1_indices[2]]
+          contracted_ints = numpy.zeros((c.nAngMomFunctions[lbra],c.nAngMomFunctions[lket]), dtype="double") 
+#_C_INTS
+          _c_ints.two_electron_contract(contracted_ints, copy(integrals[tc_key_prim]),
+                                        cc_bra[:,:], cc_ket[:,:], na, nb, nc, nd, lbra, lket)
+#_C_INTS
+          contracted_integrals[tc_key_cont] = contracted_ints
+
+# ----------------------------------------------------------------------------------- #
+def do_2e_hrr(step,order,integrals,Rx):
+
+    goofy = 0; la_off = 0; lb_off = 1; sign_Rx = 1;
+    if step == 1:
+       targets = order.HRR1_target; bases = order.HRR1_base
+       if order.Goofy_bra: goofy = 1; la_off = 1; lb_off = 0; sign_Rx = -1
+    if step == 2:
+       targets = order.HRR2_target; bases = order.HRR2_base
+       if order.Goofy_ket: goofy = 1; la_off = 1; lb_off = 0; sign_Rx = -1
+
+    for (target_class, base_classes) in zip(targets,bases):
+       if step == 1: [la,lb,lc,ld] = base_classes[1] 
+       if step == 2: [lc,ld,la,lb] = base_classes[1]
+       nla = c.nAngMomFunctions[la+la_off]; nlb = c.nAngMomFunctions[lb+lb_off]
+       nlc = c.nAngMomFunctions[lc]; nld = c.nAngMomFunctions[ld]
+       target_ints = numpy.zeros((nla*nlb,nlc*nld), dtype="double")
+       base_ints = [copy(integrals[tuple(base_class)]) for base_class in base_classes]
+#_C_INTS
+       if step == 2: 
+          _c_ints.two_electron_hrr(target_ints, base_ints[0].T, base_ints[1].T, sign_Rx*Rx[:], la, lb, lc, ld, goofy)
+       if step == 1:  
+          _c_ints.two_electron_hrr(target_ints, base_ints[0], base_ints[1], sign_Rx*Rx[:], la, lb, lc, ld, goofy)
+#_C_INTS
+       integrals[tuple(target_class)] = copy(target_ints)
+
+    if step == 2: 
+       for target_class in targets:
+          integrals[tuple(target_class)] = integrals[tuple(target_class)].T
+
+# =================================================================================== #

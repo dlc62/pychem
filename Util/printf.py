@@ -1,181 +1,92 @@
-
-# Rewrite this to avoid so much string concatenation and also to
-# get more flexible writing to particular locations, look at the io
-# module in stdlib
-
-# System libraries
-from __future__ import print_function
-import os
 import numpy
-import sys
-# Custom-written data modules
-import Data.constants as c
-import Util.util
-from Data.constants import energy_convergence_final
-
-# pretty printing to the terminal for numpy arrays
-numpy.set_printoptions(precision=5, linewidth=300)
-
-def initialize(settings, method = None):
-    if method == None:
-        try:
-           os.remove(settings.OutFileName)
-        except:
-           pass
-    settings.OutFile = open(settings.OutFileName,'a')
-    if settings.LogInput:
-        with open(sys.argv[1], 'r') as f:
-            text = f.read()
-            settings.OutFile.write("{0}   Input File\n{0}".format(32 * "*" + '\n'))
-            settings.OutFile.write(text)
-            settings.OutFile.write("{0}   End of Input File\n{0}\n".format(32 * "*" + '\n'))
-
-def finalize(settings, method = None):
-    settings.OutFile.close()
+numpy.set_printoptions(precision = 8, linewidth = 300)  #Makes the arrays print nicely in the output
 
 def print_to_file(outfile,string):
     try:
-       outfile.write(string)
+       outfile.write(string) 
     except:
        print(string)
 
 #-----------------------------------------------------------------
 
-def HF_Initial(molecule, this, settings):
+def double_delimiter(outfile=None):
+   string = '=======================================================\n'
+   if outfile is None:
+      return string
+   else:
+      print_to_file(outfile,string+'\n')
 
-    if settings.PrintLevel != 'MINIMAL':
-        outString = ""
-        outString += '****************************************************' + '\n'
-        outString +=  ' Initialization ' + '\n'
-        outString += '****************************************************' + '\n\n'
-        outString += 'Nuclear repulsion energy ' + str(molecule.NuclearRepulsion) + '\n\n'
-        outString += 'Core Fock matrix' + '\n'
-        outString +=  str(molecule.Core) + '\n\n'
-        outString +=  'Guess alpha density matrix' + '\n'
-        outString +=  str(this.Alpha.Density)  + '\n\n'
-        if numpy.all(this.Alpha.Density != this.Beta.Density):
-            outString +=  'Guess beta density matrix' + '\n'
-            outString +=  str(this.Beta.Density)  + '\n\n'
-        outString +=  '****************************************************' + '\n'
-        outString +=  ' Hartree-Fock iterations ' + '\n'
-        outString +=  '****************************************************' + '\n\n'
+def delimiter(outfile):
+   string = '-------------------------------------------------------\n'
+   if outfile is None:
+      return string
+   else:
+      print_to_file(outfile,string+'\n')
 
-        print_to_file(settings.OutFile, outString)
+def blank_line(outfile):
+   string = '\n'
+   if outfile is None:
+      return string
+   else:
+      print_to_file(outfile,string)
 
-        if settings.PrintToTerminal:
-            print(outString)
+def format_text_value(text,value):
+   if isinstance(value,numpy.ndarray): 
+      sep = '\n'; end = '\n\n' 
+   else:
+      sep = ' '; end = '\n'
+   string = text + sep + str(value) + end
+   return string
 
-#Possibly need to allow this to print the coulomb and exchange matrices (if PrintLevel == VERBOSE)
-def HF_Loop(this, settings, cycles, diis_error, final):
+def text_value(outfile,text1,value1,text2=None,value2=None,text3=None,value3=None,text4=None,value4=None,text5=None,value5=None):
+   # Construct or print up to 5 sections of text and values, text and values supplied as arguments 
+   string = format_text_value(text1,value1)
+   if text2 is not None and value2 is not None: string += format_text_value(text2,value2)
+   if text3 is not None and value3 is not None: string += format_text_value(text3,value3)
+   if text4 is not None and value4 is not None: string += format_text_value(text4,value4)
+   if text5 is not None and value5 is not None: string += format_text_value(text5,value5)
+   if outfile is None:
+      return string
+   else:
+      print_to_file(outfile,string+'\n')
 
-    #testing to see if the alpha and beta orbital energies are the same
-    #equalites = map( (lambda x,y: x == y), alpha_energies, beta_energies)
-    #restricted = reduce( (lambda x,y: x and y), equalites, True)
-    restricted = numpy.all(this.Alpha.Energies == this.Beta.Energies)
+def delimited_text_value(outfile,text1,value1,text2=None,value2=None,text3=None,value3=None,text4=None,value4=None,text5=None,value5=None):
+   # Print up to 5 sections of text and values surrounded by delimiters, text and values supplied as arguments
+   string = delimiter(None)
+   string += text_value(None,text1,value1,text2,value2,text3,value3,text4,value4,text5,value5)
+   string += delimiter(None)
+   print_to_file(outfile,string+'\n')
 
-    outString = ''
-    outString += "Cycle: " + str(cycles) + '\n'
-    outString += "Total Energy: " + str(this.TotalEnergy) + '\n'
-    outString += "Change in energy: " + str(this.dE) + '\n'
-    if diis_error != None:                 #stops this from printing when DIIS is disabled
-        outString += "DIIS Error: " + str(diis_error) + '\n'
+def double_delimited_text_value(outfile,text1,value1,text2=None,value2=None,text3=None,value3=None,text4=None,value4=None,text5=None,value5=None):
+   # Print up to 5 sections of text and values surrounded by delimiters, text and values supplied as arguments
+   string = double_delimiter(None)
+   string += text_value(None,text1,value1,text2,value2,text3,value3,text4,value4,text5,value5)
+   string += double_delimiter(None)
+   print_to_file(outfile,string+'\n')
 
-    if (settings.PrintLevel == 'DEBUG') or (final is True):
-        outString += "Alpha Orbital Energies" + '\n'
-        outString += str(this.Alpha.Energies) + '\n'
-        #Find a better way to do this comparison
-        if restricted == False:
-            outString += "Beta Orbital Energies" + '\n'
-            outString += str(this.Beta.Energies) + '\n'
+def text(outfile,text1,text2=None,text3=None,text4=None,text5=None):
+   # Construct or print up to 5 lines of text, each line supplied as a separate argument
+   string = text1 + '\n'
+   if text2 is not None: string += text2 + '\n'
+   if text3 is not None: string += text3 + '\n'
+   if text4 is not None: string += text4 + '\n'
+   if text5 is not None: string += text5 + '\n'
+   if outfile is None:
+      return string
+   else:
+      print_to_file(outfile,string+'\n')
 
-    if (settings.PrintLevel == 'DEBUG') or (final is True):
-        outString += "Alpha MOs" + '\n'
-        outString += str(this.Alpha.MOs) + '\n'
-        if restricted == False:
-            outString += "Beta MOs" + '\n'
-            outString += str(this.Beta.MOs) + '\n'
+def delimited_text(outfile,text1,text2=None,text3=None,text4=None,text5=None):
+   # Print up to 5 sections of text and values surrounded by delimiters, text and values supplied as arguments
+   string = delimiter(None)
+   string += text(None,text1,text2,text3,text4,text5)
+   string += delimiter(None)
+   print_to_file(outfile,string+'\n')
 
-    if (settings.PrintLevel == 'DEBUG'):
-        outString += "Alpha Density Matrix" + '\n'
-        outString += str(this.Alpha.Density) + '\n'
-        outString += "Alpha Fock Matrix" + '\n'
-        outString += str(this.Alpha.Fock) + '\n'
-        if restricted == False:
-            outString += "Beta Density Matrix" + '\n'
-            outString += str(this.Beta.Density) + '\n'
-            outString += "Beta Fock Matrix" + '\n'
-            outString += str(this.Beta.Fock) + '\n'
+def double_delimited_text(outfile,text1,text2=None,text3=None,text4=None,text5=None):
+   # Print up to 5 sections of text and values surrounded by delimiters, text and values supplied as arguments
+   string = double_delimiter(None)
+   string += text(None,text1,text2,text3,text4,text5)
+   string += double_delimiter(None)
+   print_to_file(outfile,string+'\n')
 
-    if final:
-        if this.S2 != None:
-            outString += "<S^2> = %.2f\n" % this.S2
-        outString += "Alpha Occupancy: {}\n".format(this.AlphaOccupancy)
-        outString += "Beta Occupancy: {}\n".format(this.BetaOccupancy)
-
-    outString += '----------------------------------------------------'# + '\n'
-
-    if settings.PrintToTerminal:
-        print(outString)
-    print_to_file(settings.OutFile, outString + '\n')
-
-def HF_Summary(settings, molecule):
-    outString = "MOM Calculation Summary\n"
-    outString += "HF State Energies: {}\n".format([state.TotalEnergy for state in molecule.States])
-
-    distances = Util.util.distance_matrix(molecule)
-    not_converged = ""; collapsed = ""
-    for i, state1 in enumerate(molecule.States):
-        if abs(state1.dE) > energy_convergence_final:
-            not_converged += "Calculation {} did not converge, final dE was: {}\n".format(i+1, state1.dE)
-        for j, state2 in enumerate(molecule.States[:i]):
-            distance_close = distances[i,j] < 0.1
-            energy_close = numpy.isclose(state1.TotalEnergy, state2.TotalEnergy)
-            spin_sym = state1.AlphaOccupancy == state2.BetaOccupancy and state1.BetaOccupancy == state2.AlphaOccupancy
-            if distance_close and energy_close and not spin_sym:
-                collapsed += "Calculations {} and {} have found the same state\n".format(j+1, i+1)
-    outString += not_converged + collapsed
-    outString += '----------------------------------------------------'
-    if settings.PrintToTerminal:
-        print(outString)
-    print_to_file(settings.OutFile, outString + '\n')
-
-def HF_Final(settings):
-    outString =  '                       End                          ' + '\n'
-    outString += '----------------------------------------------------' + '\n'
-    print_to_file(settings.OutFile, outString)
-
-def MP2_Final(settings, state_index, EMP2):
-    outString =  ' Total MP2 energy for state ' + str(state_index) + ' = ' + str(EMP2) + '\n'
-    outString += '----------------------------------------------------' + '\n'
-    outString +=  '                 End (No, really!)                  ' + '\n'
-    outString += '----------------------------------------------------' + '\n'
-    print_to_file(settings.OutFile, outString)
-
-#    def MOM(self, alpha_overlaps, beta_overlaps):
-#        outString = "Alpha Overlap Vector" + '\n'
-#        outString += str(alpha_overlaps) + '\n'
-#        outString += "Beta Overlap Vector" + '\n'
-#        outString += str(beta_overlaps)
-#        print_to_file(self.outFile, outString)
-
-def NOCI(settings, hamil, overlaps, states, energies):
-
-    outString = "\n=== NOCI Output ===\n"
-
-    if settings.NOCI.print_level > 1:
-        outString += "Hamiltonian\n{}\n".format(hamil)
-    if settings.NOCI.print_level > 2:
-        outString += "State Overlaps\n{}\n".format(overlaps)
-
-    outString += "States\n{}\n".format(states)
-    outString += "NOCI Energies\n{}\n".format(energies)
-    print_to_file(settings.OutFile, outString)
-
-    if settings.PrintToTerminal:
-        print(outString)
-
-def printf(settings, to_print):
-    """ A General logging function """
-    print_to_file(settings, to_print)
-    if settings.PrintToTerminal:
-        print(to_print)

@@ -1,125 +1,129 @@
-#!/usr/bin/env python3
+#!/usr/bin/python
 
 # System libraries
-from __future__ import print_function
+import os
 import sys
 if sys.version_info.major is 2:
-  import ConfigParser
+   import ConfigParser
 else:
-  import configparser as ConfigParser
+   import configparser as ConfigParser
+# Custom-written object modules (data and derived data at this level)
+from Util import structures
 # Custom-written code modules
 from Methods import hartree_fock
 from Methods import basis_fit
 from Methods import mp2
-from Methods import NOCI
-
-from Util import util
-from Util import printf
-from Util import inputs_structures
-
+from Methods import properties
 
 #======================================================================#
 #                           THE MAIN PROGRAM                           #
-#                  Compatible with python2.7 or higher                 #
 #======================================================================#
-# Process:                                                             #
+# Process:                                                             # 
 # -------------------------------------------------------------------- #
 # __main__: loop over sections in input file, store system-independent #
-#           data in Settings, and system-dependent data in Molecule    #
+#           data in Settings, and system-dependent data in Molecule    #  
 #           then do_calculation                                        #
 # -------------------------------------------------------------------- #
-# do_calculation:                                                      #
+# do_calculation:                                                      # 
 #   - do HF in initial (usually minimal) basis set, store MOs          #
-#   - do MOM-HF for excited states in initial basis set, store MOs     #
+#   - do MOM-HF for excited states in initial basis set, store MOs     # 
 #   for each additional basis set:                                     #
-#     - construct guess MOs for all states by basis fitting from       #
+#     - construct guess MOs for all states by basis fitting from       #       
 #       initial (minimal) basis set results                            #
-#     - perform MOM-HF calculations for all states                     #
+#     - perform MOM-HF calculations for all states                     #  
 #======================================================================#
 
 def do_calculation(settings, molecule):
-    # Open output file
-    printf.initialize(settings)
 
-    # Do ground state calculation in the starting basis, storing MOs (and 2e ints as appropriate) as we go
-    #hartree_fock.do_SCF(settings, molecule, molecule.States[0])
-    hartree_fock.do_SCF(settings, molecule)
+    # Open output file, print header
+    if os.path.exists(settings.OutFileName): os.remove(settings.OutFileName) 
+    settings.OutFile = open(settings.OutFileName,'a+')
+
+    if settings.Method is not None:
+
+        # Do ground state calculation in the starting basis, storing MOs (and 2e ints as appropriate) as we go
+        basis_set = settings.BasisSets[0]
+        hartree_fock.do(settings, molecule, basis_set)
+ 
+        #-------------------------------------------------------------------
+        # Generate starting orbital sets for each of the requested excited states and do calculation in first basis
+        for index, state in enumerate(molecule.States[1:], start = 1):
+        
+            # Reorder MOs if changing orbital occupancy, but not if changing spin multiplicity
+            if molecule.NAlphaElectrons == state.NAlpha:
+                state.Alpha.MOs = structures.reorder_MOs(molecule.States[0].Alpha.MOs, state.Alpha.Occupancy)
+                state.Beta.MOs = structures.reorder_MOs(molecule.States[0].Beta.MOs, state.Beta.Occupancy)
+
+            hartree_fock.do(settings, molecule, basis_set, index)
+
+        #-------------------------------------------------------------------
+        # Do larger basis calculations, using basis fitting to obtain initial MOs
+        for basis_set in settings.BasisSets[1:]:
+        
+            # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones 
+            alpha_MOs = []; beta_MOs = []
+            for state in molecule.States:
+                alpha_MOs.append(basis_fit.do(molecule, state.alphaMOs, basis_set))
+                beta_MOs.append(basis_fit.do(molecule, state.betaMOs, basis_set))
+
+            # Make new molecule with a new basis set and copy in old orbitals (fit using new basis set)
+            molecule = structures.update_basis(basis_set)
+            for state in molecule.States:
+                state.Alpha.MOs = alpha_MOs.pop(0)
+                state.Beta.MOs = beta_MOs.pop(0)
+
+            # Iterate over the list of states doing calculations (enforce orthogonality for MOM but not SF-NOCI)
+            for index in range(molecule.NStates):
+                hartree_fock.do(settings, molecule, basis_set, index)
 
     #-------------------------------------------------------------------
-    # Generate starting orbital sets for each of the requested excited states and do calculation in first basis
-    for index, state in enumerate(molecule.States[1:], start = 1):
-
-        state.Alpha.MOs = util.excite(molecule.States[0].Alpha.MOs, state.AlphaOccupancy, molecule.NAlphaElectrons)
-        state.Beta.MOs = util.excite(molecule.States[0].Beta.MOs, state.BetaOccupancy, molecule.NBetaElectrons)
-
-    for index, state in enumerate(molecule.States[1:], start = 1):
-        #hartree_fock.do_SCF(settings, molecule, state, index)
-        hartree_fock.do_SCF(settings, molecule, index)
-
-    # Dump MOs to file for initial basis set, all states
-    util.store('MOs', molecule.States, settings.SectionName, settings.BasisSets[0])
-
-    for basis_set in settings.BasisSets[1:]:
-        # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones
-        # Or Read starting MOs from disk
-        alpha_MOs = []; beta_MOs = []
-        for state in molecule.States:
-            #if settings.SCF.Guess != "READ":
-            alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
-            beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
-
-        Store2eInts = (settings.SCF.Ints_Handling == 'INCORE')
-        molecule.update_basis(basis_set, Store2eInts)
-
-        for state in molecule.States:
-            state.Alpha.MOs = alpha_MOs.pop(0)
-            state.Beta.MOs = beta_MOs.pop(0)
-
-        # Iterate over the list of states doing calculations while enforcing orthogonality
-        for index, state in enumerate(molecule.States):
-            hartree_fock.do_SCF(settings, molecule, index)
-
-        # Dump MOs to file for other basis sets, all states
-        util.store('MOs', molecule.States, settings.SectionName, basis_set)
-    if molecule.NStates > 1:
-        printf.HF_Summary(settings, molecule)
-    #-------------------------------------------------------------------
-    # Do state-specific MP2 in final basis only
+    # Do post-HF (MP2) calculations in final basis for all single-reference electronic states
     if settings.Method == 'MP2':
-        for index, state in enumerate(molecule.States):
-            mp2.do(settings, molecule, state, index)
+        
+        mp2.do(settings, molecule) 
 
-    if settings.NOCI.Use and molecule.NStates > 1:
-        print("Starting NOCI")
-        NOCI.do_NOCI(molecule, settings)
+    #-------------------------------------------------------------------
+    # Do NOCI calculations in final basis, setting up spin-flip basis states
+    if settings.Method == 'NOCI':
+
+        if 'SPIN-FLIP' in molecule.ExcitationType: 
+            spin_flip_states = []
+            for [index,alpha_occupancy,beta_occupancy] in molecule.SpinFlip:
+                state = structures.ElectronicState(alpha_occupancy, beta_occupancy, molecule.NOrbitals)
+                state.Alpha.MOs = structures.reorder_MOs(molecule.States[index].Alpha.MOs, alpha_occupancy)
+                state.Beta.MOs = structures.reorder_MOs(molecule.States[index].Alpha.MOs, beta_occupancy)
+                state.TotalEnergy = molecule.States[index].TotalEnergy
+                spin_flip_states.append(state)
+            molecule.States = spin_flip_states
+
+        noci.do(settings, molecule)
+
+    #-------------------------------------------------------------------
+    # Compute properties if requested - only mean-field for now
+    if settings.JobType == 'PROPERTY':
+
+        properties.calculate(settings, molecule)
 
     # Close output file
-    printf.finalize(settings)
+    settings.OutFile.close()
 
 #======================================================================#
 # __main__: Process input file, loop over sections, set up data        #
-#           inputs_structures and call do_calculation                  #
+#           structures and call do_calculation                         #
 #======================================================================#
 
-#if __name__ == "__main__":
-def run_calc(argv):
-    if len(argv) != 2:
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
         print("Please give an input file")
-        return -1
     else:
         parser = ConfigParser.SafeConfigParser()
-        has_read_data = parser.read(argv[1])
+        has_read_data = parser.read(sys.argv[1])
         if not has_read_data:
             print("Could not open input file, check you have typed the name correctly")
-            return -1
+            sys.exit()
         if len(parser.sections()) == 0:
-            print("Input file has no recognisable section headings, format: [section_heading]")
-            return -1
+            print("Input file has no recognisable section headings, format [section_heading]")
+            sys.exit() 
         for section in parser.sections():
-            molecule,settings = inputs_structures.process_input(section, parser)
-            settings.set_outfile(section)
+            molecule,settings = structures.process_input(section, parser) 
             do_calculation(settings, molecule)
-        return molecule
-
-if __name__ == "__main__":
-    run_calc(sys.argv)

@@ -2,10 +2,7 @@
 import numpy
 from numpy import dot
 
-# Custom-written data modules
-import Data.constants as c
-
-# Custom-written code modules
+# Custom-written code
 from Util import printf
 
 #=================================================================#
@@ -14,7 +11,11 @@ from Util import printf
 #                                                                 #
 #=================================================================#
 
-def do(settings, molecule, state, state_index):
+def do(settings, molecule):
+
+  printf.delimited_text(settings.OutFile, " MP2 calculations for all electronic states ")
+
+  for state_index, state in enumerate(molecule.States):
 
     # Load up MO coefficients and energies for current electronic state
     Ca = state.Alpha.MOs
@@ -73,4 +74,6 @@ def do(settings, molecule, state, state_index):
 
     MP2_Total_Energy = MP2_Eaa + MP2_Eab + MP2_Ebb
 
-    printf.MP2_Final(settings, state_index, MP2_Total_Energy)
+    printf.text_value(settings.OutFile," State: ", state_index, " Total MP2 energy: ", MP2_Total_Energy) 
+
+  printf.delimited_text(settings.OutFile, " End of MP2 calculations ")

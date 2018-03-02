@@ -1,6 +1,8 @@
+# Conversion factors
 toBohr = 1.8897161646320724
-#toBohr = 1.889725989
 toAng = 1.0/toBohr
+
+# Atomic structure parameters
 nElectrons = {'H':1,'HE':2,'LI':3,'BE':4,'B':5,'C':6,'N':7,'O':8,'F':9,'NE':10,
               'NA':11,'MG':12,'AL':13,'SI':14,'P':15,'S':16,'CL':17,'AR':18,
               'K':19,'CA':20,'SC':21,'TI':22,'V':23,'CR':24,'MN':25,'FE':26,'CO':27,
@@ -17,28 +19,14 @@ atomicMultiplicity = {'H':2,'HE':1,'LI':2,'BE':1,'B':2,'C':3,'N':4,'O':3,'F':2,'
                       'NA':2,'MG':1,'AL':2,'SI':3,'P':4,'S':3,'CL':2,'AR':1,
                       'K':2,'CA':1,'SC':2,'TI':3,'V':4,'CR':5,'MN':4,'FE':3,'CO':2,
                       'NI':1,'CU':2,'ZN':1,'GA':2,'GE':3,'AS':4,'SE':3,'BR':2,'KR':1}
-# note: assuming Cartesian basis functions (not spherical polar) below
-nAngMomFunctions = {0:1,1:3,2:6,3:10,4:15,5:21,6:28}
-lQuanta = {0:[[0,0,0]],
-           1:[[1,0,0],[0,1,0],[0,0,1]],
-           2:[[2,0,0],[1,1,0],[1,0,1],[0,2,0],[0,1,1],[0,0,2]],
-           3:[[3,0,0],[2,1,0],[2,0,1],[1,2,0],[1,0,2],[1,1,1],
-              [0,3,0],[0,2,1],[0,1,2],[0,0,3]],
-           4:[[4,0,0],[3,1,0],[3,0,1],[2,2,0],[2,0,2],[2,1,1],
-              [1,3,0],[1,0,3],[1,2,1],[1,1,2],[0,4,0],[0,3,1],
-              [0,2,2],[0,1,3],[0,0,4]],
-           5:[[5,0,0],[4,1,0],[4,0,1],[3,2,0],[3,0,2],[3,1,1],[2,3,0],
-              [2,0,3],[2,2,1],[2,1,2],[1,4,0],[1,0,4],[1,3,1],[1,1,3],
-              [1,2,2],[0,5,0],[0,4,1],[0,3,2],[0,2,3],[0,1,4],[0,0,5]]}
+nAngMomFunctions = {}
+for i in range(1,100):
+  nAngMomFunctions[i-1] = (i*i+i)/2
+
+# Settings and thresholds
 integral_threshold = -1.e-10
-energy_convergence = 1.e-7
-energy_convergence_final = 1e-8
+energy_convergence = 1.e-6
 density_convergence = 1.e-6
 DIIS_convergence = 1.e-5
-DIIS_max_condition = 1e100
-NOCI_Thresh = 1e-10
-lambda_zero_thresh = 1e-10
-
-# Max deviation from an occupany of 0 or 1 before an orbital will
-# be included in the CUHF active space
-CUHF_thresh = 0.1
+DIIS_max_condition = 1e6
+NOCI_thresh = 1.e-10
