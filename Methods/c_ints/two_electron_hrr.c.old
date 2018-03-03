@@ -1,0 +1,90 @@
+#include "two_electron_hrr.h"
+#include "angmom_index.h"
+
+void two_electron_hrr(double **target_ints, double **base0, double **base1, 
+                      double *Rx, int la, int lb, int lc, int ld, int goofy) { 
+
+   // Recurrence relation indices
+   int iax, iay, iaz, ibx, iby, ibz; 
+   int iax1, iay1, iaz1, ibx0, iby0, ibz0;
+   int index, ia0, ia1, ib0, ib1;
+   int icx, icy, icz, idx, idy, idz; 
+   // Integral indices
+   int ibra, iket, ibra0, ibra1;
+   int nla0, nla1, nlb0, nlb1;
+ 
+   nlb0 = angmom_index(0,0,lb-1)+1;
+   nlb1 = angmom_index(0,0,lb)+1;
+   nla0 = angmom_index(0,0,la)+1;
+   nla1 = angmom_index(0,0,la+1)+1;
+
+   // Loop over all contracted Cartesian basis functions
+   // Start loop over bra, decrement index of target centre for ang mom transfer
+   for (ibx = lb; ibx > -1; ibx--) {
+     for (iby = lb-ibx; iby > -1; iby--) {
+       ibz = lb - ibx - iby;
+
+       // Set up indices for recurrence relations
+       if (ibx != 0) { 
+          ibx0 = ibx-1; iby0 = iby; ibz0 = ibz; index = 0; 
+       } else if (iby != 0) { 
+          ibx0 = ibx; iby0 = iby-1; ibz0 = ibz; index = 1; 
+       } else if (ibz != 0) { 
+          ibx0 = ibx; iby0 = iby; ibz0 = ibz-1; index = 2;
+       } else { /* print error message, should not be able to get here */ }
+           
+       // Continue loop over bra, increment corresponding indices of source centre
+       for (iax = la; iax > -1; iax--) {
+         for (iay = la-iax; iay > -1; iay--) {
+           iaz = la - iax - iay;
+
+           // Set up indices for recurrence relations
+           if (index == 0) { 
+              iax1 = iax+1; iay1 = iay; iaz1 = iaz;
+           } else if (index == 1) { 
+              iax1 = iax; iay1 = iay+1; iaz1 = iaz;
+           } else if (index == 2) { 
+              iax1 = iax; iay1 = iay; iaz1 = iaz+1;
+           } else { /* print error message, should not be able to get here */ }
+
+           // Compute indices into target (ibra), base0 (ibra0) and base1 (ibra1) arrays
+           ia0 = angmom_index(iax, iay, iaz);
+           ia1 = angmom_index(iax1, iay1, iaz1);
+           ib0 = angmom_index(ibx0, iby0, ibz0);
+           ib1 = angmom_index(ibx, iby, ibz);
+           if (goofy == 0) {
+             ibra = nlb1*ia0 + ib1;
+             ibra0 = nlb0*ia1 + ib0;
+             ibra1 = nlb0*ia0 + ib0;
+           } else {
+             ibra = nla0*ib1 + ia0;
+             ibra0 = nla1*ib0 + ia1;
+             ibra1 = nla0*ib0 + ia0;
+           }
+
+           iket = -1;
+
+           // Loop over ket, simply accumulating the iket index, order unimportant
+           for (icx = lc; icx > -1; icx--) {
+             for (icy = lc-icx; icy > -1; icy--) {
+               icz = lc - icx - icy;
+
+               for (idx = ld; idx > -1; idx--) {
+                 for (idy = ld-idx; idy > -1; idy--) {
+                   idz = ld - idx - idy;
+
+                   iket += 1;
+
+                   target_ints[ibra][iket] = base0[ibra0][iket] + Rx[index]*base1[ibra1][iket]; 
+
+                 }  // end
+               }    // loops
+             }      // over
+           }        // ket
+
+         }  // end
+       }    // loops
+     }      // over
+   }        // bra
+ 
+} // end subroutine
