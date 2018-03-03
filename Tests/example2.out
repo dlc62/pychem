@@ -1,0 +1,157 @@
+-------------------------------------------------------
+ Hartree-Fock iterations 
+-------------------------------------------------------
+
+ Cycle:  1
+ Total energy:  -1.39224809635
+ Change in energy:  1.50622329145
+
+ Cycle:  2
+ Total energy:  -1.3949901058
+ Change in energy:  -0.00274200944661
+
+ Cycle:  3
+ Total energy:  -1.3962076605
+ Change in energy:  -0.00121755469945
+
+ Cycle:  4
+ Total energy:  -1.39701680308
+ Change in energy:  -0.000809142585484
+
+ Cycle:  5
+ Total energy:  -1.39757962172
+ Change in energy:  -0.00056281863881
+
+ Cycle:  6
+ Total energy:  -1.39796919139
+ Change in energy:  -0.000389569672797
+
+ Cycle:  7
+ Total energy:  -1.39823588589
+ Change in energy:  -0.000266694491859
+
+ Cycle:  8
+ Total energy:  -1.39841708584
+ Change in energy:  -0.000181199954086
+
+ Cycle:  9
+ Total energy:  -1.39853994352
+ Change in energy:  -0.000122857680779
+
+ Cycle:  10
+ Total energy:  -1.3986234882
+ Change in energy:  -8.35446835525e-05
+
+ Cycle:  11
+ Total energy:  -1.39868067318
+ Change in energy:  -5.7184973596e-05
+
+ Cycle:  12
+ Total energy:  -1.39872015493
+ Change in energy:  -3.94817473102e-05
+
+ Cycle:  13
+ Total energy:  -1.39874767067
+ Change in energy:  -2.7515741138e-05
+
+ Cycle:  14
+ Total energy:  -1.39876702253
+ Change in energy:  -1.93518611948e-05
+
+ Cycle:  15
+ Total energy:  -1.39878074519
+ Change in energy:  -1.37226665911e-05
+
+ Cycle:  16
+ Total energy:  -1.398790545
+ Change in energy:  -9.79980684246e-06
+
+ Cycle:  17
+ Total energy:  -1.39879758417
+ Change in energy:  -7.03916579781e-06
+
+ Cycle:  18
+ Total energy:  -1.39880266395
+ Change in energy:  -5.07978553621e-06
+
+ Cycle:  19
+ Total energy:  -1.39880634313
+ Change in energy:  -3.67918007882e-06
+
+ Cycle:  20
+ Total energy:  -1.39880901536
+ Change in energy:  -2.67223086325e-06
+
+ Cycle:  21
+ Total energy:  -1.39881096037
+ Change in energy:  -1.94501100648e-06
+
+ Cycle:  22
+ Total energy:  -1.39881237834
+ Change in energy:  -1.41796874509e-06
+
+ Cycle:  23
+ Total energy:  -1.39881341332
+ Change in energy:  -1.0349798778e-06
+
+ Cycle:  24
+ Total energy:  -1.39881416943
+ Change in energy:  -7.56108816446e-07
+
+-------------------------------------------------------
+ End of Hartree-Fock iterations 
+-------------------------------------------------------
+
+<S^2> = 0.75
+
+Final HF energy:  -1.39881416943
+
+
+ Alpha Orbital Energies 
+[-0.67031308 -0.17086138  0.39907341]
+
+ Alpha MOs 
+[[-0.42776534 -0.4038776  -1.06261262]
+ [-0.3559486  -0.66192732  0.91537173]
+ [-0.4706719   1.02996634  0.21548873]]
+
+ Alpha Density Matrix 
+[[ 0.3461003   0.41960009 -0.2146432 ]
+ [ 0.41960009  0.56484718 -0.51422785]
+ [-0.2146432  -0.51422785  1.2823627 ]]
+
+
+ Beta Orbital Energies 
+[-0.54115759  0.43877535  0.51723429]
+
+ Beta MOs 
+[[ 0.50446398  0.83181545  0.72721732]
+ [ 0.48971116 -1.07113295  0.12493905]
+ [ 0.23867763  0.27754891 -1.09306801]]
+
+ Beta Density Matrix 
+[[ 0.25448391  0.24704164  0.12040427]
+ [ 0.24704164  0.23981702  0.1168831 ]
+ [ 0.12040427  0.1168831   0.05696701]]
+
+
+-------------------------------------------------------
+ End of Hartree-Fock calculation 
+-------------------------------------------------------
+
+-------------------------------------------------------
+ Property calculation - electron scattering intensities 
+-------------------------------------------------------
+
+Grid value -> Scattering patterns for each electronic state 
+
+  0.000000 10.000000000000
+  0.500000  8.164531249209
+  1.000000  5.102850511563
+  1.500000  3.495159897495
+  2.000000  3.106101461088
+
+-------------------------------------------------------
+ End of property calculation 
+-------------------------------------------------------
+

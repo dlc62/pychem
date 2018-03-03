@@ -1,0 +1,14 @@
+[example2]
+Method = "HF"
+Basis_Sets = ["STO-3G"]
+Job_Type = "Property"
+Property_Type = "Scattering"
+Property_Grid = [0.0,0.5,1.0,1.5,2.0]
+Multiplicity = 2
+Charge = 0
+Coords = [['H', 1.0,  0.  ,  0.,   0.],
+          ['H', 1.0,  1.0 ,  0.,   0.],
+          ['H', 1.0,  0.4,  1.0,   0.]]
+Reference = "CUHF"
+Max_SCF_Iterations = 50
+

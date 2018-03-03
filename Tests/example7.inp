@@ -1,0 +1,14 @@
+[example7]
+Method = "HF"
+Basis_Sets = ["STO-3G"]
+Multiplicity = 1
+Charge = 0
+Coords_Units = "BOHR"
+Coords = [['B', 5.0,  0.  ,  0.,   0.],
+          ['H', 1.0, 3.013923978561,   0.,   0.]]
+Reference = "RHF"
+Max_SCF_Iterations = 50
+Job_Type = "PROPERTY"
+Property_Type = "SCATTERING"
+Property_Grid = [0.0]
+
