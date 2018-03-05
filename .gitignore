@@ -20,3 +20,4 @@ pathtable
 Outputs/
 
 *.so
+/Methods/build 
