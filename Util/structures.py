@@ -22,7 +22,7 @@ from Methods import _c_ints
 def process_input(section, parser):
     inputs = inputs_return_function(section, parser)
     settings = Settings(inputs, section)
-    molecule = Molecule(inputs=inputs, settings=settings)
+    molecule = Molecule(settings.BasisSets[0], inputs)
     return molecule,settings
 
 def inputs_return_function(section, parser):
@@ -41,10 +41,6 @@ def inputs_return_function(section, parser):
             var = var.upper()
         return var
     return inputs
-
-def update_basis(basis_set):
-    molecule = Molecule(basis=basis_set)
-    return molecule
 
 #=====================================================================#
 #  Global data structures, used absolutely everywhere                 #
@@ -294,17 +290,15 @@ class Set_MOM:
 
 class Molecule:
 
-    def __init__(self, inputs = None, settings = None, basis = None):
+    def __init__(self, basis, inputs):
         #--------------------------------------------------------------#
         #           Parse inputs and set up data structures            # 
         #          for ground and excited state calculations           #
         #--------------------------------------------------------------#
-        if basis == None:
-           self.parse_inputs(inputs)
-           basis = settings.BasisSets[0]
+        self.parse_inputs(inputs)
         self.Basis = basis
-        self.set_structures(inputs)
         self.make_excitations(inputs)
+        self.set_structures()
 
     #==================================================================#
     def parse_inputs(self,inputs):
@@ -351,9 +345,10 @@ class Molecule:
               print('Error: must specify molecule multiplicity using Multiplicity =')
               sys.exit()
 
+        self.get_excitation_type(inputs)
 
     #==================================================================#
-    def set_structures(self, inputs):
+    def set_structures(self):
         #-------------------------- Atoms List ------------------------#
         #        contains Atom -> ContractedGaussian subclasses        #
         #--------------------------------------------------------------#
@@ -388,10 +383,7 @@ class Molecule:
         self.NBetaOrbitals = int(math.ceil(self.NBetaElectrons/2.0))
         self.NCgtf = n_cgtf
         
-        # Create the ground state
-        alpha_occupancy = [1 for i in range(n_alpha)] + [0 for i in range(n_orbitals - n_alpha)]
-        beta_occupancy = [1 for i in range(n_beta)] + [0 for i in range(n_orbitals - n_beta)]
-        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
+        self.make_states(n_alpha, n_beta, n_orbitals)
 
         #----------- SCF structures - common to all states ------------#
         #           contains ShellPair -> Shell subclasses             #    
@@ -419,14 +411,29 @@ class Molecule:
                     if ib >= ia:
                        shell_pairs[(ia,ib)] = ShellPair(atom_a.Coordinates,cgtf_a,ia,ia_vec,atom_b.Coordinates,cgtf_b,ib,ib_vec)
         self.ShellPairs = shell_pairs
-        self.get_excitation_type(inputs)
+
+    def make_states(self, n_alpha, n_beta, n_orbitals):
+
+        # Make the ground state
+        alpha_occupancy = [1 for i in range(n_alpha)] + [0 for i in range(n_orbitals - n_alpha)]
+        beta_occupancy = [1 for i in range(n_beta)] + [0 for i in range(n_orbitals - n_beta)]
+        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
+
+        # Loop over the lists of excitations to make the excited reference states
+        for alpha, beta in izip_longest(self.AlphaExcitations, self.BetaExcitations, fillvalue=[]):
+            alpha_occupied = self.do_excitation(self.States[0].AlphaOccupancy, alpha)
+            beta_occupied = self.do_excitation(self.States[0].BetaOccupancy, beta)
+            self.States.append(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))
+
+        self.NStates = len(self.States)
+
 
     def get_excitation_type(self, inputs):
         available_excitation_types = [None, 'SINGLE', 'S', 'DOUBLE', 'D', 'HOMO-LUMO', 'DOUBLE-PAIRED','CUSTOM', 'SPIN-FLIP-LEVELS']
 
         # Read the relevant sections from input        
         excitation_type = inputs("Excitations", default=None)
-        spin_flip = inputs("Spin_Flip", default=False)
+        spin_flip = spin_flip = inputs("Spin_Flip", default=False)
         alpha_excitations = inputs("Alpha_Excitations", default=[])
         beta_excitations = inputs("Beta_Excitations", default=[])
 
@@ -444,7 +451,7 @@ class Molecule:
         if spin_flip is True:
             spin_flip = "CUSTOM" 
         # If it's a list we generate determinants based on these SF references
-        elif type(spin_flip) is list:
+        elif type(spin_flip) is list:   
             if excitation_type != None:
                 # TODO make these comaptible
                 print("""'Excitation_Type', 'Alpha_Excitations' and 'Beta_Excitations' are incompatible with specifying spin-flip 
@@ -461,9 +468,9 @@ class Molecule:
             sys.exit()
 
         self.ExcitationType = excitation_type
-        self.SpinFlip = spin_flip
+        self.SpinFlipType = spin_flip
 
-    def make_excitations(self, inputs):
+    def make_excitations(self, input):
 
         # Make the excitation lists based on ExcitationType and SpinFlip
         alpha_excitations = []; beta_excitations = []
@@ -483,24 +490,25 @@ class Molecule:
         
         # For spin flip generate the list of determinants to create as well
         spin_flip_states = []
-        if self.SpinFlip == "CUSTOM":
+        if self.SpinFlipType == "CUSTOM":
             # Move the excitations found above to spin_flip states and calculate a list of levels excitations
             spin_flip_states, alpha_excitations, beta_excitations = self.make_spin_flip_states_custom(alpha_excitations, beta_excitations) 
-        elif self.SpinFlip == "LEVELS":
+        elif self.SpinFlipType == "LEVELS":
             spin_flip_states = self.make_spin_flip_states_levels(inputs("Spin_Flip"))
 
-        # Loop over the lists of excitations to make the reference states
-        for alpha, beta in izip_longest(alpha_excitations, beta_excitations, fillvalue=[]):
-            alpha_occupied = self.do_excitation(self.States[0].AlphaOccupancy, alpha)
-            beta_occupied = self.do_excitation(self.States[0].BetaOccupancy, beta)
-            self.States.append(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))
-
-        self.NStates = len(self.States)
+        self.AlphaExcitations = alpha_excitations
+        self.BetaExcitations = beta_excitations
         self.SpinFlip = spin_flip_states
 
     #=================================================================#
     #              Utility functions for this section                 #
     #=================================================================#
+
+    def update_basis(self, basis_set):
+        new_molecule = copy.deepcopy(self)
+        new_molecule.Basis = basis_set
+        new_molecule.set_structures()
+        return new_molecule
 
     def single_excitations(self, occupancy):
         """Takes the number of electrons of a particular spin and the number
@@ -603,7 +611,7 @@ class Molecule:
             yield alpha_occ, beta_occ
 
     def do_excitation(self, ground_occ, state):
-        occupied = copy.deepcopy(ground_occ)
+        occupied = ground_occ[:]
         for (src, dest) in izip(state[0::2], state[1::2]):
             if src is not None:      # Use None to construct anihilation and creation operators
                 occupied[src] = 0
