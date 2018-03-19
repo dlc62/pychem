@@ -78,14 +78,12 @@ class Settings:
            print('Available methods:', available_methods)
            self.Method = 'HF'
         if self.Method == 'NOCI':
-           try:
-              inputs("Excitations")
-           except:
-              try:
-                 inputs("Alpha_Excitations")
-              except:
-                 print('Error: must specify excited states for NOCI')
-                 sys.exit()
+            excite_keyword = inputs("Excitations", False)
+            excite_custom = inputs("Alpha_Excitations", False)
+            excite_spin = type(inputs("Spin_Flip", False)) is list
+            if not (excite_keyword or excite_custom or excite_spin):
+                print('Error: must specify excited states for NOCI')
+                sys.exit()
         #------------------------ Job Type ---------------------------#
         available_jobtypes = ['ENERGY','PROPERTY']
         try:
@@ -297,8 +295,9 @@ class Molecule:
         #--------------------------------------------------------------#
         self.parse_inputs(inputs)
         self.Basis = basis
-        self.make_excitations(inputs)
         self.set_structures()
+        self.make_excitations(inputs)
+        self.make_states()
 
     #==================================================================#
     def parse_inputs(self,inputs):
@@ -383,7 +382,10 @@ class Molecule:
         self.NBetaOrbitals = int(math.ceil(self.NBetaElectrons/2.0))
         self.NCgtf = n_cgtf
         
-        self.make_states(n_alpha, n_beta, n_orbitals)
+        # Make Ground state
+        alpha_occupancy = [1 for i in range(n_alpha)] + [0 for i in range(n_orbitals - n_alpha)]
+        beta_occupancy = [1 for i in range(n_beta)] + [0 for i in range(n_orbitals - n_beta)]
+        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
 
         #----------- SCF structures - common to all states ------------#
         #           contains ShellPair -> Shell subclasses             #    
@@ -412,12 +414,7 @@ class Molecule:
                        shell_pairs[(ia,ib)] = ShellPair(atom_a.Coordinates,cgtf_a,ia,ia_vec,atom_b.Coordinates,cgtf_b,ib,ib_vec)
         self.ShellPairs = shell_pairs
 
-    def make_states(self, n_alpha, n_beta, n_orbitals):
-
-        # Make the ground state
-        alpha_occupancy = [1 for i in range(n_alpha)] + [0 for i in range(n_orbitals - n_alpha)]
-        beta_occupancy = [1 for i in range(n_beta)] + [0 for i in range(n_orbitals - n_beta)]
-        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
+    def make_states(self):
 
         # Loop over the lists of excitations to make the excited reference states
         for alpha, beta in izip_longest(self.AlphaExcitations, self.BetaExcitations, fillvalue=[]):
@@ -470,7 +467,7 @@ class Molecule:
         self.ExcitationType = excitation_type
         self.SpinFlipType = spin_flip
 
-    def make_excitations(self, input):
+    def make_excitations(self, inputs):
 
         # Make the excitation lists based on ExcitationType and SpinFlip
         alpha_excitations = []; beta_excitations = []
@@ -498,7 +495,7 @@ class Molecule:
 
         self.AlphaExcitations = alpha_excitations
         self.BetaExcitations = beta_excitations
-        self.SpinFlip = spin_flip_states
+        self.SpinFlipStates = spin_flip_states
 
     #=================================================================#
     #              Utility functions for this section                 #
@@ -508,6 +505,7 @@ class Molecule:
         new_molecule = copy.deepcopy(self)
         new_molecule.Basis = basis_set
         new_molecule.set_structures()
+        new_molecule.make_states()
         return new_molecule
 
     def single_excitations(self, occupancy):

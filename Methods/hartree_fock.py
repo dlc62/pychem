@@ -93,7 +93,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
         # DIIS
-        if settings.DIIS.Use is True:
+        if settings.DIIS.Use and num_iterations > 1:
             hf.diis.do(molecule, this_state, settings)
             diis_error = max(this_state.AlphaDIIS.Error, this_state.BetaDIIS.Error)
 
@@ -105,7 +105,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         make_MOs(molecule, this_state)
 
         # Optionally, use MOM to reorder MOs
-        if settings.MOM.Use is True and reference_orbitals != None:  
+        if settings.MOM.Use and reference_orbitals != None:  
             hf.mom.do(molecule, this_state, state_index, reference_orbitals)
        #-------------------------------------------#
 

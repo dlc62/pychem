@@ -14,6 +14,7 @@ from Methods import hartree_fock
 from Methods import basis_fit
 from Methods import mp2
 from Methods import properties
+from Methods import noci
 
 #======================================================================#
 #                           THE MAIN PROGRAM                           #
@@ -86,15 +87,16 @@ def do_calculation(settings, molecule):
     # Do NOCI calculations in final basis, setting up spin-flip basis states
     if settings.Method == 'NOCI':
 
-        if molecule.stip_flip_states != []:
+        old_states = molecule.States[:]
+        if molecule.SpinFlipStates != []:
             spin_flip_states = []
-            for [index,alpha_occupancy,beta_occupancy] in molecule.SpinFlip:
+            for [index,alpha_occupancy,beta_occupancy] in molecule.SpinFlipStates:
                 state = structures.ElectronicState(alpha_occupancy, beta_occupancy, molecule.NOrbitals)
                 state.Alpha.MOs = structures.reorder_MOs(molecule.States[index].Alpha.MOs, alpha_occupancy)
                 state.Beta.MOs = structures.reorder_MOs(molecule.States[index].Alpha.MOs, beta_occupancy)
                 state.TotalEnergy = molecule.States[index].TotalEnergy
                 spin_flip_states.append(state)
-            molecule.States = spin_flip_states
+                molecule.States = molecule.States[:1] + spin_flip_states
 
         noci.do(settings, molecule)
 

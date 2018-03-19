@@ -15,9 +15,11 @@ input.py
 *.MOs
 pathtable
 *.out
+*.csv
 
 *.jl
 Outputs/
 
 *.so
 /Methods/build 
+
