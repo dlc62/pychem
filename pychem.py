@@ -63,11 +63,11 @@ def do_calculation(settings, molecule):
             # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones 
             alpha_MOs = []; beta_MOs = []
             for state in molecule.States:
-                alpha_MOs.append(basis_fit.do(molecule, state.alphaMOs, basis_set))
-                beta_MOs.append(basis_fit.do(molecule, state.betaMOs, basis_set))
+                alpha_MOs.append(basis_fit.do(molecule, state.Alpha.MOs, basis_set))
+                beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
 
-            # Make new molecule with a new basis set and copy in old orbitals (fit using new basis set)
-            molecule = structures.update_basis(basis_set)
+            # Update existing molecule with a new basis set and copy in old orbitals (fit using new basis set)
+            molecule.update_basis(basis_set)
             for state in molecule.States:
                 state.Alpha.MOs = alpha_MOs.pop(0)
                 state.Beta.MOs = beta_MOs.pop(0)

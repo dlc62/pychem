@@ -2,6 +2,7 @@
 import sys
 import numpy
 from copy import copy
+from copy import deepcopy
 import itertools as it
 # C modules
 import _c_ints
@@ -96,10 +97,12 @@ class SetRR2:
        index = 0
        while index < len(HRR):
           if HRR[index][i1] != 0:
-             generate_HRR_terms(HRR,index,i1-1,i1)
+             generate_HRR_terms(HRR,index,i0,i1)
+#DLC             generate_HRR_terms(HRR,index,i1-1,i1)
              HRR1_terms.append(HRR[index])
           elif HRR[index][i3] != 0:
-             generate_HRR_terms(HRR,index,i3-1,i3)
+             generate_HRR_terms(HRR,index,i2,i3)
+#             generate_HRR_terms(HRR,index,i3-1,i3)
              HRR2_terms.append(HRR[index])
           else:
              VRR.append([HRR[index],0])
@@ -123,9 +126,11 @@ class SetRR2:
        # Generate HRR base integral classes
        HRR1_base = []; HRR2_base = []
        for index in range(0,len(HRR1_target)):
-          HRR1_base.append(generate_HRR_terms(HRR1_target,index,i1-1,i1,unique=False))
+          HRR1_base.append(generate_HRR_terms(HRR1_target,index,i0,i1,unique=False))
+#          HRR1_base.append(generate_HRR_terms(HRR1_target,index,i1-1,i1,unique=False))
        for index in range(0,len(HRR2_target)):
-          HRR2_base.append(generate_HRR_terms(HRR2_target,index,i3-1,i3,unique=False))
+          HRR2_base.append(generate_HRR_terms(HRR2_target,index,i2,i3,unique=False))
+#          HRR2_base.append(generate_HRR_terms(HRR2_target,index,i3-1,i3,unique=False))
 
        # Generate VRR base integral classes
        VRR1_base = []; VRR2_base = []
@@ -261,15 +266,14 @@ def one_electron(molecule,shell_pair):
        rC = atom.Coordinates
        Z = atom.NuclearCharge
 #_C_INTS
-       _c_ints.one_electron_fundamentals(nuclear_fundamentals, sigma_P, U_P, P, rC, Z, nA, nB, l_max) 
+       _c_ints.one_electron_fundamentals(nuclear_fundamentals, sigma_P[:,:], U_P[:,:], P[:,:,:], rC[:], Z, nA, nB, l_max) 
 #_C_INTS
        for m in range(0,m_max):
           nuclear_integrals[(iatom,0,0,m)] = copy(nuclear_fundamentals[m])
-#          print('c nuclear_fundamentals:', nuclear_fundamentals[m])
        nuclear_fundamentals.fill(0.0)
 
     # Overlap
-    overlap_integrals[(0,0)] = shell_pair.PrimitivePairOverlaps
+    overlap_integrals[(0,0)] = U_P[:,:]
 
     # -------------------------------------------------------------------------------- #
     #  Apply VRR to form uncontracted [m|Vn|0] and [m+2||0] integrals                  #
@@ -404,7 +408,6 @@ def do_1e_hrr(order, integrals, rAB, nA, nB, iatom):
 # ==================================================================================== #
 def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
 
-#    print("c_integrals")
     # -------------------------------------------------------------------------------- #
     #  Swap bra and ket if lket > lbra                                                 #
     # -------------------------------------------------------------------------------- #
@@ -465,7 +468,7 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
     # -------------------------------------------------------------------------------- #
 #_C_INTS
     _c_ints.two_electron_fundamentals(fundamentals, sigma_P[:,:], U_P[:,:], P[:,:,:], 
-                                      sigma_Q[:,:], U_Q[:,:], Q[:,:], R[:,:,:],
+                                      sigma_Q[:,:], U_Q[:,:], Q[:,:,:], R[:,:,:],
                                       nA, nB, nC, nD, l_max, ints_type, grid_value)
 #_C_INTS
 
@@ -485,14 +488,13 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
     integrals = {}
     for m in range(0,m_max):
        integrals[(0,0,0,0,m)] = fundamentals[m,:].T
-#       print(m,fundamentals[m,:])
 
     # -------------------------------------------------------------------------------- #
     #  Use VRR to compute uncontracted [m0|n0] 2e- integrals for current shell-quartet #
     # -------------------------------------------------------------------------------- #
     do_2e_vrr(2,order,integrals,[nC,nD,nA,nB],zeta_Q,zeta_P,kappa_Q,R_Q,R.swapaxes(0,1))
-    for m in range(0,m_max):
-       integrals[(0,0,0,0,m)] = integrals[(0,0,0,0,m)].T
+    for key in integrals:
+       integrals[key] = integrals[key].T
     do_2e_vrr(1,order,integrals,[nA,nB,nC,nD],zeta_P,zeta_Q,kappa_P,R_P,R)
 
     # -------------------------------------------------------------------------------- #
@@ -502,13 +504,16 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
     # -------------------------------------------------------------------------------- #
     contracted_integrals = {}
     do_2e_contract(order,contracted_integrals,integrals,[nA,nB,nC,nD],cc_P,cc_Q)
-#    print('contracted integrals',contracted_integrals[tuple(order.VRR1_target[-1][0])])
 
     # -------------------------------------------------------------------------------- #
     #  Use HRR to compute contracted (mn|ls) 2e- integrals for current shell-quartet   #
     #  Do exponent-dependent part of normalization in the process
     # -------------------------------------------------------------------------------- #
+    for key in contracted_integrals:
+       contracted_integrals[key] = contracted_integrals[key].T 
     do_2e_hrr(2,order,contracted_integrals,R_Q)
+    for key in contracted_integrals:
+       contracted_integrals[key] = contracted_integrals[key].T 
     do_2e_hrr(1,order,contracted_integrals,R_P)
 
     # -------------------------------------------------------------------------------- #
@@ -520,7 +525,6 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
     # -------------------------------------------------------------------------------- #
     #  Return contracted integrals                                                     # 
     # -------------------------------------------------------------------------------- #
-    # reshape to 4D array?
     if Goofy:
        return normalized_contracted_integrals.T.reshape(nlC,nlD,nlA,nlB)
     else:
@@ -530,38 +534,35 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
 def do_2e_vrr(step,order,integrals,n_primitives,zeta,eta,kappa,Rx,R):
 
     [na,nb,nc,nd] = n_primitives
-    kappa_index = 1; sign_Rx = -1
+    kappa_index = 1; sign_Rx = -1.0
     if step == 1:
-       targets = order.VRR1_target; bases = order.VRR1_base; sign_R = -1
+       targets = order.VRR1_target; bases = order.VRR1_base; sign_R = -1.0
        primary_index = order.VRR1_indices[0]; secondary_index = order.VRR1_indices[2]
-       if order.Goofy_bra: kappa_index = 0; sign_Rx = 1
+       if order.Goofy_bra: kappa_index = 0; sign_Rx = 1.0
     if step == 2:
-       targets = order.VRR2_target; bases = order.VRR2_base; sign_R = 1
+       targets = order.VRR2_target; bases = order.VRR2_base; sign_R = 1.0
        primary_index = order.VRR2_indices[0]; secondary_index = order.VRR2_indices[2]
-       if order.Goofy_ket: kappa_index = 0; sign_Rx = 1
+       if order.Goofy_ket: kappa_index = 0; sign_Rx = 1.0
 
     for (target_class, base_classes) in zip(targets, bases):
+       dummy = numpy.array([[],[]])
        tc_key = tuple(target_class[0]+[target_class[1]])
-       base_ints = [copy(integrals[tuple(bc[0]+[bc[1]])]) for bc in base_classes]
+       keys = [tuple(bc[0]+[bc[1]]) for bc in base_classes]
+       nbase = len(keys)
+       base0 = copy(integrals[keys[0]]); base1 = copy(integrals[keys[1]]) 
+       if nbase == 2: base2 = copy(dummy); base3 = copy(dummy); base4 = copy(dummy)
+       if nbase == 3: base2 = copy(dummy); base3 = copy(dummy); base4 = copy(integrals[keys[2]])
+       if nbase == 4: base2 = copy(integrals[keys[2]]); base3 = copy(integrals[keys[3]]); base4 = copy(dummy)
+       if nbase == 5: base2 = copy(integrals[keys[2]]); base3 = copy(integrals[keys[3]]); base4 = copy(integrals[keys[4]])
        lbra = target_class[0][primary_index]; nl_bra = c.nAngMomFunctions[lbra]
        lket = target_class[0][secondary_index]; nl_ket = c.nAngMomFunctions[lket]
        target_ints = numpy.zeros((nl_bra*na*nb,nl_ket*nc*nd), dtype="double") 
 #_C_INTS
-       _c_ints.two_electron_vrr(target_ints, base_ints, zeta[:,:], eta[:,:], kappa[:], sign_Rx*Rx[:], 
-                                sign_R*R[:,:,:], len(base_ints), na, nb, nc, nd, lbra, lket, kappa_index)
+       _c_ints.two_electron_vrr(target_ints, base0, base1, base2, base3, base4, zeta[:,:], eta[:,:], kappa[:],
+                                sign_Rx*Rx[:], sign_R*R[:,:,:], na, nb, nc, nd, lbra, lket, kappa_index)
 #_C_INTS
        integrals[tc_key] = copy(target_ints)
 
-    if step == 2:
-       for tc in targets:
-          tc_key = tuple(tc[0]+[tc[1]])
-          integrals[tc_key] = integrals[tc_key].T
-#    if step == 1:
-#       tc = targets[-1]
-#       tc_key = tuple(tc[0]+[tc[1]])
-#       print(tc_key)
-#       print(integrals[tc_key])
-       
 # ----------------------------------------------------------------------------------- #
 def do_2e_contract(order,contracted_integrals,integrals,n_primitives,cc_bra,cc_ket):
 
@@ -584,7 +585,7 @@ def do_2e_contract(order,contracted_integrals,integrals,n_primitives,cc_bra,cc_k
           _c_ints.two_electron_contract(contracted_ints, copy(integrals[tc_key_prim]),
                                         cc_bra[:,:], cc_ket[:,:], na, nb, nc, nd, lbra, lket)
 #_C_INTS
-          contracted_integrals[tc_key_cont] = contracted_ints
+          contracted_integrals[tc_key_cont] = copy(contracted_ints)
 
 # ----------------------------------------------------------------------------------- #
 def do_2e_hrr(step,order,integrals,Rx):
@@ -605,15 +606,8 @@ def do_2e_hrr(step,order,integrals,Rx):
        target_ints = numpy.zeros((nla*nlb,nlc*nld), dtype="double")
        base_ints = [copy(integrals[tuple(base_class)]) for base_class in base_classes]
 #_C_INTS
-       if step == 2: 
-          _c_ints.two_electron_hrr(target_ints, base_ints[0].T, base_ints[1].T, sign_Rx*Rx[:], la, lb, lc, ld, goofy)
-       if step == 1:  
-          _c_ints.two_electron_hrr(target_ints, base_ints[0], base_ints[1], sign_Rx*Rx[:], la, lb, lc, ld, goofy)
+       _c_ints.two_electron_hrr(target_ints, base_ints[0], base_ints[1], sign_Rx*Rx[:], la, lb, lc, ld, goofy)
 #_C_INTS
        integrals[tuple(target_class)] = copy(target_ints)
-
-    if step == 2: 
-       for target_class in targets:
-          integrals[tuple(target_class)] = integrals[tuple(target_class)].T
 
 # =================================================================================== #
