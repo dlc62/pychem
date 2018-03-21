@@ -249,12 +249,12 @@ static PyObject *c_ints_two_electron_fundamentals(PyObject *self, PyObject *args
 static PyObject *c_ints_two_electron_vrr(PyObject *self, PyObject *args) {
 
    /* Declare types for objects received from python */
-   int na, nb, nc, nd, lbra, lket, kappa_index, n_base_classes;
-   PyObject *target_ints_obj, *base_ints_obj;
+   int na, nb, nc, nd, lbra, lket, kappa_index;
+   PyObject *target_ints_obj, *base_int0_obj, *base_int1_obj; 
+   PyObject *base_int2_obj, *base_int3_obj, *base_int4_obj;
    PyObject *zeta_obj, *eta_obj, *kappa_obj, *Rx_obj, *R_obj; 
 
    /* Declare types for sub-objects within base_ints object */
-   PyObject *base_int0_obj, *base_int1_obj, *base_int2_obj, *base_int3_obj, *base_int4_obj;
 
    /* C pointers to the arrays contained within those objects */
    double **target_ints, **base_int0, **base_int1, **base_int2, **base_int3, **base_int4;
@@ -267,9 +267,10 @@ static PyObject *c_ints_two_electron_vrr(PyObject *self, PyObject *args) {
    descr = PyArray_DescrFromType(typenum);
 
    /* Parse the input tuple */
-   if (!PyArg_ParseTuple(args, "OOOOOOOiiiiiiii", &target_ints_obj, &base_ints_obj,
+   if (!PyArg_ParseTuple(args, "OOOOOOOOOOOiiiiiii", &target_ints_obj, &base_int0_obj,
+                         &base_int1_obj, &base_int2_obj, &base_int3_obj, &base_int4_obj,
                          &zeta_obj, &eta_obj, &kappa_obj, &Rx_obj, &R_obj, 
-                         &n_base_classes, &na, &nb, &nc, &nd, &lbra, &lket, &kappa_index))
+                         &na, &nb, &nc, &nd, &lbra, &lket, &kappa_index))
       {
          PyErr_SetString(PyExc_TypeError, "Error parsing objects passed to C");
          return NULL;
@@ -277,41 +278,16 @@ static PyObject *c_ints_two_electron_vrr(PyObject *self, PyObject *args) {
    
    /* Extract pointers to memory locations directly, without copying data to C */
    if (PyArray_AsCArray(&target_ints_obj, (void **)&target_ints, dims, 2, descr) < 0) return NULL;
+   if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int0, dims, 2, descr) < 0) return NULL;
+   if (PyArray_AsCArray(&base_int1_obj, (void **)&base_int1, dims, 2, descr) < 0) return NULL;
+   if (PyArray_AsCArray(&base_int2_obj, (void **)&base_int2, dims, 2, descr) < 0) return NULL;
+   if (PyArray_AsCArray(&base_int3_obj, (void **)&base_int3, dims, 2, descr) < 0) return NULL;
+   if (PyArray_AsCArray(&base_int4_obj, (void **)&base_int4, dims, 2, descr) < 0) return NULL;
    if (PyArray_AsCArray(&zeta_obj, (void **)&zeta, dims, 2, descr) < 0) return NULL;
    if (PyArray_AsCArray(&eta_obj, (void **)&eta, dims, 2, descr) < 0) return NULL;
    if (PyArray_AsCArray(&kappa_obj, (void *)&kappa, dims, 1, descr) < 0) return NULL;
    if (PyArray_AsCArray(&Rx_obj, (void *)&Rx, dims, 1, descr) < 0) return NULL;
    if (PyArray_AsCArray(&R_obj, (void ***)&R, dims, 3, descr) < 0) return NULL;
-
-   /* Assign pointers to ints within base_ints list, dummy to base_int0 if not supplied */
-   base_int0_obj = PyList_GetItem(base_ints_obj, (Py_ssize_t) 0);
-   base_int1_obj = PyList_GetItem(base_ints_obj, (Py_ssize_t) 1);
-   if (n_base_classes >= 3) { base_int2_obj = PyList_GetItem(base_ints_obj, (Py_ssize_t) 2); } 
-   if (n_base_classes >= 4) { base_int3_obj = PyList_GetItem(base_ints_obj, (Py_ssize_t) 3); } 
-   if (n_base_classes == 5) { base_int4_obj = PyList_GetItem(base_ints_obj, (Py_ssize_t) 4); } 
-
-   if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int0, dims, 2, descr) < 0) return NULL;
-   if (PyArray_AsCArray(&base_int1_obj, (void **)&base_int1, dims, 2, descr) < 0) return NULL;
-   if (n_base_classes == 2) {
-     if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int2, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int3, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int4, dims, 2, descr) < 0) return NULL;
-   }
-   if (n_base_classes == 3) {
-     if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int2, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int3, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int2_obj, (void **)&base_int4, dims, 2, descr) < 0) return NULL;
-   }
-   if (n_base_classes == 4) {
-     if (PyArray_AsCArray(&base_int2_obj, (void **)&base_int2, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int3_obj, (void **)&base_int3, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int0_obj, (void **)&base_int4, dims, 2, descr) < 0) return NULL;
-   }
-   if (n_base_classes == 5) {
-     if (PyArray_AsCArray(&base_int2_obj, (void **)&base_int2, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int3_obj, (void **)&base_int3, dims, 2, descr) < 0) return NULL;
-     if (PyArray_AsCArray(&base_int4_obj, (void **)&base_int4, dims, 2, descr) < 0) return NULL;
-   }
 
    /* Call external C function to compute values of [m0|n0] integrals in-place, 
       using computed indexing within bra and ket */

@@ -708,7 +708,7 @@ class ShellPair:
        overlaps = numpy.zeros((n_alpha,n_beta),dtype="double")
        centres = numpy.zeros((n_alpha,n_beta,3),dtype="double")
 #_C_INTS
-       _c_ints.shellpair_quantities(sigmas,overlaps,centres,alpha_exponents,A,n_alpha,beta_exponents,B,n_beta)
+       _c_ints.shellpair_quantities(sigmas,overlaps,centres,alpha_exponents[:],A[:],n_alpha,beta_exponents[:],B[:],n_beta)
 #_C_INTS
        self.Ltot = cgtf_a.AngularMomentum + cgtf_b.AngularMomentum
        self.PrimitivePairSigmas = sigmas
