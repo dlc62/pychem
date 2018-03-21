@@ -3,6 +3,7 @@ import numpy
 from numpy import dot
 import scipy
 from scipy.linalg import sqrtm
+import sys
 
 # Custom-written data modules
 from Data import constants as c
@@ -38,12 +39,20 @@ def do(settings, molecule, basis_set, state_index = 0):
         reference_orbitals = [this_state.Alpha.MOs, this_state.Beta.MOs]
     elif settings.SCF.Guess == "READ":
         try:
-            this_state.Alpha.MOs = numpy.loadtxt(settings.AlphaMOFile)
-            this_state.Beta.MOs = numpy.loadtxt(settings.BetaMOFile)
+            # TODO make this more flexible, maybe support only providing MO files for some states 
+            # and fall back to CORE for the rest
+            this_state.Alpha.MOs = numpy.loadtxt(settings.SCF.AlphaMOFile[state_index])
+            this_state.Beta.MOs = numpy.loadtxt(settings.SCF.BetaMOFile[state_index])
             assert len(this_state.Alpha.MOs) == molecule.NOrbitals
             assert len(this_state.Beta.MOs) == molecule.NOrbitals
             reference_orbitals = [this_state.Alpha.MOs, this_state.Beta.MOs]
-        except:
+        except IndexError:
+            print("No MO file given for state {}".format(state_index))
+            sys.exit()
+        except IOError: 
+            print("Could not read MO file, check you have the name right")
+            sys.exit()
+        except AssertionError:
             print('Error: Incorrect MOs supplied - check basis set and supply both alpha and beta sets')
             sys.exit()
     elif settings.SCF.Guess == "CORE":
@@ -57,6 +66,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         make_density_matrices(molecule, this_state)
 
     # Calculate initial energy
+    make_density_matrices(molecule, this_state)
     calculate_energy(molecule, this_state)
     dE = this_state.Energy
 
@@ -93,7 +103,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
         # DIIS
-        if settings.DIIS.Use is True:
+        if settings.DIIS.Use and num_iterations > 1:
             hf.diis.do(molecule, this_state, settings)
             diis_error = max(this_state.AlphaDIIS.Error, this_state.BetaDIIS.Error)
 
@@ -105,7 +115,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         make_MOs(molecule, this_state)
 
         # Optionally, use MOM to reorder MOs
-        if settings.MOM.Use is True and reference_orbitals != None:  
+        if settings.MOM.Use and reference_orbitals != None:  
             hf.mom.do(molecule, this_state, state_index, reference_orbitals)
        #-------------------------------------------#
 
@@ -136,6 +146,7 @@ def do(settings, molecule, basis_set, state_index = 0):
     printf.blank_line(settings.OutFile)
     print_intermediates(settings.OutFile, this_state, (settings.SCF.Reference == "RHF"))
     printf.delimited_text(settings.OutFile, " End of Hartree-Fock calculation ")
+    # TODO Print settings shouldn't determine if the MOs are saved
     if (settings.PrintLevel == 'VERBOSE'):
        numpy.savetxt(basis_set+'_'+str(state_index)+'.alpha_MOs',this_state.Alpha.MOs)
        numpy.savetxt(basis_set+'_'+str(state_index)+'.beta_MOs',this_state.Beta.MOs)
