@@ -137,13 +137,13 @@ class Settings:
         available_print_levels = ['MINIMAL','BASIC','VERBOSE','DEBUG']
         available_custom_print_options = ['MOM','DIIS'] 
         try:
-           self.PrintLevel = inputs("Print_Level").upper()
+           self.PrintLevel = inputs("Print_Level")
            assert self.PrintLevel in available_print_levels
         except:
         #   print('Printing options not supplied or recognised, defaulting to basic printing') 
            self.PrintLevel = 'BASIC'
         try:
-           self.CustomPrint = inputs("Custom_Print").upper()
+           self.CustomPrint = inputs("Custom_Print")
            assert self.CustomPrint in available_custom_print_options
         except:
         #   print('Custom print options not supplied or recognised, defaulting to basic printing') 
@@ -163,6 +163,8 @@ class Settings:
 #=====================================================================#
 
 class Set_SCF:
+    # Called only in the inital seeting up of the calculation
+    # Not in basis fitting
     def __init__(self, inputs, NBasisSets, Method):
         #------------------------- Reference -------------------------#
         available_references = ['RHF','UHF','CUHF']
@@ -186,12 +188,13 @@ class Set_SCF:
             self.Guess = "CORE"
         if self.Guess == "READ" or Method == None:
             try:
-                mo_read_state = inputs("MO_Read_State")
-                mo_read_basis = remove_punctuation(inputs("MO_Read_Basis"))
-                self.AlphaMOFile = mo_read_basis + '_' + mo_read_state + '.alpha_MOs' 
-                self.BetaMOFile = mo_read_basis + '_' + mo_read_state + '.beta_MOs' 
-            except:
-                print("Error: Must give details of files to read alpha and beta MOs from, using keywords MO_Read_Basis and MO_Read_State")
+                mo_read_files = inputs("MO_Read_Files")
+                if type(mo_read_files) is not list:
+                    mo_read_files = [mo_read_files]
+                self.AlphaMOFile = [file + '.alpha_MOs' for file in mo_read_files]
+                self.BetaMOFile = [file + '.beta_MOs' for file in mo_read_files]
+            except ConfigParser.NoOptionError:
+                print("Error: Must give details of files to read alpha and beta MOs from, using keyword MO_Read_Files")
                 sys.exit()
         #------------------------- SCF Cycles ------------------------#
         try:

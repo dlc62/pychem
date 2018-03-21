@@ -12,12 +12,14 @@ input.py
 
 *.inp
 /examples
-*.MOs
+*.alpha_MOs
+*.beta_MOs
 pathtable
 *.out
 *.csv
 
 *.jl
+*.awk
 Outputs/
 
 *.so

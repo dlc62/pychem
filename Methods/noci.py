@@ -91,7 +91,7 @@ def do(settings, molecule):
     printf.delimited_text(settings.OutFile," NOCI output ")
     printf.text_value(settings.OutFile, " States ", wavefunctions, " NOCI Energies ", energies)
     if settings.PrintLevel == "VERBOSE" or settings.PrintLevel == "DEBUG":
-       printf.text_values(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 
+       printf.text_value(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 
 
 #---------------------------------------------------------------------#
 #  Functions for computing overlaps, densities, biorthogonalized MOs  # 
