@@ -41,11 +41,11 @@ def Get_Overlap(prim1, prim2, l, m=0):
 
 def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis, old_basis):
     new_cgtos = basis.get[new_basis][atom.Label]
-    old_ang_indices = get_ang_indices(atom, basis.get[old_basis][atom.Label], cgto_count)
-    new_ang_indices = get_ang_indices(atom, new_cgtos)
+    old_ang_indices = get_ang_indices(basis.get[old_basis][atom.Label], cgto_count)
+    new_ang_indices = get_ang_indices(new_cgtos)                  # done need cgto_count here becuase we are building up list not matching old MOs in situ
     size = sum([len(l) for l in new_ang_indices])                 # getting the number of cgtos centered on this atom in the new basis
     atom_coeffs = numpy.zeros(size)
-    for Ang in range(atom.MaxAng+1):    #iterating over angular momentum quantum numbers
+    for Ang in range(atom.MaxAng+1):                              #iterating over angular momentum quantum numbers
         degen = nAngMomFunctions[Ang]
         old_idx = old_ang_indices[Ang]
         new_idx = new_ang_indices[Ang]
@@ -99,10 +99,11 @@ def Basis_Fit_Ang(atom, old_set, MOs, new_ang_set, m):    #Take all the MO coeff
     new_MOs = numpy.linalg.solve(S,T)
     return numpy.ndarray.tolist(new_MOs)
 
-def get_ang_indices(atom, cgtos, start=0):
+def get_ang_indices(cgtos, start=0):
     """ Gets the indices of the MO coefficents associated with each l value
-        for the atom """
-    indices = [[] for l in range(atom.MaxAng+1)]
+        as a nested list """
+    max_ang = max([cgto[0] for cgto in cgtos])
+    indices = [[] for l in range(max_ang+1)]        # Init a sub list for each l
     index_count = start
     for cgto in cgtos:
         ang = cgto[0]
