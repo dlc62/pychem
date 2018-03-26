@@ -14,7 +14,6 @@ from Util import printf
 # Custom-written code modules
 import integrals
 import hf_extensions as hf
-#import initial_guess
 
 #=================================================================#
 #                                                                 #
@@ -66,7 +65,6 @@ def do(settings, molecule, basis_set, state_index = 0):
         make_density_matrices(molecule, this_state)
 
     # Calculate initial energy
-    make_density_matrices(molecule, this_state)
     calculate_energy(molecule, this_state)
     dE = this_state.Energy
 
