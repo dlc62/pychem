@@ -4,7 +4,7 @@ import copy
 from scipy.misc import factorial2
 # Custom-written data modules
 from Data import basis
-from Data.constants import lQuanta, nAngMomFunctions
+from Data import constants as c
 
 def do(molecule, MOs, new_basis):
 
@@ -33,7 +33,7 @@ def Get_Overlap(prim1, prim2, l, m=0):
     #norm = (prim1[0]*prim2[0])**(3./4 + l/2.)
     #integral = (1 / gamma)**(3./2) * (1/(2*gamma)**l) * norm * prim1[1] * prim2[1]
     gamma = prim1[0] + prim2[0]
-    factorials = numpy.product(factorial2(2 * numpy.array(lQuanta[l][m]) - 1))
+    factorials = numpy.product(factorial2(2 * numpy.array(c.lQuanta[l][m]) - 1))
     integral = prim1[1] * prim2[1] / (2*gamma) ** l * (3.142 / gamma) ** (3./2) * factorials
     return integral
 
@@ -46,7 +46,7 @@ def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis, old_basis):
     size = sum([len(l) for l in new_ang_indices])                 # getting the number of cgtos centered on this atom in the new basis
     atom_coeffs = numpy.zeros(size)
     for Ang in range(atom.MaxAng+1):                              #iterating over angular momentum quantum numbers
-        degen = nAngMomFunctions[Ang]
+        degen = c.nAngMomSpher[Ang]
         old_idx = old_ang_indices[Ang]
         new_idx = new_ang_indices[Ang]
         ang_set = [cgto for cgto in atom.Basis if cgto.AngularMomentum == Ang]
@@ -107,7 +107,7 @@ def get_ang_indices(cgtos, start=0):
     index_count = start
     for cgto in cgtos:
         ang = cgto[0]
-        degen = nAngMomFunctions[ang]
+        degen = c.nAngMomSpher[ang]
         indices[ang] += range(index_count, index_count+degen)
         index_count += degen
     return indices
