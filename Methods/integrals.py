@@ -215,6 +215,7 @@ def distance(v1,v2):
 #@profile
 # ==================================================================================== #
 #  ONE-ELECTRON INTEGRALS: OVERLAP, (KINETIC, NUCLEAR ATTRACTION) -> CORE FOCK         #
+#  Note: all calculations done here in a basis of Cartesian Gaussians                  #
 # ==================================================================================== #
 def one_electron(molecule,shell_pair):
 
@@ -245,9 +246,10 @@ def one_electron(molecule,shell_pair):
       nm_P = nm_P.transpose((1,0))
       Goofy = True
 
-    lA = A.Cgtf.AngularMomentum; nlA = c.nAngMomFunctions[lA]; nA = A.Cgtf.NPrimitives; rA = A.Coords 
-    lB = B.Cgtf.AngularMomentum; nlB = c.nAngMomFunctions[lB]; nB = B.Cgtf.NPrimitives; rB = B.Coords
+    lA = A.Cgtf.AngularMomentum; nlA = A.Cgtf.NAngMomCart; nA = A.Cgtf.NPrimitives; rA = A.Coords 
+    lB = B.Cgtf.AngularMomentum; nlB = B.Cgtf.NAngMomCart; nB = B.Cgtf.NPrimitives; rB = B.Coords
     nm_P = nm_P.reshape((nlA,nlB)); exB = B.Cgtf.Exponents 
+    csA = A.Cgtf.CartToSpher; csB = B.Cgtf.CartToSpher
 
     # -------------------------------------------------------------------------------- #
     #  Set up structures required for integral evaluation                              #
@@ -337,20 +339,27 @@ def one_electron(molecule,shell_pair):
 #_C_INTS
 
     # -------------------------------------------------------------------------------- #
-    #  Extract final target contracted (m|n) integrals                                 #
+    #  Extract final target contracted (m|n) Cartesian integrals                       #
     # -------------------------------------------------------------------------------- #
     
     contracted_overlap = numpy.multiply(contracted_overlap_ints,nm_P)
     contracted_nuclear = numpy.multiply(summed_contracted_nuclear_ints,nm_P)
     contracted_kinetic = numpy.multiply(contracted_kinetic_ints,nm_P)
-    contracted_core = numpy.multiply(summed_contracted_nuclear_ints + contracted_kinetic_ints,nm_P)
+    contracted_core = contracted_nuclear + contracted_kinetic 
+
+    # -------------------------------------------------------------------------------- #
+    #  Transform to spherical polar integrals                                          #
+    # -------------------------------------------------------------------------------- #
+    
+    transformed_contracted_overlap = numpy.dot(csA,numpy.dot(contracted_overlap,csB.T))
+    transformed_contracted_core = numpy.dot(csA,numpy.dot(contracted_core,csB.T))
 
     if Goofy:
 #       return contracted_kinetic.T, contracted_nuclear.T, contracted_overlap.T
-       return contracted_core.T, contracted_overlap.T
+       return transformed_contracted_core.T, transformed_contracted_overlap.T
     else:
 #       return contracted_kinetic, contracted_nuclear, contracted_overlap
-       return contracted_core, contracted_overlap
+       return transformed_contracted_core, transformed_contracted_overlap
 
 # =================================================================================== #
 # iatom acts as flag to decide on whether to compute overlap integrals (iatom = -1) or nuclear attraction (otherwise)
@@ -366,7 +375,7 @@ def do_1e_vrr(order, integrals, sigma_P, P, rA, rC, nA, nB, iatom):
          lA = target_class[0][0]
          base_ints = [copy(integrals[tuple([iatom]+base_class[0]+[base_class[1]])]) for base_class in base_classes]
 
-      nlA = c.nAngMomFunctions[lA]
+      nlA = c.nAngMomCart[lA]
       target_ints = numpy.zeros((nlA*nA,nB), dtype="double")
 #_C_INTS    
       _c_ints.one_electron_vrr(target_ints, base_ints, sigma_P[:,:], P[:,:,:], rA[:], rC[:], iatom, len(base_ints), nA, nB, lA)
@@ -388,7 +397,7 @@ def do_1e_hrr(order, integrals, rAB, nA, nB, iatom):
          base_ints = [copy(integrals[tuple([iatom]+base_class+[0])]) for base_class in base_classes]
       
       lA = target_class[0]; lB = target_class[1]
-      nlA = c.nAngMomFunctions[lA]; nlB = c.nAngMomFunctions[lB]
+      nlA = c.nAngMomCart[lA]; nlB = c.nAngMomCart[lB]
       target_ints = numpy.zeros((nlA*nA,nlB*nB), dtype="double")
 
 #_C_INTS
@@ -405,6 +414,7 @@ def do_1e_hrr(order, integrals, rAB, nA, nB, iatom):
 #@profile
 # ==================================================================================== #
 #  TWO-ELECTRON REPULSION INTEGRALS - HGP ALGORITHM WITH SCHWARZ BOUND SCREENING       #
+#  Note: all calculations done here in a basis of Cartesian Gaussians                  #
 # ==================================================================================== #
 def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
 
@@ -461,6 +471,7 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
     R_P = shell_pair1.CentreDisplacement; R_Q = shell_pair2.CentreDisplacement
     cc_P = shell_pair1.ContractionCoeffs; cc_Q = shell_pair2.ContractionCoeffs
     nm_P = shell_pair1.Normalization; nm_Q = shell_pair2.Normalization
+    cs_P = shell_pair1.BasisTransform; cs_Q = shell_pair2.BasisTransform
 
     # -------------------------------------------------------------------------------- #
     #  Compute fundamentals                                                            #
@@ -523,12 +534,17 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
     normalized_contracted_integrals = numpy.multiply(contracted_integrals[(lA,lB,lC,lD)],normalization)
      
     # -------------------------------------------------------------------------------- #
+    #  Transform to spherical polar integrals                                          #
+    # -------------------------------------------------------------------------------- #
+    transformed_normalized_contracted_integrals = numpy.dot(cs_P,numpy.dot(normalized_contracted_integrals,cs_Q.T))
+    
+    # -------------------------------------------------------------------------------- #
     #  Return contracted integrals                                                     # 
     # -------------------------------------------------------------------------------- #
     if Goofy:
-       return normalized_contracted_integrals.T.reshape(nlC,nlD,nlA,nlB)
+       return transformed_normalized_contracted_integrals.T.reshape(nlC,nlD,nlA,nlB)
     else:
-       return normalized_contracted_integrals.reshape(nlA,nlB,nlC,nlD)
+       return transformed_normalized_contracted_integrals.reshape(nlA,nlB,nlC,nlD)
 
 # =================================================================================== #
 def do_2e_vrr(step,order,integrals,n_primitives,zeta,eta,kappa,Rx,R):
@@ -554,8 +570,8 @@ def do_2e_vrr(step,order,integrals,n_primitives,zeta,eta,kappa,Rx,R):
        if nbase == 3: base2 = copy(dummy); base3 = copy(dummy); base4 = copy(integrals[keys[2]])
        if nbase == 4: base2 = copy(integrals[keys[2]]); base3 = copy(integrals[keys[3]]); base4 = copy(dummy)
        if nbase == 5: base2 = copy(integrals[keys[2]]); base3 = copy(integrals[keys[3]]); base4 = copy(integrals[keys[4]])
-       lbra = target_class[0][primary_index]; nl_bra = c.nAngMomFunctions[lbra]
-       lket = target_class[0][secondary_index]; nl_ket = c.nAngMomFunctions[lket]
+       lbra = target_class[0][primary_index]; nl_bra = c.nAngMomCart[lbra]
+       lket = target_class[0][secondary_index]; nl_ket = c.nAngMomCart[lket]
        target_ints = numpy.zeros((nl_bra*na*nb,nl_ket*nc*nd), dtype="double") 
 #_C_INTS
        _c_ints.two_electron_vrr(target_ints, base0, base1, base2, base3, base4, zeta[:,:], eta[:,:], kappa[:],
@@ -580,7 +596,7 @@ def do_2e_contract(order,contracted_integrals,integrals,n_primitives,cc_bra,cc_k
           tc_key_cont = tuple(target_class[0])
           lbra = target_class[0][order.VRR1_indices[0]]
           lket = target_class[0][order.VRR1_indices[2]]
-          contracted_ints = numpy.zeros((c.nAngMomFunctions[lbra],c.nAngMomFunctions[lket]), dtype="double") 
+          contracted_ints = numpy.zeros((c.nAngMomCart[lbra],c.nAngMomCart[lket]), dtype="double") 
 #_C_INTS
           _c_ints.two_electron_contract(contracted_ints, copy(integrals[tc_key_prim]),
                                         cc_bra[:,:], cc_ket[:,:], na, nb, nc, nd, lbra, lket)
@@ -601,8 +617,8 @@ def do_2e_hrr(step,order,integrals,Rx):
     for (target_class, base_classes) in zip(targets,bases):
        if step == 1: [la,lb,lc,ld] = base_classes[1] 
        if step == 2: [lc,ld,la,lb] = base_classes[1]
-       nla = c.nAngMomFunctions[la+la_off]; nlb = c.nAngMomFunctions[lb+lb_off]
-       nlc = c.nAngMomFunctions[lc]; nld = c.nAngMomFunctions[ld]
+       nla = c.nAngMomCart[la+la_off]; nlb = c.nAngMomCart[lb+lb_off]
+       nlc = c.nAngMomCart[lc]; nld = c.nAngMomCart[ld]
        target_ints = numpy.zeros((nla*nlb,nlc*nld), dtype="double")
        base_ints = [copy(integrals[tuple(base_class)]) for base_class in base_classes]
 #_C_INTS

@@ -19,9 +19,11 @@ atomicMultiplicity = {'H':2,'HE':1,'LI':2,'BE':1,'B':2,'C':3,'N':4,'O':3,'F':2,'
                       'NA':2,'MG':1,'AL':2,'SI':3,'P':4,'S':3,'CL':2,'AR':1,
                       'K':2,'CA':1,'SC':2,'TI':3,'V':4,'CR':5,'MN':4,'FE':3,'CO':2,
                       'NI':1,'CU':2,'ZN':1,'GA':2,'GE':3,'AS':4,'SE':3,'BR':2,'KR':1}
-nAngMomFunctions = {}
+nAngMomCart = {}; nAngMomSpher = {};
 for i in range(1,100):
-  nAngMomFunctions[i-1] = (i*i+i)/2
+  nAngMomCart[i-1] = (i*i+i)/2
+for i in range(0,99):
+  nAngMomSpher[i] = 2*i+1
 
 # Settings and thresholds
 integral_threshold = -1.e-10

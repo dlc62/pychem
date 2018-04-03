@@ -11,6 +11,7 @@ import math
 # Import custom-written data modules
 from Data import basis
 from Data import constants as c
+from Data import transform_basis
 # Import custom-written code modules
 from Methods import _c_ints
 
@@ -394,41 +395,42 @@ class Molecule:
 
         self.ExcitationType = excitation_type
 
+        #---- Special flag to enable use of Cartesian d functions -----#
+        try:
+           cartesian_d = inputs("Cartesian_D")
+           self.CartesianD = True
+        except:
+           self.CartesianD = False
+
     #==================================================================#
     def set_structures(self):
         #-------------------------- Atoms List ------------------------#
         #        contains Atom -> ContractedGaussian subclasses        #
         #--------------------------------------------------------------#
         self.Atoms = []
-        n_electrons = 0
-        n_orbitals = 0
-        n_core_orbitals = 0
-        n_cgtf = 0
+        self.NElectrons = 0
+        self.NOrbitals = 0
+        self.NCoreOrbitals = 0
+        self.NCgtf = 0
         for index,row in enumerate(self.Coords):
             ### Add Atom to Molecule ###
-            atom = Atom(index,row,self.Basis,self.CoordsScaleFactor)
+            atom = Atom(index,row,self.Basis,self.CartesianD,self.CoordsScaleFactor)
             self.Atoms.append(atom)
-            n_electrons += c.nElectrons[atom.Label]
-            n_core_orbitals += c.nCoreOrbitals[atom.Label]
-            n_orbitals += atom.NFunctions
-            n_cgtf += len(atom.Basis) 
+            self.NElectrons += c.nElectrons[atom.Label]
+            self.NCoreOrbitals += c.nCoreOrbitals[atom.Label]
+            self.NOrbitals += atom.NFunctions
+            self.NCgtf += len(atom.Basis) 
 
         #------------ Ground State Electronic Configuration -----------#
-        n_electrons = n_electrons - self.Charge
+        self.NElectrons -= self.Charge
         try:
-            n_alpha = (n_electrons + (self.Multiplicity-1))/2
-            n_beta  = (n_electrons - (self.Multiplicity-1))/2
+            self.NAlphaElectrons = (self.NElectrons + (self.Multiplicity-1))/2
+            self.NBetaElectrons  = (self.NElectrons - (self.Multiplicity-1))/2
         except:
             print('Error: charge and multiplicity inconsistent with specified molecule')
             sys.exit()
-        self.NElectrons = n_electrons
-        self.NAlphaElectrons = n_alpha
-        self.NBetaElectrons = n_beta
-        self.NOrbitals = n_orbitals
-        self.NCoreOrbitals = n_core_orbitals
         self.NAlphaOrbitals = int(math.ceil(self.NAlphaElectrons/2.0))
         self.NBetaOrbitals = int(math.ceil(self.NBetaElectrons/2.0))
-        self.NCgtf = n_cgtf
 
     def set_scf(self):
         #----------- SCF structures - common to all states ------------#
@@ -443,13 +445,15 @@ class Molecule:
         self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
         self.ExchangeIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
         ### Generate and store ShellPair data for all unique pairs of CGTFs ###
+        ### Include data required to convert basis functions and integrals  ###
+        ### from Cartesian to spherical polar coordinates before storing    ### 
         shell_pairs = {}
-        ia = -1; ia_count = 0;
+        ia = -1; ia_count = 0
         for atom_a in self.Atoms:
            for cgtf_a in atom_a.Basis:
-              ia_vec = [(ia_count + i) for i in range(0,cgtf_a.NAngMom)]   # vector containing the indices each angular momentum function on the atom
-              ia += 1; ia_count += cgtf_a.NAngMom                          
-              ib_count = 0; ib = -1
+              ia_vec = [(ia_count + i) for i in range(0,cgtf_a.NAngMom)]
+              ia += 1; ia_count += cgtf_a.NAngMom
+              ib = -1; ib_count = 0
               for atom_b in self.Atoms:
                  for cgtf_b in atom_b.Basis:
                     ib_vec = [(ib_count + i) for i in range(0,cgtf_b.NAngMom)]
@@ -604,21 +608,22 @@ class Molecule:
 #=====================================================================#
 
 class Atom:
-    def __init__(self,index,row,basis_set,to_bohr):
+    def __init__(self,index,row,basis_set,cartesian_d,to_bohr):
         [label,Z,x,y,z] = row
         self.Index = index
         self.Label = label.upper()
         self.NuclearCharge = Z
         self.Coordinates = [x*to_bohr,y*to_bohr,z*to_bohr]
-        self.update_atomic_basis(basis_set) 
-    def update_atomic_basis(self,basis_set):
+        self.update_atomic_basis(basis_set,cartesian_d) 
+    def update_atomic_basis(self,basis_set,cartesian_d):
         self.Basis = []
         self.NFunctions = 0
         self.MaxAng = 0
         basis_data = basis.get[basis_set][self.Label]
         for function in basis_data:
-            self.Basis.append(ContractedGaussian(function))
-            self.NFunctions += (function[0]+1)*(function[0]+2)/2
+            cgtf = ContractedGaussian(function,cartesian_d)
+            self.Basis.append(cgtf)
+            self.NFunctions += cgtf.NAngMom
             if function[0] > self.MaxAng:
                 self.MaxAng = function[0]
     def update_coords(self,xyz):
@@ -629,14 +634,21 @@ class Atom:
 #---------------------------------------------------------------------#
 
 class ContractedGaussian:
-    def __init__(self,function):
+    def __init__(self,function,cartesian_d):
         self.AngularMomentum = function[0]
-        self.NAngMom = c.nAngMomFunctions[self.AngularMomentum]
+        self.NAngMomCart  = c.nAngMomCart[self.AngularMomentum]
+        self.NAngMomSpher = c.nAngMomSpher[self.AngularMomentum]
         self.Primitives = function[1:]
         self.NPrimitives = len(self.Primitives)
         self.Exponents = numpy.array([exponent for [exponent,cc] in self.Primitives])
         self.DoubleExponents = numpy.multiply(self.Exponents,2.0)
         self.ScaledCCs = [cc*(2*exponent)**((self.AngularMomentum+1.5)/2.0) for [exponent,cc] in self.Primitives]
+        if self.AngularMomentum == 2 and cartesian_d == 2:
+           self.NAngMom = self.NAngMomCart
+           self.CartToSpher = numpy.identity(self.NAngMomCart)
+        else:
+           self.NAngMom = self.NAngMomSpher
+           self.CartToSpher = numpy.array(transform_basis.cart_to_spher[self.AngularMomentum]) 
         angmom_scale_factors = []
         for lx in range(self.AngularMomentum,-1,-1):
           for ly in range(self.AngularMomentum-lx,-1,-1):
@@ -699,7 +711,8 @@ class StoreDIIS:
 class ShellPair:
     def __init__(self,coords_a,cgtf_a,ia,ia_vec,coords_b,cgtf_b,ib,ib_vec):
        # precompute all ShellPair data
-       # note that ia & ib are vectors of Fock matrix indices for each cgtf of length NAngMom
+       # note that ia_vec & ib_vec are vectors of core and overlap matrix 
+       # indices for each spherical polar cgtf of length NAngMomSpher
        self.Centre1 = Shell(coords_a,cgtf_a,ia,ia_vec)
        self.Centre2 = Shell(coords_b,cgtf_b,ib,ib_vec)
        n_alpha = cgtf_a.NPrimitives; alpha_exponents = cgtf_a.Exponents; A = numpy.array(coords_a)
@@ -720,6 +733,18 @@ class ShellPair:
        nmB = numpy.array([cgtf_b.ContractionScaling]); ccB = numpy.array([cgtf_b.ScaledCCs]) 
        self.Normalization = numpy.array([(nmA.T).dot(nmB).flatten()])
        self.ContractionCoeffs = (ccA.T).dot(ccB)
+       nlsA = cgtf_a.NAngMomSpher; nlcA = cgtf_a.NAngMomCart 
+       nlsB = cgtf_b.NAngMomSpher; nlcB = cgtf_b.NAngMomCart 
+       self.BasisTransform = numpy.zeros((nlsA*nlsB,nlcA*nlcB))
+       ispher = -1
+       for sA in cgtf_a.CartToSpher:
+         for sB in cgtf_b.CartToSpher:
+            ispher += 1; icart = -1
+            for cA in sA: 
+              for cB in sB:
+                icart += 1
+                self.BasisTransform[ispher,icart] = cA*cB
+
 
 #---------------------------------------------------------------------#
 #                    SHELLPAIR SUBCLASS - SHELL                       #
@@ -730,7 +755,7 @@ class Shell:
        self.Coords = coords
        self.Cgtf = cgtf
        self.Index = index     # Index for the CGTO in atom.Basis
-       self.Ivec = index_vec  # Indexs of the angular momentum functions in a list of all angular momentum functions on the atom
+       self.Ivec = index_vec  # Indices of each function within a shell of given angular momentum
 
 
 #=====================================================================#

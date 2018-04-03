@@ -189,17 +189,15 @@ def make_core_matrices(molecule):
 
     for a in range(0,molecule.NCgtf):
       for b in range(a,molecule.NCgtf):
+
         shell_pair = molecule.ShellPairs[(a,b)]
-
-        core,overlap = integrals.one_electron(molecule,shell_pair)
-
-        na = shell_pair.Centre1.Cgtf.NAngMom
-        nb = shell_pair.Centre2.Cgtf.NAngMom
         ia_vec = shell_pair.Centre1.Ivec
         ib_vec = shell_pair.Centre2.Ivec
 
-        for i in range(0,na):
-            for j in range(0,nb):
+        core,overlap = integrals.one_electron(molecule,shell_pair)
+
+        for i in range(0,len(ia_vec)):
+            for j in range(0,len(ib_vec)):
                 molecule.Core[ia_vec[i]][ib_vec[j]] = core[i][j]
                 molecule.Core[ib_vec[j]][ia_vec[i]] = core[i][j]
                 molecule.Overlap[ia_vec[i]][ib_vec[j]] = overlap[i][j]
@@ -225,18 +223,17 @@ def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
             if (b >= a):
               ab = molecule.ShellPairs[(a,b)]; 
               ia_vec = ab.Centre1.Ivec; ib_vec = ab.Centre2.Ivec
-              nla = ab.Centre1.Cgtf.NAngMom; nlb = ab.Centre2.Cgtf.NAngMom  
+
               if (d >= c):
                 cd = molecule.ShellPairs[(c,d)]; 
                 ic_vec = cd.Centre1.Ivec; id_vec = cd.Centre2.Ivec
-                nlc = cd.Centre1.Cgtf.NAngMom; nld = cd.Centre2.Cgtf.NAngMom
 
                 coulomb = integrals.two_electron(ab,cd,ints_type,grid_value)
 
-                for m in range(0,nla):
-                    for n in range(0,nlb):
-                        for l in range(0,nlc):
-                            for s in range(0,nld):
+                for m in range(0,len(ia_vec)):
+                    for n in range(0,len(ib_vec)):
+                        for l in range(0,len(ic_vec)):
+                            for s in range(0,len(id_vec)):
                               molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
                               molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
                               molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
@@ -249,18 +246,17 @@ def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
             if (d >= a):
               ad = molecule.ShellPairs[(a,d)]; 
               ia_vec = ad.Centre1.Ivec; id_vec = ad.Centre2.Ivec
-              nla = ad.Centre1.Cgtf.NAngMom; nld = ad.Centre2.Cgtf.NAngMom  
+
               if (b >= c):
                 cb = molecule.ShellPairs[(c,b)]; 
                 ic_vec = cb.Centre1.Ivec; ib_vec = cb.Centre2.Ivec
-                nlc = cb.Centre1.Cgtf.NAngMom; nlb = cb.Centre2.Cgtf.NAngMom
 
                 exchange = integrals.two_electron(ad,cb,ints_type,grid_value)
 
-                for m in range(0,nla):
-                    for n in range(0,nlb):
-                        for l in range(0,nlc):
-                            for s in range(0,nld):
+                for m in range(0,len(ia_vec)):
+                    for n in range(0,len(ib_vec)):
+                        for l in range(0,len(ic_vec)):
+                            for s in range(0,len(id_vec)):
                               molecule.ExchangeIntegrals[ (ia_vec[m], id_vec[s], ic_vec[l], ib_vec[n]) ] = exchange[m][s][l][n]
                               molecule.ExchangeIntegrals[ (id_vec[s], ia_vec[m], ic_vec[l], ib_vec[n]) ] = exchange[m][s][l][n]
                               molecule.ExchangeIntegrals[ (ia_vec[m], id_vec[s], ib_vec[n], ic_vec[l]) ] = exchange[m][s][l][n]
