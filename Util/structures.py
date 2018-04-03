@@ -1,6 +1,7 @@
 # Import system libraries
 from __future__ import print_function
 import sys
+from itertools import izip_longest, izip,  combinations
 if sys.version_info.major is 2:
    import ConfigParser
 else:
@@ -8,6 +9,7 @@ else:
 import ast
 import numpy
 import math
+import copy
 # Import custom-written data modules
 from Data import basis
 from Data import constants as c
@@ -21,13 +23,21 @@ from Methods import _c_ints
 def process_input(section, parser):
     inputs = inputs_return_function(section, parser)
     settings = Settings(inputs, section)
-    molecule = Molecule(inputs=inputs, settings=settings)
+    molecule = Molecule(settings.BasisSets[0], inputs)
     return molecule,settings
 
 def inputs_return_function(section, parser):
-    def inputs(var_name):
-        var = parser.get(section,var_name)
-        var = ast.literal_eval(var)
+    def inputs(var_name, default="__NO_DEFAULT__"):
+        var = default
+
+        try:
+            var = parser.get(section,var_name)
+        except: pass
+
+        if var == "__NO_DEFAULT__":
+            raise(ConfigParser.NoOptionError(var_name, section))
+        elif var != default:
+            var = ast.literal_eval(var)
         if isinstance(var, str):
             var = var.upper()
         return var
@@ -69,14 +79,12 @@ class Settings:
            print('Available methods:', available_methods)
            self.Method = 'HF'
         if self.Method == 'NOCI':
-           try:
-              inputs("Excitations")
-           except:
-              try:
-                 inputs("Alpha_Excitations")
-              except:
-                 print('Error: must specify excited states for NOCI')
-                 sys.exit()
+            excite_keyword = inputs("Excitations", False)
+            excite_custom = inputs("Alpha_Excitations", False)
+            excite_spin = type(inputs("Spin_Flip", False)) is list
+            if not (excite_keyword or excite_custom or excite_spin):
+                print('Error: must specify excited states for NOCI')
+                sys.exit()
         #------------------------ Job Type ---------------------------#
         available_jobtypes = ['ENERGY','PROPERTY']
         try:
@@ -130,13 +138,13 @@ class Settings:
         available_print_levels = ['MINIMAL','BASIC','VERBOSE','DEBUG']
         available_custom_print_options = ['MOM','DIIS'] 
         try:
-           self.PrintLevel = inputs("Print_Level").upper()
+           self.PrintLevel = inputs("Print_Level")
            assert self.PrintLevel in available_print_levels
         except:
         #   print('Printing options not supplied or recognised, defaulting to basic printing') 
            self.PrintLevel = 'BASIC'
         try:
-           self.CustomPrint = inputs("Custom_Print").upper()
+           self.CustomPrint = inputs("Custom_Print")
            assert self.CustomPrint in available_custom_print_options
         except:
         #   print('Custom print options not supplied or recognised, defaulting to basic printing') 
@@ -156,6 +164,8 @@ class Settings:
 #=====================================================================#
 
 class Set_SCF:
+    # Called only in the inital seeting up of the calculation
+    # Not in basis fitting
     def __init__(self, inputs, NBasisSets, Method):
         #------------------------- Reference -------------------------#
         available_references = ['RHF','UHF','CUHF']
@@ -179,12 +189,13 @@ class Set_SCF:
             self.Guess = "CORE"
         if self.Guess == "READ" or Method == None:
             try:
-                mo_read_state = inputs("MO_Read_State")
-                mo_read_basis = remove_punctuation(inputs("MO_Read_Basis"))
-                self.AlphaMOFile = mo_read_basis + '_' + mo_read_state + '.alpha_MOs' 
-                self.BetaMOFile = mo_read_basis + '_' + mo_read_state + '.beta_MOs' 
-            except:
-                print("Error: Must give details of files to read alpha and beta MOs from, using keywords MO_Read_Basis and MO_Read_State")
+                mo_read_files = inputs("MO_Read_Files")
+                if type(mo_read_files) is not list:
+                    mo_read_files = [mo_read_files]
+                self.AlphaMOFile = [file + '.alpha_MOs' for file in mo_read_files]
+                self.BetaMOFile = [file + '.beta_MOs' for file in mo_read_files]
+            except ConfigParser.NoOptionError:
+                print("Error: Must give details of files to read alpha and beta MOs from, using keyword MO_Read_Files")
                 sys.exit()
         #------------------------- SCF Cycles ------------------------#
         try:
@@ -281,18 +292,16 @@ class Set_MOM:
 
 class Molecule:
 
-    def __init__(self, inputs = None, settings = None, basis = None):
+    def __init__(self, basis, inputs):
         #--------------------------------------------------------------#
         #           Parse inputs and set up data structures            # 
         #          for ground and excited state calculations           #
         #--------------------------------------------------------------#
-        if basis == None:
-           self.parse_inputs(inputs)
-           basis = settings.BasisSets[0]
+        self.parse_inputs(inputs)
         self.Basis = basis
-        self.set_structures() 
-        self.set_scf()
-        self.set_excitations()
+        self.set_structures()
+        self.make_excitations(inputs)
+        self.make_states()
 
     #==================================================================#
     def parse_inputs(self,inputs):
@@ -339,61 +348,7 @@ class Molecule:
               print('Error: must specify molecule multiplicity using Multiplicity =')
               sys.exit()
 
-        #----------------------- Excitations --------------------------#
-        available_excitation_types = [None, 'SINGLE', 'DOUBLE', 'HOMO-LUMO', 'DOUBLE-PAIRED', 'CUSTOM-SINGLE','CUSTOM-PAIRED',
-                                      'S','D','SPIN-FLIP-SINGLE','SFS','SF-S','SPIN-FLIP-DOUBLE','SFD','SF-D']
-
-        try:
-           excitation_type = inputs("Excitations").upper()
-           if (excitation_type == 'S'): excitation_type = 'SINGLE'
-           if (excitation_type == 'D'): excitation_type = 'DOUBLE'
-           if (excitation_type == 'SFS') or (excitation_type == 'SF-S'): excitation_type = 'SPIN-FLIP-SINGLE'
-           if (excitation_type == 'SFD') or (excitation_type == 'SF-D'): excitation_type = 'SPIN-FLIP-DOUBLE'
-        except ConfigParser.NoOptionError:
-           try:
-              alpha_excitations = inputs("Alpha_Excitations")
-           except ConfigParser.NoOptionError:
-              alpha_excitations = [[]]
-           try:
-              beta_excitations = inputs("Beta_Excitations")
-           except ConfigParser.NoOptionError:
-              beta_excitations = [[]]
-           if (alpha_excitations == [[]]) and (beta_excitations == [[]]):
-              excitation_type = None
-           elif (alpha_excitations != [[]]) and (beta_excitations != [[]]):
-              try:
-                 assert len(alpha_excitations) == len(beta_excitations)
-                 excitation_type = 'CUSTOM-PAIRED'
-              except AssertionError:
-                 print("""Error: Alpha_Excitations and Beta_Excitations lists must be equal in length if both keywords present,
-                          blank sub-lists can be used as placeholders""")
-                 sys.exit()
-           else:
-              excitation_type = 'CUSTOM-SINGLE'
-
-        ### Check that excitations were given in the correct format ###
-        try:
-           assert excitation_type in available_excitation_types
-        except:
-           print("""Error: Excitations can be specified by keyword as Excitations = 'Single'/'S', 'Double'/'D', 'Homo-Lumo', 'Double-Paired', 
-                    'Spin-Flip-Single'/'SF-S', 'Spin-Flip-Double'/'SF-D'""")
-           sys.exit()
-
-        if (excitation_type is 'CUSTOM-SINGLE') or (excitation_type == 'CUSTOM-PAIRED'):
-           try:
-              assert type(alpha_excitations) is list
-              for alpha_excitation in alpha_excitations:
-                 assert type(alpha_excitation) is list
-              assert type(beta_excitations) is list
-              for beta_excitation in beta_excitations:
-                 assert type(beta_excitation) is list
-              self.AlphaExcitations = alpha_excitations
-              self.BetaExcitations = beta_excitations
-           except AssertionError:
-              print("""Error: Custom excitations specified as Alpha_Excitations or Beta_Excitations lists of [from,to] orbital pairs""")
-              sys.exit()
-
-        self.ExcitationType = excitation_type
+        self.get_excitation_type(inputs)
 
         #---- Special flag to enable use of Cartesian d functions -----#
         try:
@@ -431,6 +386,12 @@ class Molecule:
             sys.exit()
         self.NAlphaOrbitals = int(math.ceil(self.NAlphaElectrons/2.0))
         self.NBetaOrbitals = int(math.ceil(self.NBetaElectrons/2.0))
+        alpha_occupancy = [1 for i in range(self.NAlphaOrbitals)] + [0 for i in range(self.NOrbitals - self.NAlphaOrbitals)]
+        beta_occupancy = [1 for i in range(self.NBetaOrbitals)] + [0 for i in range(self.NOrbitals - self.NBetaOrbitals)]
+        self.States = [ElectronicState(alpha_occupancy, beta_occupancy, self.NOrbitals)]
+
+        #--------------------- Set SCF Structures ---------------------#
+ 	self.set_scf()
 
     def set_scf(self):
         #----------- SCF structures - common to all states ------------#
@@ -462,147 +423,209 @@ class Molecule:
                        shell_pairs[(ia,ib)] = ShellPair(atom_a.Coordinates,cgtf_a,ia,ia_vec,atom_b.Coordinates,cgtf_b,ib,ib_vec)
         self.ShellPairs = shell_pairs
 
-    #==================================================================#
-    def set_excitations(self):
-        #-------------- Excited state specifications ------------------#
-        #       contains ElectronicState -> Matrices subclasses        #
-        #--------------------------------------------------------------#
+    def make_states(self):
 
-        if (self.ExcitationType == 'SINGLE') or (self.ExcitationType == 'DOUBLE'):
-           self.AlphaExcitations = self.single_excitations(self.NCoreOrbitals, self.NAlphaElectrons, self.NAlphaElectrons, self.NOrbitals)
-           self.BetaExcitations = self.single_excitations(self.NCoreOrbitals, self.NBetaElectrons, self.NBetaElectrons, self.NOrbitals)
-        if (self.ExcitationType == 'DOUBLE-PAIRED'):
-           self.AlphaExcitations = self.single_excitations(self.NCoreOrbitals, self.NBetaElectrons, self.NAlphaElectrons, self.NOrbitals)
-        if (self.ExcitationType == 'HOMO-LUMO'):
-           self.AlphaExcitations = self.single_excitations(self.NAlphaElectrons-1, self.NAlphaElectrons, self.NAlphaElectrons, self.NAlphaElectrons+1)
+        # Loop over the lists of excitations to make the excited reference states
+        for alpha, beta in izip_longest(self.AlphaExcitations, self.BetaExcitations, fillvalue=[]):
+            alpha_occupied = self.do_excitation(self.States[0].AlphaOccupancy, alpha)
+            beta_occupied = self.do_excitation(self.States[0].BetaOccupancy, beta)
+            self.States.append(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))
 
-        #-------------------------------------------------------------#
-        #   Generate excited states, each an ElectronicState object   #
-        #-------------------------------------------------------------#
-
-        ### Make occupancy lists for the ground state ###
-        alpha_occupancy = [1 for i in range(0,self.NAlphaElectrons)] + [0 for i in range(0,self.NOrbitals-self.NAlphaElectrons)]
-        beta_occupancy = [1 for i in range(0,self.NBetaElectrons)] + [0 for i in range(0,self.NOrbitals-self.NBetaElectrons)]
-
-        ### Instantiate ElectronicState for ground state ###
-        self.States = [ElectronicState(alpha_occupancy,beta_occupancy,self.NOrbitals)]
-
-        ### Generate occupancy lists and ElectronicState instances for excited states ###
-        spin_flip_states = None
-        if (self.ExcitationType is not None):
-
-           alpha_ground = self.States[0].AlphaOccupancy
-           beta_ground = self.States[0].BetaOccupancy
-
-           # Common loop to make the excitations for all cases except single beta excitations
-           for (i,alpha_excitation) in enumerate(self.AlphaExcitations):
-               if alpha_excitation != []:
-                  alpha_occupied = self.do_excitation(alpha_ground, alpha_excitation)
-               else:
-                  if self.ExcitationType == 'CUSTOM-PAIRED':
-                     alpha_occupied = alpha_ground
-                     beta_occupied = self.do_excitation(beta_ground, self.BetaExcitations[i])
-                  else:
-                     break
-               if (self.ExcitationType == 'SINGLE') or (self.ExcitationType == 'HOMO-LUMO'):
-                  beta_occupied = beta_ground
-               if self.ExcitationType == 'DOUBLE-PAIRED':
-                  beta_occupied = alpha_occupied[:]
-               if self.ExcitationType == 'DOUBLE':
-                  for beta_excitation in BetaExcitations:
-                     beta_occupied = self.do_excitation(beta_ground, beta_excitation)
-                     self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-               else:
-                  beta_occupied = beta_ground
-                  self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-
-           # Do single beta excitations separately
-           if (self.ExcitationType == 'SINGLE') or (self.ExcitationType == 'CUSTOM-SINGLE'):
-               alpha_occupied = alpha_ground
-               if ((self.ExcitationType == 'SINGLE') and (self.Multiplicity == 1) and (self.AlphaExcitations != [[]])):
-                  pass
-               else:
-                  for beta_excitation in self.BetaExcitations:
-                     if beta_excitation != []:
-                        beta_occupied = self.do_excitation(beta_ground, beta_excitation)
-                        self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-                     else:
-                        break
-
-           # Or set up spin-flip states
-           if 'SPIN-FLIP' in self.ExcitationType:
-               spin_flip_states = [[0,alpha_ground[:],beta_ground[:]]]
-               alpha_occupied = alpha_ground[:]; beta_occupied = beta_ground[:]
-               alpha_occupied[self.NAlphaElectrons] = 1; beta_occupied[self.NBetaElectrons-1] = 0
-               self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-               spin_flip_states += self.make_spinflip_states(alpha_ground,beta_ground,self.NAlphaElectrons,self.NBetaElectrons,level=1)
-               if 'DOUBLE' in self.ExcitationType:
-                  alpha_occupied[self.NAlphaElectrons+1] = 1; beta_occupied[self.NBetaElectrons-2] = 0
-                  self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
-                  spin_flip_states += self.make_spinflip_states(alpha_ground,beta_ground,self.NAlphaElectrons,self.NBetaElectrons,level=2)
-
-        ### Store number of electronic states (ground + excited) ###
         self.NStates = len(self.States)
-        self.SpinFlip = spin_flip_states 
 
-    def update_basis(self,basis_set):
-        self.Basis = basis_set
-        self.NOrbitals = 0; self.NCgtf = 0
-        for atom in self.Atoms:
-            atom.update_atomic_basis(basis_set)
-            self.NOrbitals += atom.NFunctions
-            self.NCgtf += len(atom.Basis) 
-        self.set_scf()
-        self.set_excitations()
+
+    def get_excitation_type(self, inputs):
+        available_excitation_types = [None, 'SINGLE', 'S', 'DOUBLE', 'D', 'HOMO-LUMO', 'DOUBLE-PAIRED','CUSTOM', 'SPIN-FLIP-LEVELS']
+
+        # Read the relevant sections from input        
+        excitation_type = inputs("Excitations", default=None)
+        spin_flip = spin_flip = inputs("Spin_Flip", default=False)
+        alpha_excitations = inputs("Alpha_Excitations", default=[])
+        beta_excitations = inputs("Beta_Excitations", default=[])
+
+        # If specifyed by keyword that's all we need
+        if excitation_type != None:
+            if (excitation_type == 'S'): excitation_type = 'SINGLE'
+            elif (excitation_type == 'D'): excitation_type = 'DOUBLE'
+
+        # Else look for manual specification of excitations
+        elif alpha_excitations != [] or beta_excitations != []:
+            excitation_type = "CUSTOM"
+
+        # Now deal with spin flip 
+        # If spin flip is 'True' we will auto-generate reference states based on the above excitation types
+        if spin_flip is True:
+            spin_flip = "CUSTOM" 
+        # If it's a list we generate determinants based on these SF references
+        elif type(spin_flip) is list:   
+            if excitation_type != None:
+                # TODO make these comaptible
+                print("""'Excitation_Type', 'Alpha_Excitations' and 'Beta_Excitations' are incompatible with specifying spin-flip 
+                      reference by excitation level.""")
+                sys.exit()
+            else: 
+                spin_flip = "LEVELS"
+                excitation_type = "SPIN-FLIP-LEVELS"
+
+        # Check that we've got a valid excitation type
+        if excitation_type not in available_excitation_types:
+            print("Invalid excitation specification, valid keywords are:")
+            print(available_excitation_types[1:])
+            sys.exit()
+
+        self.ExcitationType = excitation_type
+        self.SpinFlipType = spin_flip
+
+    def make_excitations(self, inputs):
+
+        # Make the excitation lists based on ExcitationType and SpinFlip
+        alpha_excitations = []; beta_excitations = []
+        if self.ExcitationType == "SINGLE":
+            alpha_excitations = self.single_excitations(self.States[0].AlphaOccupancy)
+        elif self.ExcitationType == "DOUBLE":
+            alpha_excitations, beta_excitations = self.double_excitations(self.States[0])
+        elif self.ExcitationType == "DOUBLE-PAIRED":
+            alpha_excitations, beta_excitations = self.double_paired_excitations(self.States[0])
+        elif self.ExcitationType == "HOMO-LUMO":
+            alpha_excitations = [[self.NAlphaElectrons - 1, self.NAlphaElectrons]]
+        elif self.ExcitationType == "CUSTOM":
+            alpha_excitations = inputs("Alpha_Excitations", default=[])
+            beta_excitations = inputs("Beta_Excitations", default=[])
+        elif self.ExcitationType == "SPIN-FLIP-LEVELS":
+            alpha_excitations, beta_excitations = self.spin_flip_level_excitations(inputs("Spin_Flip"))
+        
+        # For spin flip generate the list of determinants to create as well
+        spin_flip_states = []
+        if self.SpinFlipType == "CUSTOM":
+            # Move the excitations found above to spin_flip states and calculate a list of levels excitations
+            spin_flip_states, alpha_excitations, beta_excitations = self.make_spin_flip_states_custom(alpha_excitations, beta_excitations) 
+        elif self.SpinFlipType == "LEVELS":
+            spin_flip_states = self.make_spin_flip_states_levels(inputs("Spin_Flip"))
+
+        self.AlphaExcitations = alpha_excitations
+        self.BetaExcitations = beta_excitations
+        self.SpinFlipStates = spin_flip_states
 
     #=================================================================#
     #              Utility functions for this section                 #
-    def single_excitations(self, n_electrons, n_orbitals):
+    #=================================================================#
+
+    def update_basis(self, basis_set):
+        new_molecule = copy.deepcopy(self)
+        new_molecule.Basis = basis_set
+        new_molecule.set_structures()
+        new_molecule.make_states()
+        return new_molecule
+
+    def single_excitations(self, occupancy):
         """Takes the number of electrons of a particular spin and the number
         of orbitals and returns the list of pairs corresponding to all single
-        excitations"""
+        valence excitations"""
+        n_electrons = sum(occupancy)
         excitations = []
-        n_virtual_orbitals = n_orbitals - n_electrons
-        for i in range(1,n_electrons+1):
-            for j in range(1,n_virtual_orbitals+1):
-                excitations.append([-i,j])
+        for i in range(self.NCoreOrbitals, n_electrons):  # Iterate over occupied valence orbital indices 
+            for j in range(n_electrons, self.NOrbitals):  # Iterate over virtual orbital indices
+                excitations.append([i,j])
         return excitations
 
-    def do_excitation(self, ground_occ, excitation):
-        occupied = copy.deepcopy(ground_occ)
-        if excitation != []:
-            occupied[excitation[0]] = 0
-            occupied[excitation[1]] = 1
-        else:
-            print("""Warning: shouldn't be calling do_excitation without a specified excitation pair""")
+    def double_excitations(self, ground):
+        alpha_excitations = []; beta_excitations = []
+        alpha_singles = self.single_excitations(ground.AlphaOccupancy)
+        beta_singles = self.single_excitations(ground.BetaOccupancy)
+        for excite1 in alpha_singles:
+            for excite2 in beta_singles:
+                alpha_excitations.append(excite1)      # Will this give multiple identical
+                beta_excitations.append(excite2)       # excitations in some cases?
+        return alpha_excitations, beta_excitations
+
+    def double_paired_excitations(self, ground):
+        excitations = []
+        alpha_occ = ground.AlphaOccupancy[self.NCoreOrbitals :]
+        beta_occ = ground.BetaOccupancy[self.NCoreOrbitals :]
+        for (i, orb1) in enumerate(zip(alpha_occ, beta_occ), start=self.NCoreOrbitals):
+            # Check both are occupied
+            if orb1 == (1,1):
+                for (j, orb2) in enumerate(zip(alpha_occ, beta_occ), start=self.NCoreOrbitals):
+                    # Check both are empty
+                    if orb2 == (0,0):
+                        excitations.append([i,j])
+        return excitations, excitations
+
+    def spin_flip_level_excitations(self, spin_flip_levels):
+
+        if max(spin_flip_levels) > self.NBetaElectrons or min(spin_flip_levels) <= 0:
+            print("""Must give spin-flip levels as a list of positive integers with a max value 
+                  no greater than the number of beta electrons""")
+            sys.exit()
+
+        alpha_excitations = [] 
+        beta_excitations = []
+        for level in spin_flip_levels:    # Thinking each excitation pair as a creation or 
+            alpha_creations = []          # anihilation operator to move electrons from beta to alpha
+            beta_annihilations = [] 
+            for i in range(level):
+                alpha_creations += [None, self.NAlphaElectrons + i]
+                beta_annihilations += [self.NBetaElectrons - 1 - i, None]
+            alpha_excitations.append(alpha_creations)
+            beta_excitations.append(beta_annihilations)
+
+        return alpha_excitations, beta_excitations
+    
+    def make_spin_flip_states_custom(self, alpha_excitations, beta_excitations):
+        spin_flip_states = []
+        levels = set()
+
+        for alpha, beta in izip_longest(alpha_excitations, beta_excitations, fillvalue=[]):
+            max_excitation = max(alpha + beta)
+            level = max_excitation - self.NAlphaElectrons + 1
+            levels.add(level)
+            # Convert the excitationt to a spin_flip_state
+            alpha_occupancy = self.do_excitation(self.States[0].AlphaOccupancy, alpha)
+            beta_occupancy = self.do_excitation(self.States[0].BetaOccupancy, beta)
+            spin_flip_states.append([level, alpha_occupancy, beta_occupancy])
+
+        levels = list(levels)
+        levels.sort()
+        alpha_excitations, beta_excitations = self.spin_flip_level_excitations(levels)
+
+        return spin_flip_states, alpha_excitations, beta_excitations
+            
+    def make_spin_flip_states_levels(self, levels):
+        # For each level we need to find the set of spin equivilent permutations 
+        spin_flip_states = []
+        unpaired = self.NAlphaElectrons - self.NBetaElectrons
+        for level in levels:
+            n_core_orbitals = self.NBetaElectrons - level 
+            n_active_orbitals = 2 * level + unpaired
+            n_alpha_active = level + unpaired
+            for alpha_occ, beta_occ in self.active_occupancies(n_active_orbitals, n_alpha_active):
+
+                alpha_occ = self.States[0].AlphaOccupancy[:n_core_orbitals] + alpha_occ
+                beta_occ = self.States[0].BetaOccupancy[:n_core_orbitals] + beta_occ
+
+                alpha_occ += (self.NOrbitals - len(alpha_occ)) * [0]
+                beta_occ += (self.NOrbitals - len(beta_occ)) * [0]
+
+                spin_flip_states.append([level, alpha_occ, beta_occ])
+
+        return spin_flip_states
+
+    def active_occupancies(self, n_orbitals, n_alpha):
+        all_alpha_indices = combinations(range(n_orbitals), n_alpha)                  # Select the active orbitals with alpha electrons 
+        for alpha_indices in all_alpha_indices:
+            alpha_occ = [1 if i in alpha_indices else 0 for i in range(n_orbitals)]
+            beta_occ = [0 if i in alpha_indices else 1 for i in range(n_orbitals)]    # All the orbitals that don't have alpha electrons have beta 
+            yield alpha_occ, beta_occ
+
+    def do_excitation(self, ground_occ, state):
+        occupied = ground_occ[:]
+        for (src, dest) in izip(state[0::2], state[1::2]):
+            if src is not None:      # Use None to construct annihilation and creation operators
+                occupied[src] = 0
+            if dest is not None:
+                occupied[dest] = 1
         return occupied
 
-    def make_spinflip_states(self,alpha_occ,beta_occ,n_alpha,n_beta,level):
-        beta_occ[n_beta-1] = 0; beta_occ[n_alpha] = 1
-        spin_flip_states = []
-        if level == 1:
-           spin_flip_states.append([level,alpha_occ,beta_occ])
-           for i in range(n_beta-1,n_alpha):
-              new_alpha = alpha_occ[:]; new_beta = beta_occ[:]
-              new_alpha[i] = 0; new_beta[i] = 1
-              new_alpha[n_alpha] = 1; new_beta[n_alpha] = 0
-              spin_flip_states.append([level,new_alpha,new_beta])
-        if level == 2:
-           beta_occ[n_beta-2] = 0; beta_occ[n_alpha+1] = 1
-           spin_flip_states.append([level,alpha_occ,beta_occ])
-           for i in range(n_beta-2,n_alpha):
-             for k in range(n_alpha,n_alpha+2):
-                new_alpha = alpha_occ[:]; new_beta = beta_occ[:]
-                new_alpha[i] = 0; new_beta[i] = 1
-                new_alpha[k] = 1; new_beta[k] = 0
-                spin_flip_states.append([level,new_alpha,new_beta])
-             for j in range(i,n_alpha):
-                new_alpha = alpha_occ[:]; new_beta = beta_occ[:]
-                new_alpha[i] = 0; new_alpha[j] = 0; new_beta[i] = 1; new_beta[j] = 1
-                new_alpha[n_alpha] = 1; new_alpha[n_alpha+1] = 1; new_beta[n_alpha] = 0; new_beta[n_alpha+1] = 0
-                spin_flip_states.append([level,new_alpha,new_beta])
-        return spin_flip_states
-         
 #=====================================================================#
 #                      MOLECULE SUBCLASS - ATOM                       #
 #=====================================================================#
@@ -664,6 +687,8 @@ class ContractedGaussian:
 class ElectronicState:
     def __init__(self,alpha_occupancy,beta_occupancy,n_orbitals):
         total_occupancy = [a+b for a,b in zip(alpha_occupancy,beta_occupancy)]
+        self.AlphaOccupancy = alpha_occupancy
+        self.BetaOccupancy = beta_occupancy
         self.NAlpha = sum(alpha_occupancy)
         self.NBeta = sum(beta_occupancy)
         self.S2 = None

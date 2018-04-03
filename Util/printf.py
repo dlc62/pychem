@@ -1,6 +1,8 @@
 import numpy
 numpy.set_printoptions(precision = 8, linewidth = 300)  #Makes the arrays print nicely in the output
 
+# TODO rewrite all of these using variadic argument function
+
 def print_to_file(outfile,string):
     try:
        outfile.write(string) 
@@ -38,17 +40,16 @@ def format_text_value(text,value):
    string = text + sep + str(value) + end
    return string
 
-def text_value(outfile,text1,value1,text2=None,value2=None,text3=None,value3=None,text4=None,value4=None,text5=None,value5=None):
-   # Construct or print up to 5 sections of text and values, text and values supplied as arguments 
-   string = format_text_value(text1,value1)
-   if text2 is not None and value2 is not None: string += format_text_value(text2,value2)
-   if text3 is not None and value3 is not None: string += format_text_value(text3,value3)
-   if text4 is not None and value4 is not None: string += format_text_value(text4,value4)
-   if text5 is not None and value5 is not None: string += format_text_value(text5,value5)
-   if outfile is None:
-      return string
-   else:
-      print_to_file(outfile,string+'\n')
+def text_value(outfile, *pairs):
+    string = ""
+    # Loop over and print each pair of text and values
+    for text, value in zip(pairs[0::2], pairs[1::2]):
+        if text is not None and value is not None:
+            string += format_text_value(text, value)
+    if outfile is None:
+        return string
+    else:
+        print_to_file(outfile, string+'\n')
 
 def delimited_text_value(outfile,text1,value1,text2=None,value2=None,text3=None,value3=None,text4=None,value4=None,text5=None,value5=None):
    # Print up to 5 sections of text and values surrounded by delimiters, text and values supplied as arguments
@@ -64,17 +65,17 @@ def double_delimited_text_value(outfile,text1,value1,text2=None,value2=None,text
    string += double_delimiter(None)
    print_to_file(outfile,string+'\n')
 
-def text(outfile,text1,text2=None,text3=None,text4=None,text5=None):
-   # Construct or print up to 5 lines of text, each line supplied as a separate argument
-   string = text1 + '\n'
-   if text2 is not None: string += text2 + '\n'
-   if text3 is not None: string += text3 + '\n'
-   if text4 is not None: string += text4 + '\n'
-   if text5 is not None: string += text5 + '\n'
-   if outfile is None:
-      return string
-   else:
-      print_to_file(outfile,string+'\n')
+def text(outfile, *texts):
+    """ Construct or print lines of text, each provided as a seperate argument"""
+    string = ""
+    for text in texts:
+        if text is not None:
+            string += text + '\n'
+    if outfile is None:
+        return string
+    else:
+        print_to_file(outfile,string+'\n')
+
 
 def delimited_text(outfile,text1,text2=None,text3=None,text4=None,text5=None):
    # Print up to 5 sections of text and values surrounded by delimiters, text and values supplied as arguments
