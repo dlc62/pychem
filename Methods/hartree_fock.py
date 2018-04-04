@@ -214,8 +214,11 @@ def make_core_matrices(molecule):
 
     # construct and store canonical orthogonalization matrices
     s,U = numpy.linalg.eigh(molecule.Overlap)
-    sp = [element**-0.5e0 for element in s]
-    molecule.X = numpy.dot(U,numpy.identity(len(sp))*(sp))
+    U = U[:,s.argsort()[::-1]]
+    s = numpy.sort(s)[::-1]
+    sp = [element**-0.5e0 for element in s if element > 0.0]
+    nsp = len(sp)
+    molecule.X = numpy.dot(U[:,:nsp],numpy.identity(nsp)*sp)
     molecule.Xt = numpy.transpose(molecule.X)
     # construct and store half-overlap matrix
     molecule.S = sqrtm(molecule.Overlap)
