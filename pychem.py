@@ -87,16 +87,16 @@ def do_calculation(settings, molecule):
     # Do NOCI calculations in final basis, setting up spin-flip basis states
     if settings.Method == 'NOCI':
 
-        old_states = molecule.States[:]
         if molecule.SpinFlipStates != []:
             spin_flip_states = []
             for [index,alpha_occupancy,beta_occupancy] in molecule.SpinFlipStates:
                 state = structures.ElectronicState(alpha_occupancy, beta_occupancy, molecule.NOrbitals)
                 state.Alpha.MOs = structures.reorder_MOs(molecule.States[index].Alpha.MOs, alpha_occupancy)
-                state.Beta.MOs = structures.reorder_MOs(molecule.States[index].Alpha.MOs, beta_occupancy)
+                state.Beta.MOs = structures.reorder_MOs(molecule.States[index].Beta.MOs, beta_occupancy)
                 state.TotalEnergy = molecule.States[index].TotalEnergy
+                hartree_fock.make_density_matrices(molecule,state)
                 spin_flip_states.append(state)
-                molecule.States = molecule.States[:1] + spin_flip_states
+            molecule.States = spin_flip_states
 
         noci.do(settings, molecule)
 
