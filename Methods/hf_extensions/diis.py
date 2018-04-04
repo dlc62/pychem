@@ -12,8 +12,9 @@ from numpy import dot
 def do(molecule, this, settings):
 
     # Set up error estimates
-    alpha_residual = get_residual(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, molecule.X, molecule.Xt) 
-    beta_residual = get_residual(molecule.Overlap, this.Beta.Density, this.Beta.Fock, molecule.X, molecule.Xt) 
+    X = molecule.X; Xt = molecule.Xt
+    alpha_residual = get_residual(molecule.Overlap, this.Alpha.Density, this.Alpha.Fock, X, Xt) 
+    beta_residual = get_residual(molecule.Overlap, this.Beta.Density, this.Beta.Fock, X, Xt) 
     this.AlphaDIIS.Error = alpha_residual.max()
     this.BetaDIIS.Error = beta_residual.max()
     settings.DIIS.Threshold = -0.1 * this.Energy
@@ -44,8 +45,11 @@ def diis(residual, fock, DIIS, settings):
     
 def get_residual(overlap, density, fock, X, Xt):
     residual  = overlap.dot(density).dot(fock) - fock.dot(density).dot(overlap)
-    residual = Xt.dot(residual).dot(X)
-    return residual
+    padded_residual = numpy.zeros_like(residual)
+    transformed_residual = Xt.dot(residual).dot(X)
+    nmo = len(transformed_residual)
+    padded_residual[0:nmo,0:nmo] = transformed_residual
+    return padded_residual
 
 #----------------------------------------------------------------------#
 
