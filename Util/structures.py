@@ -788,7 +788,7 @@ def reorder_MOs(old_MOs, occupancy):
     for i in range(n_electrons):
         if occupancy[i] == 0:
             frm.append(i)
-    for i in range(n_electrons,len(occupancy)):
+    for i in range(n_electrons,len(old_MOs[0])):
         if occupancy[i] == 1:
             to.append(i)
     for i in range(len(to)):
