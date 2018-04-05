@@ -33,6 +33,14 @@ def inputs_return_function(section, parser):
         return var
     return inputs
 
+def update_basis(self,basis_set):
+    self.Basis = basis_set
+    self.set_structures()
+    self.set_scf()
+    self.ExcitationType = None
+    self.set_excitations()
+    return self
+
 #=====================================================================#
 #  Global data structures, used absolutely everywhere                 #
 #  Convention: class variables are capitalized, instances not         #
@@ -556,16 +564,6 @@ class Molecule:
         ### Store number of electronic states (ground + excited) ###
         self.NStates = len(self.States)
         self.SpinFlipStates = spin_flip_states 
-
-    def update_basis(self,basis_set):
-        self.Basis = basis_set
-        self.NOrbitals = 0; self.NCgtf = 0
-        for atom in self.Atoms:
-            atom.update_atomic_basis(basis_set)
-            self.NOrbitals += atom.NFunctions
-            self.NCgtf += len(atom.Basis) 
-        self.set_scf()
-        self.set_excitations()
 
     #=================================================================#
     #              Utility functions for this section                 #

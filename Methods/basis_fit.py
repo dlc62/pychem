@@ -1,113 +1,95 @@
 # System libraries
+import sys
 import numpy
 import copy
-from scipy.misc import factorial2
+import math
 # Custom-written data modules
 from Data import basis
 from Data import constants as c
 
-def do(molecule, MOs, new_basis):
+#----------------------------------------------------------#
+#  Utility functions
+#----------------------------------------------------------#
+def overlap(e1,e2,l):
+    s = math.pow(2.0*e1,0.75) * math.pow(2.0*e2,0.75) * math.pow(e1+e2,-(1.5+l))
+    return s
 
-    #iterating over each MO in the old basis
-    for MO in range(len(MOs)):
-        if MO != 0 and MO == size:
-            break
-        old_coeffs = MOs[:,MO]
-        new_MO = numpy.array([])                  # single column in the eventual MO matrix
-        cgto_count = 0
-        for atom in molecule.Atoms:
-            coeffs = Basis_Fit_Atom(atom, old_coeffs, cgto_count, new_basis, molecule.Basis)
-            new_MO = numpy.append(new_MO, coeffs)
-            cgto_count += atom.NFunctions                 # keeps track of the index to fit next
-        #initializing matrix to store the coeffs once its size is known
-        if MO == 0:
-            size = len(new_MO)
-            new_coeffs = numpy.zeros((size, size))
-        new_coeffs[:,MO] = new_MO
-    return new_coeffs
+def cgtf_overlap(cgtfs1,cgtfs2,l):
+    overlap_matrix = []
+    for cgtf1 in cgtfs1:
+       overlap_vector = []
+       for cgtf2 in cgtfs2:
+          overlap_element = 0.0
+          for [e1,c1] in cgtf1:
+             for [e2,c2] in cgtf2:
+                overlap_element += c1*c2*overlap(e1,e2,l)
+          overlap_vector.append(overlap_element)
+       overlap_matrix.append(overlap_vector)
+    return overlap_matrix
 
-#---------------------------------------------------------------------------------------
+#----------------------------------------------------------#
+#  Main routine
+#----------------------------------------------------------#
+def do(molecule, MOs, new_basis_name):
 
-def Get_Overlap(prim1, prim2, l, m=0):
-    #gamma = prim1[0] + prim2[0]
-    #norm = (prim1[0]*prim2[0])**(3./4 + l/2.)
-    #integral = (1 / gamma)**(3./2) * (1/(2*gamma)**l) * norm * prim1[1] * prim2[1]
-    gamma = prim1[0] + prim2[0]
-    factorials = numpy.product(factorial2(2 * numpy.array(c.lQuanta[l][m]) - 1))
-    integral = prim1[1] * prim2[1] / (2*gamma) ** l * (3.142 / gamma) ** (3./2) * factorials
-    return integral
+    # Construct fitting vectors to express each CGTF in the old basis
+    # as a linear combination of CGTFs in the new basis
 
-#---------------------------------------------------------------------------------------
+    fit_coeffs_by_atom = []; new_basis = []
+    for atom in molecule.Atoms:
+       new_cgtfs = basis.get[new_basis_name][atom.Label]
+       new_basis.append(new_cgtfs)
+       fit_coeffs = []
+       for cgtf in atom.Basis:
+          ref_l = cgtf.AngularMomentum
+          ref_primitives = cgtf.Primitives
+          fitting_functions = []
+          for new_cgtf in new_cgtfs:
+             new_l = new_cgtf[0]
+             new_primitives = new_cgtf[1:] 
+             if new_l == ref_l:
+                fitting_functions.append(new_primitives)
+          if fitting_functions != []:
+             S_matrix = numpy.array(cgtf_overlap(fitting_functions,fitting_functions,ref_l))
+             T_vector = numpy.array(cgtf_overlap([ref_primitives],fitting_functions,ref_l)[0]) 
+             coeff_vector = numpy.linalg.solve(S_matrix,T_vector).flatten().tolist()
+             fit_coeffs.append(coeff_vector) 
+          else:
+             fit_coeffs.append([])
+       fit_coeffs_by_atom.append(fit_coeffs)
+           
+    # Compute where to place new coefficients according to angular momentum of functions in new basis
 
-def Basis_Fit_Atom(atom, MOs, cgto_count, new_basis, old_basis):
-    new_cgtos = basis.get[new_basis][atom.Label]
-    old_ang_indices = get_ang_indices(basis.get[old_basis][atom.Label], cgto_count)
-    new_ang_indices = get_ang_indices(new_cgtos)                  # done need cgto_count here becuase we are building up list not matching old MOs in situ
-    size = sum([len(l) for l in new_ang_indices])                 # getting the number of cgtos centered on this atom in the new basis
-    atom_coeffs = numpy.zeros(size)
-    for Ang in range(atom.MaxAng+1):                              #iterating over angular momentum quantum numbers
-        degen = c.nAngMomSpher[Ang]
-        old_idx = old_ang_indices[Ang]
-        new_idx = new_ang_indices[Ang]
-        ang_set = [cgto for cgto in atom.Basis if cgto.AngularMomentum == Ang]
-        #Getting the list of new functions of the correct angular momentum
-        NewFunctions = [cgto[1:] for cgto in new_cgtos if cgto[0] == Ang]
-        if ang_set != []:
-            coeffs = [0.0] * len(NewFunctions) * degen
-            for m in range(degen):                                  # iterating over magnetic quantum numbers
-                m_coeffs = Basis_Fit_Ang(atom, ang_set, MOs[old_idx], NewFunctions, m)
-                for i in range(len(m_coeffs)):
-                    coeffs[i*degen + m] = m_coeffs[i]
-        atom_coeffs[new_idx] = coeffs                               # building up the vec of coeffs
-        cgto_count += len(ang_set) * degen
+    l_sort_by_atom = []
+    position = 0; 
+    for functions in new_basis:
+       l_sort = [[] for i in range(0,10)]
+       for function in functions:
+          new_l = function[0]
+          l_sort[new_l].append(position)
+          if new_l == 2 and molecule.CartesianD == True:
+             n_new_functions = c.nAngMomCart[new_l]
+          else:
+             n_new_functions = c.nAngMomSpher[new_l] 
+          position += n_new_functions
+       l_sort_by_atom.append(l_sort)
+    n_new_MOs = position
 
-    return atom_coeffs
+    # Expand out MOs from old basis into new 
 
-#---------------------------------------------------------------------------------------
+    new_MOs = numpy.zeros((n_new_MOs,n_new_MOs))
 
-def Basis_Fit_Ang(atom, old_set, MOs, new_ang_set, m):    #Take all the MO coefficents for the state
-    #Getting the set of primitive functions for the old basis
-    cgto_count = m
-    ang_set = [cgto.Primitives for cgto in old_set]
-    Ang = old_set[0].AngularMomentum
+    for (i,atom) in enumerate(molecule.Atoms):
+       for (j,cgtf) in enumerate(atom.Basis):
+          ref_l = cgtf.AngularMomentum
+          n_l = cgtf.NAngMom
+          c_fit = fit_coeffs_by_atom[i][j]
+          l_sort = l_sort_by_atom[i][ref_l]
+          # spread out new coefficients for new functions
+          for (cf,index) in zip(c_fit,l_sort):
+             cMO = MOs[index:index+n_l,:]
+             for n in xrange(len(cMO)):
+                for m in xrange(len(cMO[n])):
+                   new_MOs[index+n,m] += cf*cMO[n,m]
 
-    funcs = range(len(new_ang_set))                               #List of indices for the new basis functions
-    #Finding the overlap matrix for the new orbitals
-    S = numpy.zeros((len(funcs), len(funcs)))
-    for orb1 in funcs:
-        for orb2 in funcs[0:orb1+1]:
-            for prim1 in new_ang_set[orb1]:
-                for prim2 in new_ang_set[orb2]:
-                    S[orb1][orb2] += Get_Overlap(prim1, prim2, Ang, m)
-    S += numpy.transpose(numpy.tril(S,-1))
-
-    #Extracting the old primitives and multiplying them by the MO coefficents
-    old_set = copy.deepcopy(ang_set)
-    for cgto in range(len(old_set)):
-        for prim in old_set[cgto]:
-            prim[1] *=  MOs[cgto_count]
-        cgto_count += (2*Ang + 1)            # This is assuming the MOs are ordered by l
-
-    #Finding the overlap of the new functions with the old
-    T = numpy.array([0.0 for i in funcs])
-    for orb1 in funcs:                         #iterating over new functions
-        for orb2 in range(len(old_set)):       #iterating over old functions
-            for prim1 in new_ang_set[orb1]:
-                for prim2 in old_set[orb2]:
-                    T[orb1] += Get_Overlap(prim1,prim2,Ang, m)
-
-    new_MOs = numpy.linalg.solve(S,T)
-    return numpy.ndarray.tolist(new_MOs)
-
-def get_ang_indices(cgtos, start=0):
-    """ Gets the indices of the MO coefficents associated with each l value
-        as a nested list """
-    max_ang = max([cgto[0] for cgto in cgtos])
-    indices = [[] for l in range(max_ang+1)]        # Init a sub list for each l
-    index_count = start
-    for cgto in cgtos:
-        ang = cgto[0]
-        degen = c.nAngMomSpher[ang]
-        indices[ang] += range(index_count, index_count+degen)
-        index_count += degen
-    return indices
+    return new_MOs
