@@ -69,9 +69,9 @@ def do_calculation(settings, molecule):
 
             # Update basis set for this molecule by copying in old orbitals (fit using new basis set)
             molecule = structures.update_basis(molecule, basis_set)
-            for state in molecule.States:
-                state.Alpha.MOs = alpha_MOs.pop(0)
-                state.Beta.MOs = beta_MOs.pop(0)
+            for index,state in enumerate(molecule.States[1:]):
+                state.Alpha.MOs = alpha_MOs[index+1]
+                state.Beta.MOs = beta_MOs[index+1]
 
             # Iterate over the list of states doing calculations (enforce orthogonality for MOM but not SF-NOCI)
             for index in range(molecule.NStates):
