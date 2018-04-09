@@ -11,18 +11,14 @@ def calculate(settings, molecule):
 
       # Set up structures to hold outputs, compute intermediates
       scattering_patterns = [[] for i in range(0,molecule.NStates)]
-      two_pdms = [make_two_particle_density_matrix(molecule.NOrbitals, state) for state in molecule.States]
-#      print('overlap integrals')
-      coulomb,exchange = check_normalization(molecule.NOrbitals, two_pdms[0], molecule.Overlap)
-#      print('coulomb and exchange normalization',coulomb, exchange)
+      two_pdms = [make_two_particle_density_matrices(molecule.NOrbitals, state) for state in molecule.States]
+#      coulomb,exchange = check_normalization(molecule.NOrbitals, two_pdms[0], molecule.Overlap)
 
       # For each grid point, generate scattering integrals and contract with 2-PDM for each electronic state
-#      print('scattering integrals')
       for grid_point in settings.PropertyGrid:
          evaluate_2e_ints(molecule, 1, grid_point)
          for index,state in enumerate(molecule.States):
             value = contract_two(molecule.NOrbitals, two_pdms[index], molecule.CoulombIntegrals, molecule.ExchangeIntegrals)
-#            print('coulomb + exchange scattering', value)
             scattering_patterns[index].append(molecule.NElectrons+value)
 
       # Print out results
@@ -38,51 +34,56 @@ def calculate(settings, molecule):
 
 #-------------------------------------------------------------
 
-def make_two_particle_density_matrix(n_orbitals, this):
+def make_two_particle_density_matrices(n_orbitals, this):
    
-    two_pdm = numpy.zeros((n_orbitals,) * 4)
+    two_pdm_tot = numpy.zeros((n_orbitals,) * 4)
+    two_pdm_ab  = numpy.zeros((n_orbitals,) * 4)
  
     for a in range(0,n_orbitals):
       for b in range(0,n_orbitals):
         for c in range(0,n_orbitals):
           for d in range(0,n_orbitals):
 
-            two_pdm[a,b,c,d] = (this.Alpha.Density[a,b]*this.Alpha.Density[c,d]
-                                +this.Beta.Density[a,b] *this.Beta.Density[c,d]) 
+            two_pdm_tot[a,b,c,d] =  this.Total.Density[a,b]*this.Total.Density[c,d]
+            two_pdm_ab[a,b,c,d]  = (this.Alpha.Density[a,b]*this.Alpha.Density[c,d]
+                                   +this.Beta.Density[a,b] *this.Beta.Density[c,d]) 
 
-    return two_pdm
+    return [two_pdm_tot,two_pdm_ab]
 
 #-------------------------------------------------------------
 
-def contract_two(n_orbitals, two_pdm, coulomb, exchange):
+def contract_two(n_orbitals, two_pdms, coulomb, exchange):
 
     value = 0.0
+
+    [two_pdm_tot, two_pdm_ab] = two_pdms
 
     for a in range(0,n_orbitals):
       for b in range(0,n_orbitals):
         for c in range(0,n_orbitals):
           for d in range(0,n_orbitals):
 
-            value += two_pdm[a,b,c,d]*(2*coulomb[a,b,c,d]-exchange[a,d,c,b])
-#            print(a,b,c,d, coulomb[a,b,c,d], exchange[a,d,c,b])
-#            value += two_pdm[a,b,c,d]*(coulomb[a,b,c,d])
+            value += two_pdm_tot[a,b,c,d]*coulomb[a,b,c,d]
+            value -= two_pdm_ab[a,b,c,d]*exchange[a,d,c,b]
 
     return value
 
 #-------------------------------------------------------------
 
-def check_normalization(n_orbitals, two_pdm, overlap):
+def check_normalization(n_orbitals, two_pdms, overlap):
 
-    coulomb = 0.0; exchange = 0.0
+    coulomb = 0.0
+    exchange = 0.0 
+
+    [two_pdm_tot, two_pdm_ab] = two_pdms
 
     for a in range(0,n_orbitals):
       for b in range(0,n_orbitals):
         for c in range(0,n_orbitals):
           for d in range(0,n_orbitals):
 
-            coulomb += two_pdm[a,b,c,d]*overlap[a,b]*overlap[c,d]
-            exchange -= 0.5*two_pdm[a,b,c,d]*overlap[a,d]*overlap[c,b]
-#            print(a,b,c,d,overlap[a,b]*overlap[c,d],overlap[a,d]*overlap[c,b])
+            coulomb += two_pdm_tot[a,b,c,d]*overlap[a,b]*overlap[c,d]
+            exchange -= two_pdm_ab[a,b,c,d]*overlap[a,d]*overlap[b,c]
 
     return coulomb,exchange
 
