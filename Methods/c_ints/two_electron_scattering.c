@@ -22,10 +22,8 @@ void two_electron_scattering(double ***fundamentals, double **sigma_P, double **
       Spow *= Ssq;
       df *= (double)(2*m+1);
       S2[m] = Spow;
-      f[m] = Spow/df;
+      f[m] = 1.0/df;
    }        
-
-//   printf("S %12.6f\n", S);
 
    // Loop over all combinations of primitives
 
@@ -58,9 +56,6 @@ void two_electron_scattering(double ***fundamentals, double **sigma_P, double **
              for (m = 1; m < l_max+1; m ++) {
                fundamentals[m][ibra][iket] = 0;
              }
-//             for (m = 0; m < l_max+1; m ++) {
-//               fundamentals[m][ibra][iket] = U*eS*S2[m]*f[m];
-//             }
 
            } else if (R2 < epsilon) { // special case R = 0, S != 0
 
@@ -74,11 +69,6 @@ void two_electron_scattering(double ***fundamentals, double **sigma_P, double **
            
              // compute z^-m j_m(z) for 0 < m < l_max)
              spherical_bessel_j(j,z,l_max);
-//             printf("z = %10.6f, ",z);
-//             for (m = 0; m < l_max+1; m ++) {
-//                printf("j[%i] = %10.6f, ", m, j[m]);
-//             }
-//             printf("\n");
 
              for (m = l_max; m > -1; m --) {
                fundamentals[m][ibra][iket] = U*eS*S2[m]*j[m];

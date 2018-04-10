@@ -51,34 +51,26 @@ void spherical_bessel_j(double* j, double z, int l_max) {
         j[m] = zi*(zinv*sin(zoff) + mm1*zinv2*cos(zoff));
       }
 
-   } else { // Use upward recursion if l_max < l_thresh or downward recursion otherwise
+   } else { // Use upward recursion if l_max < l_thresh or set to zero otherwise
 
       zinv = 1/z; zinv2 = zinv*zinv;
       j0 = sin(z)*zinv;
       j[0] = j0;
       j[1] = (sin(z) - z*cos(z))*zinv2;
 
-      if (l_max < l_thresh) {
-         
-         for (m = 2; m < l_max + 1; m++) {
-            j[m] = (2*m-1)*j[m-1]/z - j[m-2]; 
-         }
+      for (m = 2; m < l_thresh + 1; m++) {
+         j[m] = ((2*m-1)*j[m-1]*zinv - j[m-2]); 
+      }
 
-      } else { 
+      zinv2 = 1.0;
+      for (m = 0; m < l_thresh + 1; m++) {
+         j[m] = j[m]*zinv2;
+         zinv2 *= zinv;
+      }
 
-         zoff = z-l_max*half_pi; mm1 = (double)(l_max*(l_max+1)/2);
-         j[l_max] = pow(z,-l_max)*(zinv*sin(zoff)+mm1*zinv2*cos(zoff));
-
-         zoff = z-(l_max-1)*half_pi; mm1 = (double)(l_max*(l_max-1)/2);
-         j[l_max-1] = pow(z,-l_max+1)*(zinv*sin(zoff)+mm1*zinv2*cos(zoff));
-
-         for (m = l_max; m > -1; m--) {
-            j[m] = (2*m+3)*j[m+1] - j[m+2];
-         }
-
-         // is renormalization necessary if we start from reliable values of j[l_max] and j[l_max-1]?
-         // check by printing j[0] and j0
-      } 
+      for (m = l_max; m > l_thresh; m--) {
+         j[m] = 0.0;
+      }
 
    } // end cases - series expansion at low z, asymptotic expansion at high z and direct evaluation + recurrence relations otherwise 
 
