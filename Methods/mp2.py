@@ -46,8 +46,8 @@ def do(settings, molecule):
                     Alpha_Coulomb[a][b][c][d]      +=  Ca[m][a]*Ca[n][b]*Ca[l][c]*Ca[s][d] * molecule.CoulombIntegrals[m][n][l][s]
                     Beta_Coulomb[a][b][c][d]       +=  Cb[m][a]*Cb[n][b]*Cb[l][c]*Cb[s][d] * molecule.CoulombIntegrals[m][n][l][s]
                     Alpha_Beta_Coulomb[a][b][c][d] +=  Ca[m][a]*Ca[n][b]*Cb[l][c]*Cb[s][d] * molecule.CoulombIntegrals[m][n][l][s]
-                    Alpha_Exchange[a][b][c][d]     +=  Ca[m][a]*Ca[n][b]*Ca[l][c]*Ca[s][d] * molecule.ExchangeIntegrals[m][n][l][s]
-                    Beta_Exchange[a][b][c][d]      +=  Cb[m][a]*Cb[n][b]*Cb[l][c]*Cb[s][d] * molecule.ExchangeIntegrals[m][n][l][s]
+                    Alpha_Exchange[a][b][c][d]     +=  Ca[m][a]*Ca[s][d]*Ca[n][b]*Ca[l][c] * molecule.CoulombIntegrals[m][n][l][s]
+                    Beta_Exchange[a][b][c][d]      +=  Cb[m][a]*Cb[s][d]*Cb[n][b]*Cb[l][c] * molecule.CoulombIntegrals[m][n][l][s]
 
     # Use the transformed integrals in the MP2 energy expression, i,j index occupied MOs and p,q are virtuals
     MP2_Eaa = 0.0

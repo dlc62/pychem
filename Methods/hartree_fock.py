@@ -255,29 +255,6 @@ def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
                               molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
                               molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
 
-            if (d >= a):
-              ad = molecule.ShellPairs[(a,d)]; 
-              ia_vec = ad.Centre1.Ivec; id_vec = ad.Centre2.Ivec
-
-              if (b >= c):
-                cb = molecule.ShellPairs[(c,b)]; 
-                ic_vec = cb.Centre1.Ivec; ib_vec = cb.Centre2.Ivec
-
-                exchange = integrals.two_electron(ad,cb,ints_type,grid_value)
-
-                for m in range(0,len(ia_vec)):
-                    for n in range(0,len(ib_vec)):
-                        for l in range(0,len(ic_vec)):
-                            for s in range(0,len(id_vec)):
-                              molecule.ExchangeIntegrals[ (ia_vec[m], id_vec[s], ic_vec[l], ib_vec[n]) ] = exchange[m][s][l][n]
-                              molecule.ExchangeIntegrals[ (id_vec[s], ia_vec[m], ic_vec[l], ib_vec[n]) ] = exchange[m][s][l][n]
-                              molecule.ExchangeIntegrals[ (ia_vec[m], id_vec[s], ib_vec[n], ic_vec[l]) ] = exchange[m][s][l][n]
-                              molecule.ExchangeIntegrals[ (id_vec[s], ia_vec[m], ib_vec[n], ic_vec[l]) ] = exchange[m][s][l][n]
-                              molecule.ExchangeIntegrals[ (ic_vec[l], ib_vec[n], ia_vec[m], id_vec[s]) ] = exchange[m][s][l][n]
-                              molecule.ExchangeIntegrals[ (ic_vec[l], ib_vec[n], id_vec[s], ia_vec[m]) ] = exchange[m][s][l][n]
-                              molecule.ExchangeIntegrals[ (ib_vec[n], ic_vec[l], ia_vec[m], id_vec[s]) ] = exchange[m][s][l][n]
-                              molecule.ExchangeIntegrals[ (ib_vec[n], ic_vec[l], id_vec[s], ia_vec[m]) ] = exchange[m][s][l][n]
-
 #----------------------------------------------------------------------
 
 def make_coulomb_exchange_matrices(molecule, this):
@@ -292,8 +269,8 @@ def make_coulomb_exchange_matrices(molecule, this):
           for d in range(0,molecule.NOrbitals):
 
              this.Total.Coulomb[a,b]  +=  this.Total.Density[c,d]*molecule.CoulombIntegrals[a,b,c,d]
-             this.Alpha.Exchange[a,b] += -this.Alpha.Density[c,d]*molecule.ExchangeIntegrals[a,d,c,b]
-             this.Beta.Exchange[a,b]  += -this.Beta.Density[c,d]*molecule.ExchangeIntegrals[a,d,c,b]
+             this.Alpha.Exchange[a,d] += -this.Alpha.Density[b,c]*molecule.CoulombIntegrals[a,b,c,d]
+             this.Beta.Exchange[a,d]  += -this.Beta.Density[b,c]*molecule.CoulombIntegrals[a,b,c,d]
 
 #----------------------------------------------------------------------
 

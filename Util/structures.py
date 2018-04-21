@@ -470,7 +470,6 @@ class Molecule:
         self.Xt = []
         self.S = []
         self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
-        self.ExchangeIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
         ### Generate and store ShellPair data for all unique pairs of CGTFs ###
         ### Include data required to convert basis functions and integrals  ###
         ### from Cartesian to spherical polar coordinates before storing    ### 
