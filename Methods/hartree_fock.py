@@ -1,8 +1,6 @@
 # System libraries
 import numpy
 from numpy import dot
-import scipy
-from scipy.linalg import sqrtm
 import sys
 
 # Custom-written data modules
@@ -221,7 +219,7 @@ def make_core_matrices(molecule):
     molecule.X = numpy.dot(U[:,:nsp],numpy.identity(nsp)*sp)
     molecule.Xt = numpy.transpose(molecule.X)
     # construct and store half-overlap matrix
-    molecule.S = sqrtm(molecule.Overlap)
+    molecule.S = numpy.dot(molecule.X,molecule.Xt)
 
 #----------------------------------------------------------------------
 
