@@ -237,7 +237,7 @@ def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
         for m in range(0,len(ia_vec)):
           for n in range(0,len(ib_vec)):
             bounds[(m,n)] = coulomb[m][n][m][n]
-        molecule.Bounds[a][b] = bounds
+        molecule.Bounds[a][b] = numpy.sqrt(bounds)
         
         for m in range(0,len(ia_vec)):
           for n in range(0,len(ib_vec)):
@@ -266,7 +266,7 @@ def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
             if (a == c) and (b == d):
               coulomb = None      # Already done
             else:
-              coulomb_bound = numpy.multiply.outer(numpy.sqrt(ab_bound),numpy.sqrt(cd_bound))
+              coulomb_bound = numpy.multiply.outer(ab_bound,cd_bound)
               if numpy.amax(coulomb_bound) > constants.integral_threshold:
                 coulomb = integrals.two_electron(ab,cd,ints_type,grid_value)
               else:
