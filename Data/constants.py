@@ -28,7 +28,7 @@ for i in range(0,99):
   nAngMomSpher[i] = 2*i+1
 
 # Settings and thresholds
-integral_threshold = -1.e-10
+integral_threshold = 1.e-10
 energy_convergence = 1.e-6
 density_convergence = 1.e-6
 DIIS_convergence = 1.e-5

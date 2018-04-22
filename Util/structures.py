@@ -469,6 +469,7 @@ class Molecule:
         self.X = []
         self.Xt = []
         self.S = []
+        self.Bounds = numpy.ndarray.tolist(numpy.zeros((self.NCgtf,) * 2)) 
         self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
         ### Generate and store ShellPair data for all unique pairs of CGTFs ###
         ### Include data required to convert basis functions and integrals  ###

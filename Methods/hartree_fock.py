@@ -1,10 +1,11 @@
 # System libraries
+from __future__ import print_function
 import numpy
 from numpy import dot
 import sys
 
 # Custom-written data modules
-from Data import constants as c
+from Data import constants
 
 # Custom-written utility modules
 from Util import printf
@@ -81,7 +82,7 @@ def do(settings, molecule, basis_set, state_index = 0):
     final_loop = False
     diis_error = None
 
-    while c.energy_convergence < abs(dE):
+    while constants.energy_convergence < abs(dE):
         num_iterations += 1
         
         #-------------------------------------------#
@@ -122,7 +123,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         dE = this_state.Energy - old_energy
         this_state.TotalEnergy = this_state.Energy + molecule.NuclearRepulsion
 
-        if abs(dE) < c.energy_convergence:
+        if abs(dE) < constants.energy_convergence:
             final_loop = True
 
         # Loop print
@@ -225,31 +226,66 @@ def make_core_matrices(molecule):
 
 def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
 
+    # Compute Schwarz bounds and store integrals generated in process
     for a in range(0,molecule.NCgtf):
       for b in range(a,molecule.NCgtf):
+
+        ab = molecule.ShellPairs[(a,b)]; 
+        ia_vec = ab.Centre1.Ivec; ib_vec = ab.Centre2.Ivec
+        bounds = numpy.zeros((len(ia_vec),len(ib_vec)))
+        coulomb = integrals.two_electron(ab,ab,ints_type,grid_value)
+        for m in range(0,len(ia_vec)):
+          for n in range(0,len(ib_vec)):
+            bounds[(m,n)] = coulomb[m][n][m][n]
+        molecule.Bounds[a][b] = bounds
+        
+        for m in range(0,len(ia_vec)):
+          for n in range(0,len(ib_vec)):
+            for l in range(0,len(ia_vec)):
+              for s in range(0,len(ib_vec)):
+                molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ia_vec[l], ib_vec[s]) ] = coulomb[m][n][l][s]
+                molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ia_vec[l], ib_vec[s]) ] = coulomb[m][n][l][s]
+                molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ib_vec[s], ia_vec[l]) ] = coulomb[m][n][l][s]
+                molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ib_vec[s], ia_vec[l]) ] = coulomb[m][n][l][s]
+
+    # Evaluate and store all other non-negligible 2e ints
+    for a in range(0,molecule.NCgtf):
+      for b in range(a,molecule.NCgtf):
+
+        ab = molecule.ShellPairs[(a,b)]  
+        ab_bound = molecule.Bounds[a][b]
+        ia_vec = ab.Centre1.Ivec; ib_vec = ab.Centre2.Ivec
+
         for c in range(a,molecule.NCgtf):
           for d in range(c,molecule.NCgtf):
 
-            ab = molecule.ShellPairs[(a,b)]; 
-            ia_vec = ab.Centre1.Ivec; ib_vec = ab.Centre2.Ivec
-
-            cd = molecule.ShellPairs[(c,d)]; 
+            cd = molecule.ShellPairs[(c,d)]  
+            cd_bound = molecule.Bounds[c][d]
             ic_vec = cd.Centre1.Ivec; id_vec = cd.Centre2.Ivec
 
-            coulomb = integrals.two_electron(ab,cd,ints_type,grid_value)
+            if (a == c) and (b == d):
+              coulomb = None      # Already done
+            else:
+              coulomb_bound = numpy.multiply.outer(numpy.sqrt(ab_bound),numpy.sqrt(cd_bound))
+              if numpy.amax(coulomb_bound) > constants.integral_threshold:
+                coulomb = integrals.two_electron(ab,cd,ints_type,grid_value)
+              else:
+                coulomb = None    # Already initialized to zero
 
-            for m in range(0,len(ia_vec)):
-              for n in range(0,len(ib_vec)):
-                for l in range(0,len(ic_vec)):
-                  for s in range(0,len(id_vec)):
-                    molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
-                    molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
-                    molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
-                    molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
-                    molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
-                    molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
-                    molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
-                    molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
+            if coulomb is not None:
+ 
+              for m in range(0,len(ia_vec)):
+                for n in range(0,len(ib_vec)):
+                  for l in range(0,len(ic_vec)):
+                    for s in range(0,len(id_vec)):
+                      molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
+                      molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
+                      molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
+                      molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
+                      molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
+                      molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
+                      molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
+                      molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
 
 #----------------------------------------------------------------------
 
