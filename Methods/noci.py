@@ -4,9 +4,7 @@ from scipy.linalg import eigh as gen_eig
 # Custom code
 from hartree_fock import make_coulomb_exchange_matrices
 from Util import printf
-from Data import constants as c
-
-NOCI_thresh = 1e-10
+from Data import constants as const
 
 #--------------------------------------------------------------#
 #                Set up required structures                    # 
@@ -121,7 +119,7 @@ def make_weighted_density(MOs, overlaps):
     nOrbs = np.shape(MOs)[1]
     density = np.zeros((nOrbs, nOrbs))
     for i, overlap in enumerate(overlaps):
-        if overlap > NOCI_thresh:
+        if overlap > const.NOCI_thresh:
             P = np.outer(MOs[0][:,i], MOs[1][:,i])
             density += P / overlap
         else:
@@ -132,7 +130,7 @@ def process_overlaps(reduced_overlap, zeros_list, overlaps, spin):
     # Builds up the list of zero values as a list of (zero, spin) tuples
     # as well as the reduced overlap value
     for i, overlap in enumerate(overlaps):
-        if overlap > NOCI_thresh:
+        if overlap > const.NOCI_thresh:
             reduced_overlap *= overlap
         else:
             zeros_list.append((i,spin))
@@ -171,11 +169,11 @@ def no_zeros(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, b
 
     # Add the one electron terms
     for i in range(molecule.NAlphaElectrons):
-        if alpha_overlaps[i] > NOCI_thresh:
+        if alpha_overlaps[i] > const.NOCI_thresh:
             elem += alpha_core[i,i] / alpha_overlaps[i]
 
     for i in range(molecule.NBetaElectrons):
-        if beta_overlaps[i] > NOCI_thresh:
+        if beta_overlaps[i] > const.NOCI_thresh:
              elem += beta_core[i,i] / beta_overlaps[i]
 
     return elem
