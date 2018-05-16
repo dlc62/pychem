@@ -113,7 +113,7 @@ def get_C2_coeffs(matrix, residuals):
     best_vect = None
     for vect in vects:
         vect /= sum(vect)         # renormalization
-        if abs(max(vect)) < 100:  # exluding vectors with large non-linearities
+        if abs(max(vect)) < 100:  # excluding vectors with large non-linearities
             error = estimate_error(vect, residuals)
             error_val = numpy.linalg.norm(error)
             if error_val < min_error:
@@ -143,6 +143,9 @@ def inner_product(mat1, mat2):
 def eigenvalue_condition_number(matrix):
     eigvals, eigvecs = numpy.linalg.eig(matrix)
     abs_eigvals = [abs(element) for element in eigvals]
-    condition_number = max(abs_eigvals) / min(abs_eigvals) 
+    try:
+       condition_number = max(abs_eigvals) / min(abs_eigvals) 
+    except:
+       condition_number = float("Inf")     # Arbitrary large number
     return condition_number
 
