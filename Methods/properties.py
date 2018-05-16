@@ -46,8 +46,8 @@ def make_two_particle_density_matrices(n_orbitals, this):
           for d in range(0,n_orbitals):
 
             two_pdm_tot[a,b,c,d] =  this.Total.Density[a,b]*this.Total.Density[c,d]
-            two_pdm_ab[a,b,c,d]  = (this.Alpha.Density[a,d]*this.Alpha.Density[b,c]
-                                   +this.Beta.Density[a,d] *this.Beta.Density[b,c]) 
+            two_pdm_ab[a,b,c,d]  = (this.Alpha.Density[a,d]*this.Alpha.Density[c,b]
+                                   +this.Beta.Density[a,d] *this.Beta.Density[c,b]) 
 
     return [two_pdm_tot,two_pdm_ab]
 
