@@ -23,7 +23,7 @@ def process_input(section, parser):
     inputs = inputs_return_function(section, parser)
     settings = Settings(inputs, section)
     molecule = Molecule(inputs=inputs, settings=settings)
-    if settings.SCF.BasisFit and molecule.CartesianD:
+    if settings.SCF.BasisFit and (molecule.CartesianL != []):
        print('Error: basis fitting currently not available for Cartesian basis functions')
        sys.exit()
     return molecule,settings
@@ -153,6 +153,11 @@ class Settings:
         except:
         #   print('Custom print options not supplied or recognised, defaulting to basic printing') 
            pass
+        try:
+            self.DumpMOs = inputs("Dump_MOs")
+            assert type(self.DumpMOs) is bool
+        except:
+            self.DumpMOs = False
         self.OutFileName = str(section_name) + '.out'
         self.OutFile = None
         self.SectionName = section_name
@@ -181,6 +186,15 @@ class Set_SCF:
         except AssertionError:
            print('Error: Only the following references are available:', available_references)
            sys.exit()
+        try:
+           self.ConstrainExcited = inputs("Constrain_Excited")
+        except:
+           if self.Reference == "CUHF":
+               self.ConstrainExcited = True
+           else:
+               self.ConstrainExcited = False
+        #------------------------- SCF Guess -------------------------#
+        available_guesses = ['READ', 'CORE', 'SAD']
         #------------------------- SCF Guess -------------------------#
         available_guesses = ['READ', 'CORE', 'SAD']
         try:
@@ -351,12 +365,18 @@ class Molecule:
               print('Error: must specify molecule multiplicity using Multiplicity =')
               sys.exit()
 
-        #---- Special flag to enable use of Cartesian d functions -----#
+        #-------- Special flags for basis set modifications -----------#
         try:
-           cartesian_d = inputs("Cartesian_D")
-           self.CartesianD = True
+           cartesian_l = inputs("Cartesian_L")
+           self.CartesianL = cartesian_l
         except:
-           self.CartesianD = False
+           self.CartesianL = []
+
+        try:
+           max_l = inputs("Max_L")
+           self.MaxL = max_l
+        except:
+           self.MaxL = 100   # Ridiculously large dummy value
 
         #----------------------- Excitations --------------------------#
         available_excitation_types = [None, 'HOMO-LUMO', 'CUSTOM-SINGLE','CUSTOM-SINGLES', 'CUSTOM-PAIRED',
@@ -441,7 +461,7 @@ class Molecule:
         self.NCgtf = 0
         for index,row in enumerate(self.Coords):
             ### Add Atom to Molecule ###
-            atom = Atom(index,row,self.Basis,self.CartesianD,self.CoordsScaleFactor)
+            atom = Atom(index,row,self.Basis,self.CartesianL,self.MaxL,self.CoordsScaleFactor)
             self.Atoms.append(atom)
             self.NElectrons += c.nElectrons[atom.Label]
             self.NCoreOrbitals += c.nCoreOrbitals[atom.Label]
@@ -469,6 +489,7 @@ class Molecule:
         self.X = []
         self.Xt = []
         self.S = []
+        self.Si = []
         self.Bounds = numpy.ndarray.tolist(numpy.zeros((self.NCgtf,) * 2)) 
         self.CoulombIntegrals = numpy.zeros((self.NOrbitals,) * 4) 
         ### Generate and store ShellPair data for all unique pairs of CGTFs ###
@@ -762,20 +783,21 @@ class Molecule:
 #=====================================================================#
 
 class Atom:
-    def __init__(self,index,row,basis_set,cartesian_d,to_bohr):
+    def __init__(self,index,row,basis_set,cartesian_l,max_l,to_bohr):
         [label,Z,x,y,z] = row
         self.Index = index
         self.Label = label.upper()
         self.NuclearCharge = Z
         self.Coordinates = [x*to_bohr,y*to_bohr,z*to_bohr]
-        self.update_atomic_basis(basis_set,cartesian_d) 
-    def update_atomic_basis(self,basis_set,cartesian_d):
+        self.update_atomic_basis(basis_set,cartesian_l,max_l) 
+    def update_atomic_basis(self,basis_set,cartesian_l,max_l):
         self.Basis = []
         self.NFunctions = 0
         self.MaxAng = 0
         basis_data = basis.get[basis_set][self.Label]
         for function in basis_data:
-            cgtf = ContractedGaussian(function,cartesian_d)
+          if function[0] <= max_l:
+            cgtf = ContractedGaussian(function,cartesian_l)
             self.Basis.append(cgtf)
             self.NFunctions += cgtf.NAngMom
             if function[0] > self.MaxAng:
@@ -788,7 +810,7 @@ class Atom:
 #---------------------------------------------------------------------#
 
 class ContractedGaussian:
-    def __init__(self,function,cartesian_d):
+    def __init__(self,function,cartesian_l):
         self.AngularMomentum = function[0]
         self.NAngMomCart  = c.nAngMomCart[self.AngularMomentum]
         self.NAngMomSpher = c.nAngMomSpher[self.AngularMomentum]
@@ -797,7 +819,7 @@ class ContractedGaussian:
         self.Exponents = numpy.array([exponent for [exponent,cc] in self.Primitives])
         self.DoubleExponents = numpy.multiply(self.Exponents,2.0)
         self.ScaledCCs = [cc*(2*exponent)**((self.AngularMomentum+1.5)/2.0) for [exponent,cc] in self.Primitives]
-        if self.AngularMomentum == 2 and cartesian_d == 2:
+        if self.AngularMomentum in cartesian_l:
            self.NAngMom = self.NAngMomCart
            self.CartToSpher = numpy.identity(self.NAngMomCart)
         else:
@@ -887,9 +909,12 @@ class ShellPair:
        nmB = numpy.array([cgtf_b.ContractionScaling]); ccB = numpy.array([cgtf_b.ScaledCCs]) 
        self.Normalization = numpy.array([(nmA.T).dot(nmB).flatten()])
        self.ContractionCoeffs = (ccA.T).dot(ccB)
-       nlsA = cgtf_a.NAngMomSpher; nlcA = cgtf_a.NAngMomCart 
-       nlsB = cgtf_b.NAngMomSpher; nlcB = cgtf_b.NAngMomCart 
-       self.BasisTransform = numpy.zeros((nlsA*nlsB,nlcA*nlcB))
+#       nlsA = cgtf_a.NAngMomSpher; nlcA = cgtf_a.NAngMomCart 
+#       nlsB = cgtf_b.NAngMomSpher; nlcB = cgtf_b.NAngMomCart 
+       nlA = cgtf_a.NAngMom; nlcA = cgtf_a.NAngMomCart 
+       nlB = cgtf_b.NAngMom; nlcB = cgtf_b.NAngMomCart 
+       self.BasisTransform = numpy.zeros((nlA*nlB,nlcA*nlcB))
+#       self.BasisTransform = numpy.zeros((nlsA*nlsB,nlcA*nlcB))
        ispher = -1
        for sA in cgtf_a.CartToSpher:
          for sB in cgtf_b.CartToSpher:
@@ -937,3 +962,7 @@ def reorder_MOs(old_MOs, occupancy):
         new_MOs[:,[frm[i],to[i]]] = new_MOs[:,[to[i],frm[i]]]
     return new_MOs
 
+def swap_MOs(old_MOs,frm,to):
+    new_MOs = old_MOs.copy()
+    new_MOs[:,[frm,to]] = new_MOs[:,[to,frm]]
+    return new_MOs
