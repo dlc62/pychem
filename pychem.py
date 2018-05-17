@@ -40,20 +40,37 @@ def do_calculation(settings, molecule):
     if os.path.exists(settings.OutFileName): os.remove(settings.OutFileName) 
     settings.OutFile = open(settings.OutFileName,'a+')
 
+    # Calculate HF states from highest spin multiplicity to lowest
+    state_order = [index for index in range(0,molecule.NStates)]
+    if 'SF' in molecule.ExcitationType: state_order.reverse()
+
     if settings.Method is not None:
 
         # Do ground state calculation in the starting basis, storing MOs (and 2e ints as appropriate) as we go
         basis_set = settings.BasisSets[0]
-        hartree_fock.do(settings, molecule, basis_set)
+        hartree_fock.do(settings, molecule, basis_set, state_order[0], initial_run=True)
  
         #-------------------------------------------------------------------
         # Generate starting orbital sets for each of the requested excited states and do calculation in first basis
-        for index, state in enumerate(molecule.States[1:], start = 1):
-        
+        for i in range(1,molecule.NStates):
+            index = state_order[i]; prev_index = state_order[i-1]
+            state = molecule.States[index]; prev_state = molecule.States[prev_index]
+
+            # Use higher spin-multiplicity virtuals as starting guess for spin-broken UHF beta orbitals
+            if 'SF' in molecule.ExcitationType:
+                state.Alpha.MOs = prev_state.Alpha.MOs[:,:]
+                state.Beta.MOs = prev_state.Alpha.MOs[:,:]
+                keep_constrained = (settings.SCF.ConstrainExcited and index != 0) 
+                if settings.SCF.Reference == "UHF" and not keep_constrained:
+                    n_swap = prev_state.NAlpha - state.NAlpha
+                    for i_swap in range(0,n_swap):
+                        to = state.NBeta - 1 + i_swap
+                        frm = prev_state.NAlpha - 1 - i_swap
+                        state.Beta.MOs = structures.swap_MOs(state.Beta.MOs, to, frm)
             # Reorder MOs if changing orbital occupancy, but not if changing spin multiplicity
-            if molecule.NAlphaElectrons == state.NAlpha:
-                state.Alpha.MOs = structures.reorder_MOs(molecule.States[0].Alpha.MOs, state.Alpha.Occupancy)
-                state.Beta.MOs = structures.reorder_MOs(molecule.States[0].Beta.MOs, state.Beta.Occupancy)
+            elif molecule.NAlphaElectrons == state.NAlpha:
+                state.Alpha.MOs = structures.reorder_MOs(molecule.States[prev_index].Alpha.MOs, state.Alpha.Occupancy)
+                state.Beta.MOs = structures.reorder_MOs(molecule.States[prev_index].Beta.MOs, state.Beta.Occupancy)
 
             hartree_fock.do(settings, molecule, basis_set, index)
 

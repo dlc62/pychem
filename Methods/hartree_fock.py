@@ -3,6 +3,8 @@ from __future__ import print_function
 import numpy
 from numpy import dot
 import sys
+#from scipy.linalg import sqrtm
+from math import sqrt
 
 # Custom-written data modules
 from Data import constants
@@ -20,7 +22,7 @@ import hf_extensions as hf
 #                                                                 #
 #=================================================================#
 
-def do(settings, molecule, basis_set, state_index = 0):
+def do(settings, molecule, basis_set, state_index, initial_run = False):
 
     # Calculate values that are constant throughout the calculation
     molecule.NuclearRepulsion = integrals.nuclear_repulsion(molecule)
@@ -28,8 +30,8 @@ def do(settings, molecule, basis_set, state_index = 0):
 
     # Set up for SCF calculation
     this_state = molecule.States[state_index]
-    if state_index == 0:
-       initialize_fock_matrices(molecule.Core, this_state)
+    initialize_fock_matrices(molecule.Core, this_state)
+    if initial_run:
        evaluate_2e_ints(molecule)
 
     # Generate initial orbitals and/or density matrices
@@ -73,6 +75,8 @@ def do(settings, molecule, basis_set, state_index = 0):
        printf.text_value(settings.OutFile, " Nuclear repulsion energy: ", molecule.NuclearRepulsion)
        printf.text_value(settings.OutFile, " Alpha density matrix ", this_state.Alpha.Density,
                                            " Beta density matrix ", this_state.Beta.Density)
+       printf.text_value(settings.OutFile, " Alpha MO coefficients ", this_state.Alpha.MOs,
+                                           " Beta MO coefficients ", this_state.Beta.MOs)
     printf.delimited_text(settings.OutFile," Hartree-Fock iterations ") 
 
     #-------------------------------------------#
@@ -93,7 +97,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         make_fock_matrices(molecule, this_state)
          
         # apply CUHF constraints
-        if settings.SCF.Reference == "CUHF":
+        if settings.SCF.Reference == "CUHF" or (settings.SCF.ConstrainExcited and state_index != 0):
             constrain_UHF(molecule, this_state)
 
         #-------------------------------------------#
@@ -111,8 +115,8 @@ def do(settings, molecule, basis_set, state_index = 0):
         
         make_MOs(molecule, this_state)
 
-        # Optionally, use MOM to reorder MOs
-        if settings.MOM.Use and reference_orbitals != None:  
+        # Optionally, use MOM to reorder MOs but absolutely not if doing NOCI calculations
+        if settings.MOM.Use and reference_orbitals != None and settings.Method != "NOCI":  
             hf.mom.do(molecule, this_state, state_index, reference_orbitals)
        #-------------------------------------------#
 
@@ -129,7 +133,7 @@ def do(settings, molecule, basis_set, state_index = 0):
         # Loop print
         printf.text_value(settings.OutFile, " Cycle: ", num_iterations, " Total energy: ", this_state.TotalEnergy,
                           " Change in energy: ", dE, " DIIS error: ", diis_error)
-        if settings.PrintLevel == "DEBUG":
+        if settings.PrintLevel == "VERBOSE":
            print_intermediates(settings.OutFile, this_state, (settings.SCF.Reference == "RHF"))
 
         if num_iterations >= settings.SCF.MaxIter:
@@ -143,8 +147,7 @@ def do(settings, molecule, basis_set, state_index = 0):
     printf.blank_line(settings.OutFile)
     print_intermediates(settings.OutFile, this_state, (settings.SCF.Reference == "RHF"))
     printf.delimited_text(settings.OutFile, " End of Hartree-Fock calculation ")
-    # TODO Print settings shouldn't determine if the MOs are saved
-    if (settings.PrintLevel == 'VERBOSE'):
+    if settings.DumpMOs:
        numpy.savetxt(basis_set+'_'+str(state_index)+'.alpha_MOs',this_state.Alpha.MOs)
        numpy.savetxt(basis_set+'_'+str(state_index)+'.beta_MOs',this_state.Beta.MOs)
 
@@ -215,12 +218,15 @@ def make_core_matrices(molecule):
     s,U = numpy.linalg.eigh(molecule.Overlap)
     U = U[:,s.argsort()[::-1]]
     s = numpy.sort(s)[::-1]
-    sp = [element**-0.5e0 for element in s if element > 0.0]
+    sp = [element**-0.5e0 for element in s if element > constants.linear_dependence]
     nsp = len(sp)
     molecule.X = numpy.dot(U[:,:nsp],numpy.identity(nsp)*sp)
     molecule.Xt = numpy.transpose(molecule.X)
     # construct and store half-overlap matrix
-    molecule.S = numpy.dot(molecule.X,molecule.Xt)
+    sr = numpy.zeros((nsp,nsp))
+    for i,element in enumerate(sp):
+       sr[i,i] = 1/element 
+    molecule.S = (U[:,:nsp]).dot(sr).dot(U[:,:nsp].T)
 
 #----------------------------------------------------------------------
 
@@ -301,8 +307,8 @@ def make_coulomb_exchange_matrices(molecule, this):
           for d in range(0,molecule.NOrbitals):
 
              this.Total.Coulomb[a,b]  +=  this.Total.Density[c,d]*molecule.CoulombIntegrals[a,b,c,d]
-             this.Alpha.Exchange[a,d] += -this.Alpha.Density[b,c]*molecule.CoulombIntegrals[a,b,c,d]
-             this.Beta.Exchange[a,d]  += -this.Beta.Density[b,c]*molecule.CoulombIntegrals[a,b,c,d]
+             this.Alpha.Exchange[a,d] += -this.Alpha.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
+             this.Beta.Exchange[a,d]  += -this.Beta.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
 
 #----------------------------------------------------------------------
 
@@ -323,7 +329,7 @@ def constrain_UHF(molecule, this):
     S = molecule.S
 
     half_density_matrix = S.dot(this.Total.Density/2).dot(S)
-    NO_vals, NO_vects = numpy.linalg.eigh(half_density_matrix)  # See J. Chem. Phys. 88, 4926
+    NO_vals, NO_vects = numpy.linalg.eigh(half_density_matrix)  # See J. Chem. Phys. 1988, 88(8), 4926
     NO_coeffs = numpy.linalg.inv(S).dot(NO_vects)               # for details on finding the NO coefficents
     back_trans = numpy.linalg.inv(NO_coeffs)
 
