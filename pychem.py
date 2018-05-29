@@ -42,7 +42,8 @@ def do_calculation(settings, molecule):
 
     # Calculate HF states from highest spin multiplicity to lowest
     state_order = [index for index in range(0,molecule.NStates)]
-    if 'SF' in molecule.ExcitationType: state_order.reverse()
+    if molecule.ExcitationType is not None:
+        if 'SF' in molecule.ExcitationType: state_order.reverse()
 
     if settings.Method is not None:
 
