@@ -1,10 +1,12 @@
 # System libraries
+import copy
 import numpy as np
 from scipy.linalg import eigh as gen_eig
 # Custom code
-from hartree_fock import make_coulomb_exchange_matrices
+from hartree_fock import make_coulomb_exchange_matrices, make_density_matrices
 from Util import printf
 from Data import constants as const
+from Util import structures
 
 #--------------------------------------------------------------#
 #                Set up required structures                    # 
@@ -31,6 +33,10 @@ class Matrices:
 #                       Main routine                           # 
 #--------------------------------------------------------------#
 def do(settings, molecule):
+
+    if "SF" in molecule.ExcitationType:
+        reorder_orbitals(molecule)
+
     dims = len(molecule.States)              # Dimensionality of the CI space
     CI_matrix = np.zeros((dims, dims))
     CI_overlap = np.zeros((dims, dims))
@@ -84,12 +90,81 @@ def do(settings, molecule):
 
     # Solve the generalized eigenvalue problem
     energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
+    molecule.NOCIEnergies = energies
+    molecule.NOCIWavefunction = wavefunctions
 
     # Print the results to file
     printf.delimited_text(settings.OutFile," NOCI output ")
     printf.text_value(settings.OutFile, " States ", wavefunctions, " NOCI Energies ", energies)
     if settings.PrintLevel == "VERBOSE" or settings.PrintLevel == "DEBUG":
        printf.text_value(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 
+
+#---------------------------------------------------------------------#
+#     Functions for rearranging the HF orbitals as required           #
+#---------------------------------------------------------------------#
+def assemble_orbitals(MOs_shape, occupancies, first_set, second_set):
+    new_MOs = np.zeros(MOs_shape)
+
+    n_orbitals_occupied = 0
+    for i, occ in enumerate(occupancies):
+        if occ == 0:
+            continue
+        elif occ == 1 and first_set.Occupancy[i] == 1:
+            new_MOs[:,n_orbitals_occupied] = first_set.MOs[:,i]
+            n_orbitals_occupied += 1 
+        elif occ == 1 and second_set.Occupancy[i] == 1:
+            new_MOs[:,n_orbitals_occupied] = second_set.MOs[:,i]
+            n_orbitals_occupied += 1 
+        else:
+            raise ValueError("Trying to construct a state without a HF optimized orbital")
+
+    return new_MOs
+
+
+def reorder_orbitals(molecule):
+
+    new_states = []
+    for spin_state in molecule.SpinFlipStates:
+
+        # Select the required HF state
+        HF_state = molecule.States[spin_state[0]]
+        assert HF_state.NAlpha >= HF_state.NBeta, "All high multiplicity states should have more alpha electrons than beta"
+
+        # Decide which of the two sets of orbits we want to use to form the 
+        # alpha and beta sets of the NOCI state respectivly. We want to ensure that 
+        # states with permutational spin symmetry in their occupancies reflect 
+        # this in their MOs 
+        # If the ocupancies are the same this doesn't matter
+        as_alpha = HF_state.Alpha
+        as_beta = HF_state.Beta
+
+        # Else let the set with the lowest unoccupied orbital use the alpha set as a way 
+        # of defining this unambigiously
+        if spin_state[1] != spin_state[2]:
+            for (alpha, beta) in zip(spin_state[1], spin_state[2]):
+                if alpha == 1 and beta == 0:
+                    as_alpha = HF_state.Beta
+                    as_beta = HF_state.Alpha
+                if alpha == 0 and beta == 1:
+                    as_alpha = HF_state.Alpha
+                    as_beta = HF_state.Beta
+
+        # Now assemble the new orbitals
+        new_alpha = assemble_orbitals(HF_state.Alpha.MOs.shape, spin_state[1], as_alpha, as_beta)
+        new_beta = assemble_orbitals(HF_state.Beta.MOs.shape, spin_state[2], as_beta, as_alpha)
+
+        new_state = structures.ElectronicState(spin_state[1], spin_state[2], molecule.NOrbitals)
+        new_state.Alpha.MOs = new_alpha
+        new_state.Beta.MOs = new_beta
+        new_state.TotalEnergy = HF_state.TotalEnergy
+        new_state.Energy = HF_state.Energy
+        make_density_matrices(molecule, new_state)
+
+        new_states.append(new_state)
+
+    if new_states != []:
+        molecule.States = new_states
+
 
 #---------------------------------------------------------------------#
 #  Functions for computing overlaps, densities, biorthogonalized MOs  # 

@@ -206,9 +206,11 @@ class Set_SCF:
         if self.Guess == "READ" or Method == None:
             try:
                 mo_read_state = inputs("MO_Read_State")
+                if type(mo_read_state) is list:
+                    mo_read_state = [str(i) for i in mo_read_state]
                 mo_read_basis = remove_punctuation(inputs("MO_Read_Basis"))
-                self.AlphaMOFile = mo_read_basis + '_' + mo_read_state + '.alpha_MOs' 
-                self.BetaMOFile = mo_read_basis + '_' + mo_read_state + '.beta_MOs' 
+                self.AlphaMOFile = [mo_read_basis + '_' + state + '.alpha_MOs' for state in mo_read_state]
+                self.BetaMOFile = [mo_read_basis + '_' + state + '.beta_MOs' for state in mo_read_state]
             except:
                 print("Error: Must give details of files to read alpha and beta MOs from, using keywords MO_Read_Basis and MO_Read_State")
                 sys.exit()
@@ -543,6 +545,7 @@ class Molecule:
         self.States = [ElectronicState(alpha_ground,beta_ground,self.NOrbitals)]
         
         if self.ExcitationType is None:
+            self.ExcitationType = "None"
             self.NStates = 1
             self.SpinFlipStates = []
             return
@@ -571,6 +574,9 @@ class Molecule:
            # Do first spin flip
            alpha_occupied[self.NAlphaElectrons] = 1; beta_occupied[self.NBetaElectrons-1] = 0
            # Attach appropriate electronic states and excitation lists specifying determinants
+           # Generate spin_flip_states, these are a list with list elemenst where the first element is
+           # the multiplicity of the spin flip state used to generate and the next tw elements are 
+           # the the alpha and beta occupancies of the resultant (not spin flipped) state 
            if 'SFS' in self.ExcitationType:
               self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
               if 'CI' in self.ExcitationType:
@@ -735,13 +741,13 @@ class Molecule:
            single_excitations = remaining_single_excitations[:]  
         alpha_singles = []; beta_singles = []
         for single_excitation in single_excitations:
-           alpha_singles.append(do_excitation(alpha_ground,single_excitation))
-           beta_singles.append(do_excitation(beta_ground,single_excitation)) 
+           alpha_singles.append(self.do_excitation(alpha_ground,single_excitation))
+           beta_singles.append(self.do_excitation(beta_ground,single_excitation)) 
 
         # Generate excitation strings and excited state occupancies for double excitations in case they are needed 
+        alpha_doubles = []; beta_doubles = []
         if sf_level > 1: 
            double_excitations = self.double_excitations(n_beta-sf_level,n_beta,n_alpha,n_alpha+sf_level)
-           alpha_doubles = []; beta_doubles = []
            for double_excitation in double_excitations:
               alpha_doubles.append(do_double_excitation(alpha_ground,double_excitation))
               beta_doubles.append(do_double_excitation(beta_ground,double_excitation))
@@ -859,7 +865,7 @@ class ElectronicState:
 
 class Matrices:
     def __init__(self,n_orbitals,occupancy=[],total=False):
-        self.Occupancy = occupancy
+        self.Occupancy = copy.copy(occupancy)
         self.Density = numpy.zeros((n_orbitals,) * 2)
         self.Fock = numpy.zeros((n_orbitals,) * 2)
         if not total:

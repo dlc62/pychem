@@ -1,4 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+
+# Hard coding the interpreter path leads to all kinds of unintuitize bahaviour 
+# including breaking virtualenvs 
 
 # System libraries
 import os
@@ -8,8 +11,8 @@ if sys.version_info.major is 2:
 else:
    import configparser as ConfigParser
 # Custom-written object modules (data and derived data at this level)
-from Util import structures
-# Custom-written code modules
+from Util import structures, printf 
+# Custom-written code modulemport ipdb; ipdb.set_trace() s
 from Methods import hartree_fock
 from Methods import basis_fit
 from Methods import mp2
@@ -34,11 +37,27 @@ from Methods import noci
 #     - perform MOM-HF calculations for all states                     #  
 #======================================================================#
 
+def print_commit(outfile):
+    try:
+        git_dir = os.path.dirname(os.path.realpath(__file__)) + "/.git/"
+        contents = "ref: HEAD"
+
+        while contents.startswith("ref: "):
+            ref = contents.split()[1]
+            with open(git_dir + ref) as f:
+                contents = f.read().strip()
+
+        printf.text(outfile, "pychem git commit hash: " + contents)
+    except:
+        printf.text(outfile, "Could not find pychem git hash")
+
 def do_calculation(settings, molecule):
 
     # Open output file, print header
     if os.path.exists(settings.OutFileName): os.remove(settings.OutFileName) 
     settings.OutFile = open(settings.OutFileName,'a+')
+
+    print_commit(settings.OutFile)
 
     # Calculate HF states from highest spin multiplicity to lowest
     state_order = [index for index in range(0,molecule.NStates)]
@@ -57,10 +76,10 @@ def do_calculation(settings, molecule):
             state = molecule.States[index]; prev_state = molecule.States[prev_index]
 
             # Use higher spin-multiplicity virtuals as starting guess for spin-broken UHF beta orbitals
-            if 'SF' in molecule.ExcitationType:
+            if 'SF' in molecule.ExcitationType and state.Alpha.Occupancy != state.Beta.Occupancy:
                 state.Alpha.MOs = prev_state.Alpha.MOs[:,:]
                 state.Beta.MOs = prev_state.Alpha.MOs[:,:]
-                keep_constrained = (settings.SCF.ConstrainExcited and index != 0) 
+                keep_constrained = (settings.SCF.ConstrainExcited and index != 0)
                 if settings.SCF.Reference == "UHF" and not keep_constrained:
                     n_swap = prev_state.NAlpha - state.NAlpha
                     for i_swap in range(0,n_swap):
@@ -77,7 +96,6 @@ def do_calculation(settings, molecule):
         #-------------------------------------------------------------------
         # Do larger basis calculations, using basis fitting to obtain initial MOs
         for basis_set in settings.BasisSets[1:]:
-        
             # Iterate over list and perform basis fitting on each state, replacing old MOs with new ones 
             alpha_MOs = []; beta_MOs = []
             for state in molecule.States:
@@ -104,17 +122,6 @@ def do_calculation(settings, molecule):
     # Do NOCI calculations in final basis, setting up spin-flip basis states
     if settings.Method == 'NOCI':
 
-        if molecule.SpinFlipStates != []:
-            spin_flip_states = []
-            for [index,alpha_occupancy,beta_occupancy] in molecule.SpinFlipStates:
-                state = structures.ElectronicState(alpha_occupancy, beta_occupancy, molecule.NOrbitals)
-                state.Alpha.MOs = structures.reorder_MOs(molecule.States[index].Alpha.MOs, alpha_occupancy)
-                state.Beta.MOs = structures.reorder_MOs(molecule.States[index].Beta.MOs, beta_occupancy)
-                state.TotalEnergy = molecule.States[index].TotalEnergy
-                hartree_fock.make_density_matrices(molecule,state)
-                spin_flip_states.append(state)
-            molecule.States = spin_flip_states
-
         noci.do(settings, molecule)
 
     #-------------------------------------------------------------------
@@ -131,18 +138,23 @@ def do_calculation(settings, molecule):
 #           structures and call do_calculation                         #
 #======================================================================#
 
+
+def main(input_file):
+    parser = ConfigParser.SafeConfigParser()
+    has_read_data = parser.read(input_file)
+    if not has_read_data:
+        print("Could not open input file, check you have typed the name correctly")
+        sys.exit()
+    if len(parser.sections()) == 0:
+        print("Input file has no recognisable section headings, format [section_heading]")
+        sys.exit() 
+    for section in parser.sections():
+        molecule,settings = structures.process_input(section, parser) 
+        do_calculation(settings, molecule)
+    return molecule
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Please give an input file")
     else:
-        parser = ConfigParser.SafeConfigParser()
-        has_read_data = parser.read(sys.argv[1])
-        if not has_read_data:
-            print("Could not open input file, check you have typed the name correctly")
-            sys.exit()
-        if len(parser.sections()) == 0:
-            print("Input file has no recognisable section headings, format [section_heading]")
-            sys.exit() 
-        for section in parser.sections():
-            molecule,settings = structures.process_input(section, parser) 
-            do_calculation(settings, molecule)
+        main(sys.argv[1])
