@@ -1,0 +1,11 @@
+[H2_test]
+Method = "HF"
+Job_Type = "Energy"
+Basis_Sets = ["6-311G"]
+Multiplicity = 1
+Charge = 0
+Coords = [['H', 1.0,  0.,  0.,   0.],
+          ['H', 1.0,  0.,  0.,   1.0]]
+Reference = "CUHF"
+Max_SCF_Iterations = 50
+
