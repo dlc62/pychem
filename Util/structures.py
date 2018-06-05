@@ -911,9 +911,9 @@ class ShellPair:
        self.PrimitivePairCentres = centres
        self.PrimitivePairHalfSigmas = numpy.multiply(sigmas,0.5)
        self.CentreDisplacement = numpy.subtract(A,B)
-       nmA = numpy.array([cgtf_a.ContractionScaling]); ccA = numpy.array([cgtf_a.ScaledCCs]) 
-       nmB = numpy.array([cgtf_b.ContractionScaling]); ccB = numpy.array([cgtf_b.ScaledCCs]) 
-       self.Normalization = numpy.array([(nmA.T).dot(nmB).flatten()])
+       nmA = numpy.array(cgtf_a.ContractionScaling); ccA = numpy.array([cgtf_a.ScaledCCs]) 
+       nmB = numpy.array(cgtf_b.ContractionScaling); ccB = numpy.array([cgtf_b.ScaledCCs]) 
+       self.Normalization = numpy.outer(nmA,nmB)
        self.ContractionCoeffs = (ccA.T).dot(ccB)
 #       nlsA = cgtf_a.NAngMomSpher; nlcA = cgtf_a.NAngMomCart 
 #       nlsB = cgtf_b.NAngMomSpher; nlcB = cgtf_b.NAngMomCart 

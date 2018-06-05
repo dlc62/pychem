@@ -287,6 +287,9 @@ def one_electron(molecule,shell_pair):
           rC = atom.Coordinates
           Z = atom.NuclearCharge
           do_1e_vrr(order_nuclear, nuclear_integrals, sigma_P, P, rA, rC, nA, nB, iatom)
+          tc = order_nuclear.VRR_target[-1]
+          tc_key = tuple([iatom]+tc[0]+[tc[1]])
+          ints = nuclear_integrals[tc_key]
 
     # Overlap
     do_1e_vrr(order_overlap, overlap_integrals, sigma_P, P, rA, [], nA, nB, -1)
@@ -296,11 +299,16 @@ def one_electron(molecule,shell_pair):
     # -------------------------------------------------------------------------------- #
 
     # Nuclear attraction
-    for iatom in range(0,molecule.NAtom):
-       do_1e_hrr(order_nuclear, nuclear_integrals, rAB, nA, nB, iatom)
+    if order_nuclear.HRR_target != []:
+       for iatom in range(0,molecule.NAtom):
+          do_1e_hrr(order_nuclear, nuclear_integrals, rAB, nA, nB, iatom)
+          tc = order_nuclear.HRR_target[-1]
+          tc_key = tuple([iatom]+tc+[0])
+          ints = nuclear_integrals[tc_key]
 
     # Overlap
-    do_1e_hrr(order_overlap, overlap_integrals, rAB, nA, nB, -1)
+    if order_overlap.HRR_target != []:
+       do_1e_hrr(order_overlap, overlap_integrals, rAB, nA, nB, -1)
 
     # -------------------------------------------------------------------------------- #
     #  Use derivative relation to form uncontracted [m|T|n] integrals directly         #
@@ -530,7 +538,7 @@ def two_electron(shell_pair1,shell_pair2,ints_type,grid_value):
     # -------------------------------------------------------------------------------- #
     #  Finish normalizing contracted basis functions - angular momentum dependent part #
     # -------------------------------------------------------------------------------- #
-    normalization = (nm_P.T).dot(nm_Q)
+    normalization = numpy.outer(nm_P,nm_Q)
     normalized_contracted_integrals = numpy.multiply(contracted_integrals[(lA,lB,lC,lD)],normalization)
      
     # -------------------------------------------------------------------------------- #
