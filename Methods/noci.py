@@ -50,6 +50,7 @@ def do(settings, molecule):
             alpha = biorthogonalize(state1.Alpha.MOs[:,0:nA], state2.Alpha.MOs[:,0:nA], molecule.Overlap)
             beta = biorthogonalize(state1.Beta.MOs[:,0:nB], state2.Beta.MOs[:,0:nB], molecule.Overlap)
 
+
             # Calculate the core fock matrix for the state transformed into the MO basis
             alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1])
             beta_core = beta[0].T.dot(molecule.Core).dot(beta[1])
@@ -59,6 +60,7 @@ def do(settings, molecule):
             alpha_overlaps = np.diagonal(alpha[0].T.dot(molecule.Overlap).dot(alpha[1]))
             beta_overlaps = np.diagonal(beta[0].T.dot(molecule.Overlap).dot(beta[1]))
             state_overlap = (np.product(alpha_overlaps) * np.product(beta_overlaps))
+
 
             #state_overlap = (np.product(alpha_overlaps) + np.product(beta_overlaps)) / 2
             reduced_overlap, zeros_list = process_overlaps(1, [], alpha_overlaps, "alpha")
@@ -102,21 +104,18 @@ def do(settings, molecule):
 #---------------------------------------------------------------------#
 #     Functions for rearranging the HF orbitals as required           #
 #---------------------------------------------------------------------#
-def assemble_orbitals(MOs_shape, occupancies, first_set, second_set):
-    new_MOs = np.zeros(MOs_shape)
+def assemble_orbitals(occupancies, optimized):
+    new_MOs = np.zeros(optimized.MOs.shape)
 
     n_orbitals_occupied = 0
     for i, occ in enumerate(occupancies):
         if occ == 0:
             continue
-        elif occ == 1 and first_set.Occupancy[i] == 1:
-            new_MOs[:,n_orbitals_occupied] = first_set.MOs[:,i]
-            n_orbitals_occupied += 1 
-        elif occ == 1 and second_set.Occupancy[i] == 1:
-            new_MOs[:,n_orbitals_occupied] = second_set.MOs[:,i]
+        elif occ == 1 and optimized.Occupancy[i] == 1:
+            new_MOs[:,n_orbitals_occupied] = optimized.MOs[:,i]
             n_orbitals_occupied += 1 
         else:
-            raise ValueError("Trying to construct a state without a HF optimized orbital")
+            raise ValueError("Trying to construct a NOCI state without a suitable HF optimized orbital")
 
     return new_MOs
 
@@ -130,28 +129,9 @@ def reorder_orbitals(molecule):
         HF_state = molecule.States[spin_state[0]]
         assert HF_state.NAlpha >= HF_state.NBeta, "All high multiplicity states should have more alpha electrons than beta"
 
-        # Decide which of the two sets of orbits we want to use to form the 
-        # alpha and beta sets of the NOCI state respectivly. We want to ensure that 
-        # states with permutational spin symmetry in their occupancies reflect 
-        # this in their MOs 
-        # If the ocupancies are the same this doesn't matter
-        as_alpha = HF_state.Alpha
-        as_beta = HF_state.Beta
-
-        # Else let the set with the lowest unoccupied orbital use the alpha set as a way 
-        # of defining this unambigiously
-        if spin_state[1] != spin_state[2]:
-            for (alpha, beta) in zip(spin_state[1], spin_state[2]):
-                if alpha == 1 and beta == 0:
-                    as_alpha = HF_state.Beta
-                    as_beta = HF_state.Alpha
-                if alpha == 0 and beta == 1:
-                    as_alpha = HF_state.Alpha
-                    as_beta = HF_state.Beta
-
-        # Now assemble the new orbitals
-        new_alpha = assemble_orbitals(HF_state.Alpha.MOs.shape, spin_state[1], as_alpha, as_beta)
-        new_beta = assemble_orbitals(HF_state.Beta.MOs.shape, spin_state[2], as_beta, as_alpha)
+        # Now assemble the new orbitals using only the optimized alpha HF orbitals
+        new_alpha = assemble_orbitals(spin_state[1], HF_state.Alpha)
+        new_beta = assemble_orbitals(spin_state[2], HF_state.Alpha)
 
         new_state = structures.ElectronicState(spin_state[1], spin_state[2], molecule.NOrbitals)
         new_state.Alpha.MOs = new_alpha
@@ -180,13 +160,8 @@ def biorthogonalize(MOs1, MOs2, overlap):
     U, _, Vt = np.linalg.svd(det_overlap)
 
     # Transforming each of the determinants into a biorthogonal basis
-    new_MOs1 = MOs1.dot(U.T)
-    new_MOs2 = MOs2.dot(Vt)
-
-    # Ensuring the relative phases of the orbitals are maintained
-    MO1_overlap = new_MOs1[:,0].dot(overlap).dot(new_MOs2[:,0])
-    if MO1_overlap < 0:
-        new_MOs1 *= -1
+    new_MOs1 = MOs1.dot(U)
+    new_MOs2 = MOs2.dot(Vt.T)
 
     return [new_MOs1, new_MOs2]
 
@@ -283,7 +258,7 @@ def two_zeros(molecule, alpha, beta, zeros_list):
     P_beta = np.outer(beta[0][:,i], beta[1][:,i])
     state = CoDensityState(molecule.NOrbitals, P_alpha, P_beta)
     make_coulomb_exchange_matrices(molecule, state)
-    active_exhange = state.Alpha.Exchange if spin == 'alpha' else state.Beta.exchange
+    active_exhange = state.Alpha.Exchange if spin == 'alpha' else state.Beta.Exchange
     active_P = P_alpha if spin == "alpha" else P_beta
     elem = inner_product(active_P, state.Total.Coulomb) + inner_product(active_P, active_exhange)
 
@@ -292,4 +267,3 @@ def two_zeros(molecule, alpha, beta, zeros_list):
 def inner_product(mat1, mat2):
     product = mat1.dot(mat2.T)
     return np.trace(product)
-

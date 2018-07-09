@@ -1,6 +1,8 @@
 # System libraries
 import numpy
-from numpy import dot
+from numpy import dot, seterr 
+
+seterr(all="raise")
 
 #======================================================================#
 #                           MAIN ROUTINES                              #
@@ -85,7 +87,9 @@ def update_diis_matrix(DIIS, new_matrix, settings):
 def reduce_space(DIIS, settings):
 # Removes the oldest vector from the DIIS space
     condition = eigenvalue_condition_number(DIIS.Matrix)
-    while len(DIIS.Residuals) > settings.DIIS.Size or condition > settings.DIIS.MaxCondition:
+    while len(DIIS.Residuals) > settings.DIIS.Size < 0 or condition > settings.DIIS.MaxCondition:
+        if len(DIIS.Residuals) == 1:
+            break
         DIIS.Matrix = numpy.delete(DIIS.Matrix,0,0)
         DIIS.Matrix = numpy.delete(DIIS.Matrix,0,1)
         DIIS.Residuals.pop(0)

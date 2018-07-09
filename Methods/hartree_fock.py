@@ -3,8 +3,8 @@ from __future__ import print_function
 import numpy
 from numpy import dot
 import sys
-#from scipy.linalg import sqrtm
 from math import sqrt
+from itertools import izip
 
 # Custom-written data modules
 from Data import constants
@@ -142,7 +142,8 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
 
     # Final print/dump to file
     printf.delimited_text(settings.OutFile, " End of Hartree-Fock iterations ")
-    if this_state.S2 is not None: printf.text(settings.OutFile, "<S^2> = %.2f" % this_state.S2)
+    if this_state.S2 is not None:
+        printf.text(settings.OutFile, "<S^2> = %.2f" % this_state.S2)
     printf.text_value(settings.OutFile, 'Final HF energy: ', this_state.TotalEnergy)
     printf.blank_line(settings.OutFile)
     print_intermediates(settings.OutFile, this_state, (settings.SCF.Reference == "RHF"))
@@ -184,15 +185,20 @@ def make_density_matrices(molecule,this):
 
 def calculate_energy(molecule,this):
 
-    energy = 0.0e0
+    #energy = 0.0e0
 
-    for a in range(0,molecule.NOrbitals):
-       for b in range(0,molecule.NOrbitals):
-          energy += 0.5e0*(this.Total.Density[a,b]*molecule.Core[a,b]+
-                           this.Alpha.Density[a,b]*this.Alpha.Fock[a,b]+
-                           this.Beta.Density[a,b] *this.Beta.Fock[a,b])
+    #for a in range(0,molecule.NOrbitals):
+    #   for b in range(0,molecule.NOrbitals):
+    #      energy += 0.5e0*(this.Total.Density[a,b]*molecule.Core[a,b]+
+    #                       this.Alpha.Density[a,b]*this.Alpha.Fock[a,b]+
+    #                       this.Beta.Density[a,b] *this.Beta.Fock[a,b])
+    core = numpy.sum(numpy.multiply(this.Total.Density, molecule.Core))
+    alpha = numpy.sum(numpy.multiply(this.Alpha.Density, this.Alpha.Fock))
+    beta = numpy.sum(numpy.multiply(this.Beta.Density, this.Beta.Fock))
 
-    this.Energy = energy
+    this.Energy = 0.5 * (core + alpha + beta)
+    
+    #this.Energy = energy
 
 #----------------------------------------------------------------------
 
@@ -245,14 +251,24 @@ def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
             bounds[(m,n)] = coulomb[m][n][m][n]
         molecule.Bounds[a][b] = numpy.sqrt(bounds)
         
-        for m in range(0,len(ia_vec)):
-          for n in range(0,len(ib_vec)):
-            for l in range(0,len(ia_vec)):
-              for s in range(0,len(ib_vec)):
-                molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ia_vec[l], ib_vec[s]) ] = coulomb[m][n][l][s]
-                molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ia_vec[l], ib_vec[s]) ] = coulomb[m][n][l][s]
-                molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ib_vec[s], ia_vec[l]) ] = coulomb[m][n][l][s]
-                molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ib_vec[s], ia_vec[l]) ] = coulomb[m][n][l][s]
+        #for m in range(0,len(ia_vec)):
+        #  for n in range(0,len(ib_vec)):
+        #    for l in range(0,len(ia_vec)):
+        #      for s in range(0,len(ib_vec)):
+        #        molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ia_vec[l], ib_vec[s]) ] = coulomb[m][n][l][s]
+        #        molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ia_vec[l], ib_vec[s]) ] = coulomb[m][n][l][s]
+        #        molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ib_vec[s], ia_vec[l]) ] = coulomb[m][n][l][s]
+        #        molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ib_vec[s], ia_vec[l]) ] = coulomb[m][n][l][s]
+
+        # This does the same as above but is substantially faster
+        for m, coul1 in izip(ia_vec, coulomb):
+          for n, coul2 in izip(ib_vec, coul1):
+            for l, coul3 in izip(ia_vec, coul2):
+              for s, coul_val in izip(ib_vec, coul3):
+                molecule.CoulombIntegrals[m, n, l, s] = coul_val
+                molecule.CoulombIntegrals[n, m, l, s] = coul_val
+                molecule.CoulombIntegrals[m, n, s, l] = coul_val
+                molecule.CoulombIntegrals[n, m, s, l] = coul_val
 
     # Evaluate and store all other non-negligible 2e ints
     for a in range(0,molecule.NCgtf):
@@ -280,35 +296,54 @@ def evaluate_2e_ints(molecule,ints_type=0,grid_value=-1.0):
 
             if coulomb is not None:
  
-              for m in range(0,len(ia_vec)):
-                for n in range(0,len(ib_vec)):
-                  for l in range(0,len(ic_vec)):
-                    for s in range(0,len(id_vec)):
-                      molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
-                      molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
-                      molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
-                      molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
-                      molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
-                      molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
-                      molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
-                      molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
+               #for m in range(0,len(ia_vec)):
+               # for n in range(0,len(ib_vec)):
+               #   for l in range(0,len(ic_vec)):
+               #     for s in range(0,len(id_vec)):
+               #       molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
+               #       molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], ic_vec[l], id_vec[s]) ] = coulomb[m][n][l][s]
+               #       molecule.CoulombIntegrals[ (ia_vec[m], ib_vec[n], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
+               #       molecule.CoulombIntegrals[ (ib_vec[n], ia_vec[m], id_vec[s], ic_vec[l]) ] = coulomb[m][n][l][s]
+               #       molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
+               #       molecule.CoulombIntegrals[ (ic_vec[l], id_vec[s], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
+               #       molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ia_vec[m], ib_vec[n]) ] = coulomb[m][n][l][s]
+               #       molecule.CoulombIntegrals[ (id_vec[s], ic_vec[l], ib_vec[n], ia_vec[m]) ] = coulomb[m][n][l][s]
 
+              for m, coul1 in izip(ia_vec,coulomb):
+                for n, coul2 in izip(ib_vec, coul1):
+                  for l, coul3 in izip(ic_vec, coul2):
+                    for s, coul_val in izip(id_vec, coul3):
+                      molecule.CoulombIntegrals[m, n, l, s] = coul_val
+                      molecule.CoulombIntegrals[n, m, l, s] = coul_val
+                      molecule.CoulombIntegrals[m, n, s, l] = coul_val
+                      molecule.CoulombIntegrals[n, m, s, l] = coul_val
+                      molecule.CoulombIntegrals[l, s, m, n] = coul_val
+                      molecule.CoulombIntegrals[l, s, n, m] = coul_val
+                      molecule.CoulombIntegrals[s, l, m, n] = coul_val
+                      molecule.CoulombIntegrals[s, l, n, m] = coul_val
+    
 #----------------------------------------------------------------------
 
 def make_coulomb_exchange_matrices(molecule, this):
     
-    this.Total.Coulomb.fill(0)
-    this.Alpha.Exchange.fill(0)
-    this.Beta.Exchange.fill(0)
+    #this.Total.Coulomb.fill(0)
+    #this.Alpha.Exchange.fill(0)
+    #this.Beta.Exchange.fill(0)
 
-    for a in range(0,molecule.NOrbitals):
-      for b in range(0,molecule.NOrbitals):
-        for c in range(0,molecule.NOrbitals):
-          for d in range(0,molecule.NOrbitals):
+    #for a in range(0,molecule.NOrbitals):
+    #  for b in range(0,molecule.NOrbitals):
+    #    for c in range(0,molecule.NOrbitals):
+    #      for d in range(0,molecule.NOrbitals):
+    #
+    #         this.Total.Coulomb[a,b]  +=  this.Total.Density[c,d]*molecule.CoulombIntegrals[a,b,c,d]
+    #         this.Alpha.Exchange[a,d] += -this.Alpha.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
+    #         this.Beta.Exchange[a,d]  += -this.Beta.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
 
-             this.Total.Coulomb[a,b]  +=  this.Total.Density[c,d]*molecule.CoulombIntegrals[a,b,c,d]
-             this.Alpha.Exchange[a,d] += -this.Alpha.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
-             this.Beta.Exchange[a,d]  += -this.Beta.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
+    # This does the same as the nexted loops above but using BLAS routines and is more than 10x faster 
+    this.Total.Coulomb  = numpy.einsum("cd,abcd -> ab", this.Total.Density, molecule.CoulombIntegrals)
+    this.Alpha.Exchange = numpy.einsum("cb,abcd -> ad", -this.Alpha.Density, molecule.CoulombIntegrals)
+    this.Beta.Exchange  = numpy.einsum("cb,abcd -> ad", -this.Beta.Density, molecule.CoulombIntegrals)
+
 
 #----------------------------------------------------------------------
 
@@ -363,3 +398,7 @@ def print_intermediates(outfile, this, restricted):
        printf.text_value(outfile, " Beta Orbital Energies ", this.Beta.Energies, 
                          " Beta MOs ", this.Beta.MOs, 
                          " Beta Density Matrix ", this.Beta.Density) 
+
+def mix_alpha_beta(molecule, factor):
+    molecule.Beta.MOs = factor * molecule.Alpha.MOs + (1 - factor) * molecule.Beta.MOs
+    

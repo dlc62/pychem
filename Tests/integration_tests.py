@@ -41,7 +41,7 @@ class IntegrationTest():
 
     def NOCI_energies_test(self, energies):
         for i, energy in enumerate(energies):
-           np.testing.assert_almost_equal(energy, self.molecule.NOCIEnergies[i], decimal=5)
+            np.testing.assert_almost_equal(energy, self.molecule.NOCIEnergies[i], decimal=5)
 
 
     # takes an arrayy and compares that to the upper right corner 
@@ -49,7 +49,7 @@ class IntegrationTest():
     def alpha_orbitals_test(self, state_index, sub_array):
         x,y = sub_array.shape
         sub_orbitals = self.molecule.States[state_index].Alpha.MOs[:x, :y]
-        np.testing.assert_almost_equal(sub_array, sub_orbitals, decimal=5)
+        np.testing.assert_almost_equal(np.absolute(sub_array), np.absolute(sub_orbitals), decimal=5)
 
 
 # Testing LiH at 2.2A in 6-31G
@@ -62,8 +62,7 @@ class LiH_SFS_NOCI_Test(IntegrationTest, unittest.TestCase):
 
 
     def test_NOCI_energies(self):
-        self.NOCI_energies_test([-7.96647127, -7.91538363, -7.86526525])
-
+        self.NOCI_energies_test([-7.9682599, -7.91538111, -7.85624465])
 
     # This runs after NOCI has rearanged the orbitals
     def test_alpha_orbitals(self):

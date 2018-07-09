@@ -13,8 +13,8 @@ def do(molecule, this, state_index, ref_MOs):
     beta_ref_MOs = ref_MOs[1]
 
     # Make alpha and beta p-vectors
-    alpha_p_vector = make_p_vector(this.Alpha.MOs, alpha_ref_MOs, molecule.NElectrons, molecule.Overlap)
-    beta_p_vector = make_p_vector(this.Beta.MOs, beta_ref_MOs, molecule.NElectrons, molecule.Overlap)
+    alpha_p_vector = make_p_vector(this.Alpha.MOs, alpha_ref_MOs, this.NAlpha, molecule.Overlap)
+    beta_p_vector = make_p_vector(this.Beta.MOs, beta_ref_MOs, this.NBeta, molecule.Overlap)
 
     # Store MOs according to p-vector ordering
     this.Alpha.MOs, this.Alpha.Energies = Sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector) 
