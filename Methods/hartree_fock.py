@@ -67,7 +67,7 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
 
     # Calculate initial energy
     calculate_energy(molecule, this_state)
-    dE = this_state.Energy
+    dE = 1                                    # an arbitaray number larger than the convergence threshold
 
     # Initial print
     if settings.PrintLevel == "VERBOSE":
@@ -83,7 +83,6 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
     #           Begin SCF Iterations            #
     #-------------------------------------------#
     num_iterations = 0
-    final_loop = False
     diis_error = None
 
     while constants.energy_convergence < abs(dE):
@@ -104,7 +103,7 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
         #    Convergence accelerators/modifiers     #
         #-------------------------------------------#
         # DIIS
-        if settings.DIIS.Use and num_iterations > 1:
+        if settings.DIIS.Use and num_iterations > settings.DIIS.Start:
             hf.diis.do(molecule, this_state, settings)
             diis_error = max(this_state.AlphaDIIS.Error, this_state.BetaDIIS.Error)
 
@@ -126,9 +125,6 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
         calculate_energy(molecule, this_state)
         dE = this_state.Energy - old_energy
         this_state.TotalEnergy = this_state.Energy + molecule.NuclearRepulsion
-
-        if abs(dE) < constants.energy_convergence:
-            final_loop = True
 
         # Loop print
         printf.text_value(settings.OutFile, " Cycle: ", num_iterations, " Total energy: ", this_state.TotalEnergy,

@@ -77,7 +77,7 @@ def do_calculation(settings, molecule):
             state = molecule.States[index]; prev_state = molecule.States[prev_index]
 
             # Use higher spin-multiplicity virtuals as starting guess for spin-broken UHF beta orbitals
-            if 'SF' in molecule.ExcitationType and state.Alpha.Occupancy != state.Beta.Occupancy:
+            if 'SF' in molecule.ExcitationType and state.Alpha.Occupancy != state.Beta.Occupancy and False:
                 state.Alpha.MOs = prev_state.Alpha.MOs[:,:]
                 state.Beta.MOs = prev_state.Alpha.MOs[:,:]
                 keep_constrained = (settings.SCF.ConstrainExcited and index != 0)

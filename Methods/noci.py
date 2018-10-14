@@ -98,7 +98,7 @@ def do(settings, molecule):
     # Print the results to file
     printf.delimited_text(settings.OutFile," NOCI output ")
     printf.text_value(settings.OutFile, " States ", wavefunctions, " NOCI Energies ", energies)
-    if settings.PrintLevel == "VERBOSE" or settings.PrintLevel == "DEBUG":
+    if settings.PrintLevel == "VERBOSE" or settings.PrintLevel == "DEBUG" or True:
        printf.text_value(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 
 
 #---------------------------------------------------------------------#
@@ -229,7 +229,6 @@ def no_zeros(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, b
     return elem
 
 def one_zero(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, beta_core, zero):
-
     zero_index = zero[0]
 
     # Making all the required Codensity matrices

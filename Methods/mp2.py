@@ -1,6 +1,5 @@
 # System libraries
 import numpy
-from numpy import dot
 
 # Custom-written code
 from Util import printf

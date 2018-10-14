@@ -1,6 +1,6 @@
 # System libraries
 import numpy
-from numpy import dot, seterr 
+from numpy import seterr 
 
 seterr(all="raise")
 
@@ -34,10 +34,10 @@ def diis(residual, fock, DIIS, settings):
         DIIS.Residuals.append(residual)
         DIIS.OldFocks.append(fock)
         if len(DIIS.Residuals) > 1:
-            make_diis_matrix(DIIS,settings) 
-            reduce_space(DIIS,settings)
-            coeffs = get_coeffs(DIIS,settings)
-            fock = make_fock_matrix(DIIS,coeffs)
+            make_diis_matrix(DIIS, settings) 
+            reduce_space(DIIS, settings)
+            coeffs = get_coeffs(DIIS, settings)
+            fock = make_fock_matrix(DIIS, coeffs)
     return fock
 
 #======================================================================#
