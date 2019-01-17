@@ -1,5 +1,4 @@
 # System libraries
-import copy
 import numpy as np
 from scipy.linalg import eigh as gen_eig
 # Custom code
@@ -46,10 +45,8 @@ def do(settings, molecule):
     for i, state1 in enumerate(molecule.States):
         for j, state2 in enumerate(molecule.States[:i+1]):
 
-            # Biorthogonalize the occupied MOs
             alpha = biorthogonalize(state1.Alpha.MOs[:,0:nA], state2.Alpha.MOs[:,0:nA], molecule.Overlap)
             beta = biorthogonalize(state1.Beta.MOs[:,0:nB], state2.Beta.MOs[:,0:nB], molecule.Overlap)
-
 
             # Calculate the core fock matrix for the state transformed into the MO basis
             alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1])
@@ -60,7 +57,6 @@ def do(settings, molecule):
             alpha_overlaps = np.diagonal(alpha[0].T.dot(molecule.Overlap).dot(alpha[1]))
             beta_overlaps = np.diagonal(beta[0].T.dot(molecule.Overlap).dot(beta[1]))
             state_overlap = (np.product(alpha_overlaps) * np.product(beta_overlaps))
-
 
             #state_overlap = (np.product(alpha_overlaps) + np.product(beta_overlaps)) / 2
             reduced_overlap, zeros_list = process_overlaps(1, [], alpha_overlaps, "alpha")
@@ -74,7 +70,7 @@ def do(settings, molecule):
 
             num_zeros = len(zeros_list)
 
-        # Calculate the Hamiltonian matrix element for this pair of states
+            # Calculate the Hamiltonian matrix element for this pair of states
             #print("Num Zeros: {} || States: {}, {}".format(num_zeros, i, j))
             if num_zeros is 0:
                 elem = no_zeros(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, beta_core)
@@ -257,9 +253,9 @@ def two_zeros(molecule, alpha, beta, zeros_list):
     P_beta = np.outer(beta[0][:,i], beta[1][:,i])
     state = CoDensityState(molecule.NOrbitals, P_alpha, P_beta)
     make_coulomb_exchange_matrices(molecule, state)
-    active_exhange = state.Alpha.Exchange if spin == 'alpha' else state.Beta.Exchange
+    active_exchange = state.Alpha.Exchange if spin == 'alpha' else state.Beta.Exchange
     active_P = P_alpha if spin == "alpha" else P_beta
-    elem = inner_product(active_P, state.Total.Coulomb) + inner_product(active_P, active_exhange)
+    elem = inner_product(active_P, state.Total.Coulomb) + inner_product(active_P, active_exchange)
 
     return elem
 

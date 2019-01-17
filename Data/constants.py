@@ -34,6 +34,6 @@ density_convergence = 1.e-6
 linear_dependence = 1.e-6
 DIIS_convergence = 1.e-5
 DIIS_max_condition = 1e7
-NOCI_thresh = 1.e-10
+NOCI_thresh = 1.e-8
 
 
