@@ -3,7 +3,7 @@ import numpy
 
 ########################## MOM and Excited State Functions  ###########################
 
-def do(molecule, this, state_index, ref_MOs):
+def do(molecule, this, ref_MOs):
 
     """ Reorders MO array and MO energies, placing columns in 
         descending order of their overlap with the reference state"""
@@ -17,8 +17,8 @@ def do(molecule, this, state_index, ref_MOs):
     beta_p_vector = make_p_vector(this.Beta.MOs, beta_ref_MOs, this.NBeta, molecule.Overlap)
 
     # Store MOs according to p-vector ordering
-    this.Alpha.MOs, this.Alpha.Energies = Sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector) 
-    this.Beta.MOs, this.Beta.Energies = Sort_MOs(this.Beta.MOs, this.Beta.Energies, beta_p_vector) 
+    this.Alpha.MOs, this.Alpha.Energies = sort_MOs(this.Alpha.MOs, this.Alpha.Energies, alpha_p_vector) 
+    this.Beta.MOs, this.Beta.Energies = sort_MOs(this.Beta.MOs, this.Beta.Energies, beta_p_vector) 
 
 
 def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
@@ -33,7 +33,7 @@ def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
     return numpy.abs(P_vector)
 
 
-def Sort_MOs(MOs, energies, p):
+def sort_MOs(MOs, energies, p):
     """Sorts MOs and energies in decending order
     based on a vector p (the overlap vector)"""
     temp = [[p[i],MOs[:,i],energies[i]] for i in range(len(p))]

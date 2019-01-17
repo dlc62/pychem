@@ -31,11 +31,18 @@ class Matrices:
 #--------------------------------------------------------------#
 #                       Main routine                           # 
 #--------------------------------------------------------------#
+
+def pprint_spin_flip_states(states):
+    string = "\n"
+    for state in states:
+        string += str(state) + "\n"
+    return string
+
 def do(settings, molecule):
 
     if "SF" in molecule.ExcitationType:
         reorder_orbitals(molecule)
-
+    
     dims = len(molecule.States)              # Dimensionality of the CI space
     CI_matrix = np.zeros((dims, dims))
     CI_overlap = np.zeros((dims, dims))
@@ -71,7 +78,7 @@ def do(settings, molecule):
             num_zeros = len(zeros_list)
 
             # Calculate the Hamiltonian matrix element for this pair of states
-            #print("Num Zeros: {} || States: {}, {}".format(num_zeros, i, j))
+            # print("Num Zeros: {} || States: {}, {}".format(num_zeros, i, j))
             if num_zeros is 0:
                 elem = no_zeros(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, beta_core)
             elif num_zeros is 1:
@@ -93,6 +100,9 @@ def do(settings, molecule):
 
     # Print the results to file
     printf.delimited_text(settings.OutFile," NOCI output ")
+
+    # printf.text_value(settings.OutFile, " Spin Flip States ", pprint_spin_flip_states(molecule.SpinFlipStates))
+
     printf.text_value(settings.OutFile, " States ", wavefunctions, " NOCI Energies ", energies)
     if settings.PrintLevel == "VERBOSE" or settings.PrintLevel == "DEBUG" or True:
        printf.text_value(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 

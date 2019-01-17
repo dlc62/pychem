@@ -29,9 +29,17 @@ def process_input(section, parser):
     return molecule,settings
 
 def inputs_return_function(section, parser):
-    def inputs(var_name):
-        var = parser.get(section,var_name)
-        var = ast.literal_eval(var)
+    def inputs(var_name, default="__NO_DEFAULT__"):
+        var = default
+
+        try:
+            var = parser.get(section,var_name)
+        except: pass
+
+        if var == "__NO_DEFAULT__":
+            raise(ConfigParser.NoOptionError(var_name, section))
+        elif var != default:
+            var = ast.literal_eval(var)
         if isinstance(var, str):
             var = var.upper()
         return var
@@ -195,13 +203,10 @@ class Set_SCF:
                self.ConstrainExcited = False
         #------------------------- SCF Guess -------------------------#
         available_guesses = ['READ', 'CORE', 'SAD']
-        #------------------------- SCF Guess -------------------------#
-        available_guesses = ['READ', 'CORE', 'SAD']
         try:
             self.Guess = inputs("SCF_Guess")
             assert(self.Guess in available_guesses)
         except:
-        #    print("Could not identify SCF guess keyword, defaulting to core guess")
             self.Guess = "CORE"
         if self.Guess == "READ" or Method == None:
             try:
@@ -296,7 +301,8 @@ class Set_MOM:
                 except:
                     self.Use = False
         try:
-            self.Reference = inputs("MOM_Reference")
+	    self.Reference = inputs("MOM_Reference")
+
             assert self.Reference in available_MOM_references
         except:
             self.Reference = "FIXED"
@@ -475,7 +481,8 @@ class Molecule:
         try:
             self.NAlphaElectrons = (self.NElectrons + (self.Multiplicity-1))/2
             self.NBetaElectrons  = (self.NElectrons - (self.Multiplicity-1))/2
-        except:
+	    assert (self.NAlphaElectrons - self.NBetaElectrons) + 1 == self.Multiplicity
+        except AssertionError:
             print('Error: charge and multiplicity inconsistent with specified molecule')
             sys.exit()
         self.NAlphaOrbitals = int(math.ceil(self.NAlphaElectrons/2.0))
@@ -583,8 +590,9 @@ class Molecule:
                  spin_flip_states += self.make_CI_states(alpha_ground,beta_ground,self.NAlphaElectrons,self.NBetaElectrons,ci_level=min(ci_level,2),sf_level=1,istate=1)
               else:
                  spin_flip_states += self.make_spinflip_states(alpha_ground,beta_ground,self.NAlphaElectrons,self.NBetaElectrons,level=1,istate=1)
-           # Do next spin flip (even if we don't use it)
-           alpha_occupied[self.NAlphaElectrons+1] = 1; beta_occupied[self.NBetaElectrons-2] = 0
+           # Do next spin flip (even if we don't use it) unless the alpha orbitals are already full
+	   if alpha_occupied[-1] == 0:
+	       alpha_occupied[self.NAlphaElectrons+1] = 1; beta_occupied[self.NBetaElectrons-2] = 0
            # Attach appropriate electronic states and excitation lists specifying determinants
            if 'SFSD' in self.ExcitationType:
               self.States += [(ElectronicState(alpha_occupied, beta_occupied, self.NOrbitals))]
@@ -599,12 +607,31 @@ class Molecule:
               else:
                  spin_flip_states += self.make_spinflip_states(alpha_ground,beta_ground,self.NAlphaElectrons,self.NBetaElectrons,level=1,istate=1)
                  spin_flip_states += self.make_spinflip_states(alpha_ground,beta_ground,self.NAlphaElectrons,self.NBetaElectrons,level=2,istate=1)
+
         else:
            if self.ExcitationType is not None:
               print("Error: excitation type " + self.ExcitationType + " not recognised in set_excitations")
               sys.exit() 
 
-        #-------------------------------------------------------------#
+	#spin_flip_states = [spin_flip_states[0]]
+
+	#alpha = [[1,1,1,1, 1,1,1,1,1,0],[1,1,1,1, 1,1,0,1,1,1],[1,1,1,1, 1,0,1,1,1,1],[1,1,1,1, 0,1,1,1,1,1]]
+	#beta =  [[1,1,1,1, 1,1,0,0,1,0],[1,1,1,1, 1,1,0,0,0,1],[1,1,1,1, 1,0,1,0,0,1],[1,1,1,1, 0,1,1,0,0,1]]
+
+	#possibilities = []
+	#for i in alpha:
+	#    for j in beta:
+	#	possibilities.append([i, j])
+	
+	#possibilities = possibilities[1::]
+	#for i in possibilities:
+	#    spin_flip_states.append([1] + i)
+
+	spin_flip_states.append([1, [1,1,1,1, 0,1,1,1,1,1], [1,1,1,1, 1,1,1,0,0,0]])
+	spin_flip_states.append([1, [1,1,1,1, 1,1,1,1,1,0], [1,1,1,1, 0,1,1,0,0,1]])
+	spin_flip_states.append([1, [1,1,1,1, 0,1,1,1,1,1], [1,1,1,1, 0,1,1,0,0,1]])
+
+	#-------------------------------------------------------------#
         #   Generate excited states, each an ElectronicState object   #
         #-------------------------------------------------------------#
 
@@ -661,6 +688,8 @@ class Molecule:
 
     #=================================================================#
     #              Utility functions for this section                 #
+    #=================================================================#
+
     def single_excitations(self, occ_start, occ_stop, virt_start, virt_stop):
         """Takes the number of electrons of a particular spin and the number
         of orbitals and returns the list of pairs corresponding to all single
@@ -729,6 +758,8 @@ class Molecule:
                 spin_flip_states.append([istate,new_alpha,new_beta])
         return spin_flip_states
          
+
+
     def make_CI_states(self,alpha_ground,beta_ground,n_alpha,n_beta,ci_level,sf_level,istate):
 
         ci_states = []
@@ -749,8 +780,8 @@ class Molecule:
         if sf_level > 1: 
            double_excitations = self.double_excitations(n_beta-sf_level,n_beta,n_alpha,n_alpha+sf_level)
            for double_excitation in double_excitations:
-              alpha_doubles.append(do_double_excitation(alpha_ground,double_excitation))
-              beta_doubles.append(do_double_excitation(beta_ground,double_excitation))
+              alpha_doubles.append(self.do_double_excitation(alpha_ground,double_excitation))
+              beta_doubles.append(self.do_double_excitation(beta_ground,double_excitation))
               
         # Generate excited state occupancy sets 
         if ci_level > 0:

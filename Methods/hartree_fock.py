@@ -1,9 +1,7 @@
 # System libraries
 from __future__ import print_function
 import numpy
-from numpy import dot
 import sys
-from math import sqrt
 from itertools import izip
 
 # Custom-written data modules
@@ -22,8 +20,7 @@ import hf_extensions as hf
 #                                                                 #
 #=================================================================#
 
-def do(settings, molecule, basis_set, state_index, initial_run = False):
-
+def do(settings, molecule, basis_set, state_index, initial_run = True):
     # Calculate values that are constant throughout the calculation
     molecule.NuclearRepulsion = integrals.nuclear_repulsion(molecule)
     make_core_matrices(molecule)
@@ -35,9 +32,7 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
        evaluate_2e_ints(molecule)
 
     # Generate initial orbitals and/or density matrices
-    if this_state.Alpha.MOs != []:
-        reference_orbitals = [this_state.Alpha.MOs, this_state.Beta.MOs]
-    elif settings.SCF.Guess == "READ":
+    if settings.SCF.Guess == "READ":
         try:
             # TODO make this more flexible, maybe support only providing MO files for some states 
             # and fall back to CORE for the rest
@@ -55,12 +50,11 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
         except AssertionError:
             print('Error: Incorrect MOs supplied - check basis set and supply both alpha and beta sets')
             sys.exit()
+    elif this_state.Alpha.MOs != []:
+        reference_orbitals = [this_state.Alpha.MOs, this_state.Beta.MOs]
     elif settings.SCF.Guess == "CORE":
         make_MOs(molecule, this_state)
         reference_orbitals = None
-#    elif settings.SCF.Guess == "SAD":
-#        molecule.AlphaDensity, molecule.BetaDensity = initial_guess.sad(molecule)
-#        reference_orbitals = None
 
     if settings.SCF.Guess != "SAD":
         make_density_matrices(molecule, this_state)
@@ -87,7 +81,14 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
 
     while constants.energy_convergence < abs(dE):
         num_iterations += 1
-        
+
+        # Don't print non converging message on zero iteration runs 
+        # For using orbitals from other souces without doing SCF 
+        if num_iterations > settings.SCF.MaxIter:
+            if settings.SCF.MaxIter > 0:
+                print("SCF not converging")
+            break
+
         #-------------------------------------------#
         #               Main SCF step               #
         #-------------------------------------------#
@@ -115,8 +116,8 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
         make_MOs(molecule, this_state)
 
         # Optionally, use MOM to reorder MOs but absolutely not if doing NOCI calculations
-        if settings.MOM.Use and reference_orbitals != None and settings.Method != "NOCI":  
-            hf.mom.do(molecule, this_state, state_index, reference_orbitals)
+        if settings.MOM.Use and reference_orbitals != None and settings.Method != "NOCI":
+            hf.mom.do(molecule, this_state, reference_orbitals)
        #-------------------------------------------#
 
         make_density_matrices(molecule,this_state)
@@ -132,9 +133,6 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
         if settings.PrintLevel == "VERBOSE":
            print_intermediates(settings.OutFile, this_state, (settings.SCF.Reference == "RHF"))
 
-        if num_iterations >= settings.SCF.MaxIter:
-            print("SCF not converging")
-            break
 
     # Final print/dump to file
     printf.delimited_text(settings.OutFile, " End of Hartree-Fock iterations ")
@@ -151,6 +149,7 @@ def do(settings, molecule, basis_set, state_index, initial_run = False):
 #############################################################################
 ########################### Basic HF Subroutines ############################
 # this = this electronic state
+
 
 def initialize_fock_matrices(core,this):
 
@@ -368,7 +367,7 @@ def constrain_UHF(molecule, this):
     this.S2 = N*(N+4)/4. - Nab - 2 * sum([x ** 2 for x in NO_vals])   # Using formula from J. Chem. Phys. 88, 4926
 
     # Sort in order of descending occupancy
-    idx = NO_vals.argsort()[::-1]                    # Note the [::-1] reverses the index array
+    idx = NO_vals.argsort()[::-1]     
     core_space = idx[:Nc]                            # Indices of the core NOs
     valence_space = idx[(Nc + Na):]                  # Indices of the valence NOs
 
@@ -383,6 +382,18 @@ def constrain_UHF(molecule, this):
 
     this.Alpha.Fock = this.Alpha.Fock + lambda_matrix
     this.Beta.Fock = this.Beta.Fock - lambda_matrix
+
+#----------------------------------------------------------------------
+
+def level_shift(fock, shift_param, nElec, MOs):
+    shift_matrix = numpy.zeros_like(fock)
+    for i in range(nElec, len(shift_matrix)):
+        shift_matrix[i,i] = shift_param
+    
+    #transform the matrix into the AO basis
+    shift_matrix = MOs.dot(shift_matrix).dot(MOs.T)
+
+    fock += shift_matrix
 
 #----------------------------------------------------------------------
 

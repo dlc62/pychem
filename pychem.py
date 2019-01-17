@@ -68,7 +68,7 @@ def do_calculation(settings, molecule):
 
         # Do ground state calculation in the starting basis, storing MOs (and 2e ints as appropriate) as we go
         basis_set = settings.BasisSets[0]
-        hartree_fock.do(settings, molecule, basis_set, state_order[0], initial_run=True)
+        hartree_fock.do(settings, molecule, basis_set, state_order[0])
  
         #-------------------------------------------------------------------
         # Generate starting orbital sets for each of the requested excited states and do calculation in first basis
@@ -77,7 +77,7 @@ def do_calculation(settings, molecule):
             state = molecule.States[index]; prev_state = molecule.States[prev_index]
 
             # Use higher spin-multiplicity virtuals as starting guess for spin-broken UHF beta orbitals
-            if 'SF' in molecule.ExcitationType and state.Alpha.Occupancy != state.Beta.Occupancy and False:
+            if 'SF' in molecule.ExcitationType and state.Alpha.Occupancy != state.Beta.Occupancy:
                 state.Alpha.MOs = prev_state.Alpha.MOs[:,:]
                 state.Beta.MOs = prev_state.Alpha.MOs[:,:]
                 keep_constrained = (settings.SCF.ConstrainExcited and index != 0)
@@ -92,7 +92,7 @@ def do_calculation(settings, molecule):
                 state.Alpha.MOs = structures.reorder_MOs(molecule.States[prev_index].Alpha.MOs, state.Alpha.Occupancy)
                 state.Beta.MOs = structures.reorder_MOs(molecule.States[prev_index].Beta.MOs, state.Beta.Occupancy)
 
-            hartree_fock.do(settings, molecule, basis_set, index)
+            hartree_fock.do(settings, molecule, basis_set, index, initial_run=False)
 
         #-------------------------------------------------------------------
         # Do larger basis calculations, using basis fitting to obtain initial MOs
@@ -108,10 +108,12 @@ def do_calculation(settings, molecule):
             for index,state in enumerate(molecule.States[1:]):
                 state.Alpha.MOs = alpha_MOs[index+1]
                 state.Beta.MOs = beta_MOs[index+1]
+                state.Energy = 0.0
 
             # Iterate over the list of states doing calculations (enforce orthogonality for MOM but not SF-NOCI)
             for index in range(molecule.NStates):
-                hartree_fock.do(settings, molecule, basis_set, index)
+                initial = index != 0  
+                hartree_fock.do(settings, molecule, basis_set, index, initial_run=initial)
 
     #-------------------------------------------------------------------
     # Do post-HF (MP2) calculations in final basis for all single-reference electronic states
@@ -142,13 +144,15 @@ def do_calculation(settings, molecule):
 
 def main(input_file):
     parser = ConfigParser.SafeConfigParser()
-    has_read_data = parser.read(input_file)
-    if not has_read_data:
+    try:
+        has_read_data = parser.read(input_file)
+    except ConfigParser.MissingSectionHeaderError:
+        print("Input file has no recognisable section headings, format: [section_heading]")
+        sys.exit() 
+
+    if len(has_read_data) == 0:
         print("Could not open input file, check you have typed the name correctly")
         sys.exit()
-    if len(parser.sections()) == 0:
-        print("Input file has no recognisable section headings, format [section_heading]")
-        sys.exit() 
     for section in parser.sections():
         molecule,settings = structures.process_input(section, parser) 
         do_calculation(settings, molecule)
