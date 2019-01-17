@@ -112,7 +112,7 @@ def do_calculation(settings, molecule):
 
             # Iterate over the list of states doing calculations (enforce orthogonality for MOM but not SF-NOCI)
             for index in range(molecule.NStates):
-                initial = index != 0  
+                initial = index == 0
                 hartree_fock.do(settings, molecule, basis_set, index, initial_run=initial)
 
     #-------------------------------------------------------------------
