@@ -19,7 +19,7 @@ def do(molecule, this, settings):
     beta_residual = get_residual(molecule.Overlap, this.Beta.Density, this.Beta.Fock, X, Xt) 
     this.AlphaDIIS.Error = alpha_residual.max()
     this.BetaDIIS.Error = beta_residual.max()
-    settings.DIIS.Threshold = -0.1 * this.Energy
+    settings.DIIS.Threshold =  0.5 #-0.1 * this.Energy
 
     # Perform DIIS procedure
     this.Alpha.Fock = diis(alpha_residual, this.Alpha.Fock, this.AlphaDIIS, settings)
@@ -30,7 +30,7 @@ def do(molecule, this, settings):
 #----------------------------------------------------------------------#
 
 def diis(residual, fock, DIIS, settings):
-    if residual.max() < settings.DIIS.Threshold:
+    if abs(residual.max()) < abs(settings.DIIS.Threshold):
         DIIS.Residuals.append(residual)
         DIIS.OldFocks.append(fock)
         if len(DIIS.Residuals) > 1:
