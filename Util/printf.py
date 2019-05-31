@@ -1,5 +1,11 @@
+
+# Make numpy print array properly 
 import numpy
-numpy.set_printoptions(precision = 8, linewidth = 300)  #Makes the arrays print nicely in the output
+import sys 
+numpy.set_printoptions(precision = 8,
+                       linewidth = sys.maxsize,
+                       threshold = sys.maxsize,
+                       )  
 
 # TODO rewrite all of these using variadic argument function
 

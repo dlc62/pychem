@@ -30,9 +30,9 @@ def do(settings, molecule, basis_set, state_index, initial_run = True):
     initialize_fock_matrices(molecule.Core, this_state)
     if initial_run:
        evaluate_2e_ints(molecule)
-
+   
     # Generate initial orbitals and/or density matrices
-    if settings.SCF.Guess == "READ":
+    if settings.SCF.Guess == "READ" and basis_set == settings.BasisSets[0]:
         try:
             # TODO make this more flexible, maybe support only providing MO files for some states 
             # and fall back to CORE for the rest
@@ -56,9 +56,8 @@ def do(settings, molecule, basis_set, state_index, initial_run = True):
         make_MOs(molecule, this_state)
         reference_orbitals = None
 
-    if settings.SCF.Guess != "SAD":
-        make_density_matrices(molecule, this_state)
-
+    make_density_matrices(molecule, this_state)
+    
     # Calculate initial energy
     calculate_energy(molecule, this_state)
     dE = 1                                    # an arbitaray number larger than the convergence threshold
@@ -109,15 +108,22 @@ def do(settings, molecule, basis_set, state_index, initial_run = True):
             diis_error = max(this_state.AlphaDIIS.Error, this_state.BetaDIIS.Error)
 
         # Update MOM reference orbitals to last iteration values if requested
-        if settings.MOM.Use is True:
+        if settings.MOM.Use:
             if settings.MOM.Reference == 'MUTABLE':
                 reference_orbitals = [this_state.Alpha.MOs, this_state.Beta.MOs]
         
         make_MOs(molecule, this_state)
 
         # Optionally, use MOM to reorder MOs but absolutely not if doing NOCI calculations
-        if settings.MOM.Use and reference_orbitals != None and settings.Method != "NOCI":
+        if settings.MOM.Use and reference_orbitals != None:# and not settings.Method.startswith("NOCI"):
             hf.mom.do(molecule, this_state, reference_orbitals)
+
+        # Sort occupied orbitals by energy
+        # This isn't nessecary for HF but avoids compilcations in 
+        # post-HF methods and makes the output easier to follow
+        this_state.Alpha.sort_occupied()
+        this_state.Beta.sort_occupied()
+
        #-------------------------------------------#
 
         make_density_matrices(molecule,this_state)
@@ -132,6 +138,7 @@ def do(settings, molecule, basis_set, state_index, initial_run = True):
                           " Change in energy: ", dE, " DIIS error: ", diis_error)
         if settings.PrintLevel == "VERBOSE":
            print_intermediates(settings.OutFile, this_state, (settings.SCF.Reference == "RHF"))
+
 
 
     # Final print/dump to file
@@ -334,7 +341,7 @@ def make_coulomb_exchange_matrices(molecule, this):
     #         this.Alpha.Exchange[a,d] += -this.Alpha.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
     #         this.Beta.Exchange[a,d]  += -this.Beta.Density[c,b]*molecule.CoulombIntegrals[a,b,c,d]
 
-    # This does the same as the nexted loops above but using BLAS routines and is more than 10x faster 
+    # This does the same as the nexted loops above but 10x faster 
     this.Total.Coulomb  = numpy.einsum("cd,abcd -> ab", this.Total.Density, molecule.CoulombIntegrals)
     this.Alpha.Exchange = numpy.einsum("cb,abcd -> ad", -this.Alpha.Density, molecule.CoulombIntegrals)
     this.Beta.Exchange  = numpy.einsum("cb,abcd -> ad", -this.Beta.Density, molecule.CoulombIntegrals)

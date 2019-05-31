@@ -9,6 +9,7 @@ import ast
 import numpy
 import math
 import copy
+from enum import Enum
 # Import custom-written data modules
 from Data import basis
 from Data import constants as c
@@ -80,7 +81,12 @@ class Settings:
         #                     Universal settings                      #
         #-------------------------------------------------------------#
         #------------------------- Method ----------------------------#
-        available_methods = [None,'HF','MP2','NOCI']
+
+	# TODO do this properly later 
+	self.MP2_type = inputs("MP2_type").upper()
+	assert(self.MP2_type in ["AFTER", "BEFORE"])
+
+        available_methods = [None,'HF','MP2','MP2-SCS','NOCI', 'NOCI-P2', "NOCI-P2-SCS", "NOCI-P2-SOS", "MP2-SOS", "NOCI-P2-SCS"]
         try:
            self.Method = inputs("Method").upper()
            assert self.Method in available_methods
@@ -251,13 +257,10 @@ class Set_SCF:
 
 class Set_DIIS:
     def __init__(self,inputs,reference):
-        if reference == "CUHF":
-            self.Use = False
-        else:
-            try:
-                self.Use = inputs("Use_DIIS")
-            except:
-                self.Use = True
+	try:
+	    self.Use = inputs("Use_DIIS")
+	except:
+	    self.Use = True
         try:
             self.Size = inputs("DIIS_Size")
         except:
@@ -381,10 +384,10 @@ class Molecule:
            self.CartesianL = []
 
         try:
-           max_l = inputs("Max_L")
+	   max_l = inputs("Max_L")
            self.MaxL = max_l
         except:
-           self.MaxL = 100   # Ridiculously large dummy value
+           self.MaxL = sys.maxint   # Ridiculously large dummy value
 
         #----------------------- Excitations --------------------------#
         available_excitation_types = [None, 'HOMO-LUMO', 'CUSTOM-SINGLE','CUSTOM-SINGLES', 'CUSTOM-PAIRED',
@@ -478,15 +481,15 @@ class Molecule:
 
         #------------ Ground State Electronic Configuration -----------#
         self.NElectrons -= self.Charge
-        try:
-            self.NAlphaElectrons = (self.NElectrons + (self.Multiplicity-1))/2
-            self.NBetaElectrons  = (self.NElectrons - (self.Multiplicity-1))/2
-	    assert (self.NAlphaElectrons - self.NBetaElectrons) + 1 == self.Multiplicity
-        except AssertionError:
+	self.NAlphaElectrons = (self.NElectrons + (self.Multiplicity-1))/2
+	self.NBetaElectrons  = (self.NElectrons - (self.Multiplicity-1))/2
+
+	valid_mult = (self.NAlphaElectrons - self.NBetaElectrons) + 1 == self.Multiplicity
+	valid_charge = (self.NAlphaElectrons + self.NBetaElectrons) == self.NElectrons
+
+	if not valid_mult or not valid_charge:
             print('Error: charge and multiplicity inconsistent with specified molecule')
             sys.exit()
-        self.NAlphaOrbitals = int(math.ceil(self.NAlphaElectrons/2.0))
-        self.NBetaOrbitals = int(math.ceil(self.NBetaElectrons/2.0))
 
     def set_scf(self):
         #----------- SCF structures - common to all states ------------#
@@ -612,24 +615,6 @@ class Molecule:
            if self.ExcitationType is not None:
               print("Error: excitation type " + self.ExcitationType + " not recognised in set_excitations")
               sys.exit() 
-
-	#spin_flip_states = [spin_flip_states[0]]
-
-	#alpha = [[1,1,1,1, 1,1,1,1,1,0],[1,1,1,1, 1,1,0,1,1,1],[1,1,1,1, 1,0,1,1,1,1],[1,1,1,1, 0,1,1,1,1,1]]
-	#beta =  [[1,1,1,1, 1,1,0,0,1,0],[1,1,1,1, 1,1,0,0,0,1],[1,1,1,1, 1,0,1,0,0,1],[1,1,1,1, 0,1,1,0,0,1]]
-
-	#possibilities = []
-	#for i in alpha:
-	#    for j in beta:
-	#	possibilities.append([i, j])
-	
-	#possibilities = possibilities[1::]
-	#for i in possibilities:
-	#    spin_flip_states.append([1] + i)
-
-	spin_flip_states.append([1, [1,1,1,1, 0,1,1,1,1,1], [1,1,1,1, 1,1,1,0,0,0]])
-	spin_flip_states.append([1, [1,1,1,1, 1,1,1,1,1,0], [1,1,1,1, 0,1,1,0,0,1]])
-	spin_flip_states.append([1, [1,1,1,1, 0,1,1,1,1,1], [1,1,1,1, 0,1,1,0,0,1]])
 
 	#-------------------------------------------------------------#
         #   Generate excited states, each an ElectronicState object   #
@@ -906,6 +891,15 @@ class Matrices:
         else:
             self.Coulomb = numpy.zeros((n_orbitals,) * 2)
 
+    # Sort just the occupied orbitals by energy 
+    def sort_occupied(self):
+	n_Elec = sum(self.Occupancy)
+	occupied_energies = self.Energies[:n_Elec]
+	idx = numpy.argsort(occupied_energies)
+	idx = numpy.append(idx, range(n_Elec, len(self.Occupancy)))
+	self.Energies = numpy.array(self.Energies)[idx]
+	self.MOs = self.MOs[:,idx]
+
 #---------------------------------------------------------------------#
 #                  ELECTRONIC STATE SUBCLASS - DIIS                   #
 #---------------------------------------------------------------------#
@@ -1003,3 +997,7 @@ def swap_MOs(old_MOs,frm,to):
     new_MOs = old_MOs.copy()
     new_MOs[:,[frm,to]] = new_MOs[:,[to,frm]]
     return new_MOs
+
+class Spin(Enum):
+    Alpha = 1
+    Beta = -1 

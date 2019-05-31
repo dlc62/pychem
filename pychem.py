@@ -104,8 +104,9 @@ def do_calculation(settings, molecule):
                 beta_MOs.append(basis_fit.do(molecule, state.Beta.MOs, basis_set))
 
             # Update basis set for this molecule by copying in old orbitals (fit using new basis set)
+            # Except the first one - just use the core guess for the ground state
             molecule = structures.update_basis(molecule, basis_set)
-            for index,state in enumerate(molecule.States[1:]):
+            for index, state in enumerate(molecule.States[1:]):
                 state.Alpha.MOs = alpha_MOs[index+1]
                 state.Beta.MOs = beta_MOs[index+1]
                 state.Energy = 0.0
@@ -117,13 +118,13 @@ def do_calculation(settings, molecule):
 
     #-------------------------------------------------------------------
     # Do post-HF (MP2) calculations in final basis for all single-reference electronic states
-    if settings.Method == 'MP2':
+    if settings.Method.startswith('MP2'):
         
         mp2.do(settings, molecule) 
 
     #-------------------------------------------------------------------
     # Do NOCI calculations in final basis, setting up spin-flip basis states
-    if settings.Method == 'NOCI':
+    if settings.Method.startswith('NOCI'):
 
         noci.do(settings, molecule)
 
