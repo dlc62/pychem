@@ -166,7 +166,6 @@ def initialize_fock_matrices(core,this):
 #----------------------------------------------------------------------
 
 def make_MOs(molecule,this):
-
     X = molecule.X
     Xt = molecule.Xt
     this.Alpha.Energies,Ca = numpy.linalg.eigh(Xt.dot(this.Alpha.Fock).dot(X))
@@ -413,6 +412,6 @@ def print_intermediates(outfile, this, restricted):
                          " Beta MOs ", this.Beta.MOs, 
                          " Beta Density Matrix ", this.Beta.Density) 
 
-def mix_alpha_beta(molecule, factor):
-    molecule.Beta.MOs = factor * molecule.Alpha.MOs + (1 - factor) * molecule.Beta.MOs
+def mix_alpha_beta(state, factor):
+    state.Beta.MOs = factor * state.Alpha.MOs + (1 - factor) * state.Beta.MOs
     

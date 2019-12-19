@@ -1,12 +1,13 @@
 [LiH_test]
 Method = "NOCI"
-Basis_Sets = ["6-31G"]
+Basis_Sets = ["STO-3G"]
 Multiplicity = 1
 Charge = 0
+MP2_Type = "After"
 Coords_Units = "ANGSTROM"
 Coords = [['Li', 3.0,  0.  ,  0.,   0.],
           ['H',  1.0,  2.2,   0.,   0.]]
-Reference = "UHF"
+Reference = "CUHF"
 Constrain_Excited = True
 Max_SCF_Iterations = 50
 Job_Type = "ENERGY"

@@ -29,7 +29,7 @@ for i in range(0,99):
 
 # Settings and thresholds
 integral_threshold = 1.e-8
-energy_convergence = 1.e-7
+energy_convergence = 1.e-6
 density_convergence = 1.e-6
 linear_dependence = 1.e-6
 DIIS_convergence = 1.e-5
