@@ -759,8 +759,6 @@ class Molecule:
         for single_excitation in single_excitations:
            alpha_singles.append(self.do_excitation(alpha_ground,single_excitation))
            beta_singles.append(self.do_excitation(beta_ground,single_excitation)) 
-
-        # Generate excitation strings and excited state occupancies for double excitations in case they are needed 
         alpha_doubles = []; beta_doubles = []
         if sf_level > 1: 
            double_excitations = self.double_excitations(n_beta-sf_level,n_beta,n_alpha,n_alpha+sf_level)
@@ -798,6 +796,7 @@ class Molecule:
                           ci_states.append([istate,alpha_double,beta_double])
 
         return ci_states
+
            
 
 #=====================================================================#
@@ -875,6 +874,11 @@ class ElectronicState:
         self.AlphaDIIS = StoreDIIS()
         self.BetaDIIS = StoreDIIS()
 
+	# Multiple methods dealing with spin flips assume that it's impossible 
+	# to have an electronic state with more beta than alpha electrons 
+	# So lets enforce that here 
+	assert self.NAlpha >= self.NBeta
+
 #---------------------------------------------------------------------#
 #                ELECTRONIC STATE SUBCLASS - MATRICES                 #
 #---------------------------------------------------------------------#
@@ -891,14 +895,46 @@ class Matrices:
         else:
             self.Coulomb = numpy.zeros((n_orbitals,) * 2)
 
-    # Sort just the occupied orbitals by energy 
-    def sort_occupied(self):
-	n_Elec = sum(self.Occupancy)
-	occupied_energies = self.Energies[:n_Elec]
-	idx = numpy.argsort(occupied_energies)
-	idx = numpy.append(idx, range(n_Elec, len(self.Occupancy)))
-	self.Energies = numpy.array(self.Energies)[idx]
+    # Sort MOs by occupancy number 
+    # This is a modified version of the method described in J. Phys. Chem. A 2010, 114, 8772
+    # Note that even with a stable sorting algorithm this doesn't preserve order within the different 
+    # spaces
+    def sort_orbitals(self, AO_overlaps, total_density):
+	X = AO_overlaps.dot(self.MOs)
+	occupancies = X.T.dot(total_density).dot(X).diagonal()
+	occupancies = numpy.abs(occupancies)
+	
+	# Find the indices to sort the orbitals into the substances while preserving 
+	# relative order within the subspaces
+	doubly = [] 
+	singly = []
+	unoccupied = []
+
+	for i, occ in enumerate(occupancies):
+	    if occ >= 1.99:
+		doubly.append(i)
+	    elif occ > 0.01:
+		unoccupied.append(i)
+	    else:
+		singly.append(i)
+
+	idx = doubly + singly + unoccupied
 	self.MOs = self.MOs[:,idx]
+	if self.Energies != []:
+	    self.Energies = numpy.array(self.Energies)[idx]
+    
+    def sort_by_energy(self):
+   	""" Seperatly sort the occupied and unoccupied MO sets by energy """
+   	# Sort the occupied set 
+	occ_idx = [i for i, occ in enumerate(self.Occupancy) if occ == 1]
+	vir_idx = [i for i, occ in enumerate(self.Occupancy) if occ == 0]
+	self.__sort_idx_by_energies(occ_idx)
+	self.__sort_idx_by_energies(vir_idx)
+
+    def __sort_idx_by_energies(self, idx):
+	new_idx = numpy.argsort(self.Energies[idx])
+	self.Energies[idx] = self.Energies[idx][new_idx]
+	self.MOs[:,idx] = self.MOs[:,idx][:,new_idx]
 
 #---------------------------------------------------------------------#
 #                  ELECTRONIC STATE SUBCLASS - DIIS                   #

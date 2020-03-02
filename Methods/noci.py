@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.linalg import eigh as gen_eig
 from collections import namedtuple 
+from copy import copy
 # Custom code
 from Util import printf, structures
 from Util.structures import Spin 
@@ -16,7 +17,7 @@ import mp2
 ZeroOverlap = namedtuple("Zero", "index, spin")
 
 class CoDensityState:
-    # A state-like object used for calculating and storing the pseudo Fock matrix
+   # # A state-like object used for calculating and storing the pseudo Fock matrix
     def __init__(self, n_orbitals, alpha_density, beta_density):
         self.Alpha = Matrices(n_orbitals)
         self.Beta = Matrices(n_orbitals)
@@ -45,13 +46,13 @@ def pprint_spin_flip_states(states):
 
 def do(settings, molecule):
 
+    from copy import deepcopy 
+    mol = deepcopy(molecule)
     if "SF" in molecule.ExcitationType:
-        reorder_orbitals(molecule)
+        make_spin_flip_states(molecule)
 
-        #extend_CI(molecule, 2)
-    
+    molecule.States = [molecule.States[1], molecule.States[2]]
 
-    MP2_corrections = []
     dims = len(molecule.States)              # Dimensionality of the CI space
     CI_matrix = np.zeros((dims, dims))
     CI_overlap = np.zeros((dims, dims))
@@ -61,40 +62,33 @@ def do(settings, molecule):
     for i, state1 in enumerate(molecule.States):
         for j, state2 in enumerate(molecule.States[:i+1]):
 
-            alpha = biorthogonalize(state1.Alpha.MOs, state2.Alpha.MOs, molecule.Overlap, nA)
-            beta = biorthogonalize(state1.Beta.MOs, state2.Beta.MOs, molecule.Overlap, nB)
+            alpha = biorthogonalize(state1.Alpha.MOs, state2.Alpha.MOs, molecule.Overlap, nA, i,j)
+            beta = biorthogonalize(state1.Beta.MOs, state2.Beta.MOs, molecule.Overlap, nB, i,j)
 
             # Calculate the core fock matrix for the state transformed into the MO basis
-            alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1])
-            beta_core = beta[0].T.dot(molecule.Core).dot(beta[1])
+            alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1]) 
+            beta_core = beta[0].T.dot(molecule.Core).dot(beta[1]) 
 
             # Get the diagonal elements and use them to calculated the overlap, reduced overlap
             # and the list of zero overlaps
             alpha_overlaps = np.diagonal(alpha[0].T.dot(molecule.Overlap).dot(alpha[1]))
             beta_overlaps = np.diagonal(beta[0].T.dot(molecule.Overlap).dot(beta[1]))
-            state_overlap = (np.product(alpha_overlaps) * np.product(beta_overlaps))
+            state_overlap = np.product(alpha_overlaps) * np.product(beta_overlaps)
 
-            #state_overlap = (np.product(alpha_overlaps) + np.product(beta_overlaps)) / 2
             reduced_overlap, zeros_list = process_overlaps(1, [], alpha_overlaps, Spin.Alpha)
             reduced_overlap, zeros_list = process_overlaps(reduced_overlap, zeros_list, beta_overlaps, Spin.Beta)
-
-            # Ensure that the alpha and beta arrays are the same size
-            if nA > nB:
-                beta_overlaps = resize_array(beta_overlaps, alpha_overlaps, fill=1)   # Fill with 1s so as not to affect the product
-                beta[0] = resize_array(beta[0], alpha[0])
-                beta[1] = resize_array(beta[1], alpha[1])
 
             num_zeros = len(zeros_list)
 
             # Calculate the Hamiltonian matrix element for this pair of states
             # And find the combined state
-            print("Num Zeros: {} || States: {}, {}".format(num_zeros, i, j))
+            #print("Num Zeros: {} || States: {}, {}".format(num_zeros, i, j))
             
-            if num_zeros is 0:
+            if num_zeros == 0:
                 elem,state = no_zeros(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, beta_core)
-            elif num_zeros is 1:
+            elif num_zeros == 1:
                 elem, state = one_zero(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, beta_core, zeros_list[0])
-            elif num_zeros is 2:
+            elif num_zeros == 2:
                 elem, state = two_zeros(molecule, alpha, beta, zeros_list)
             else:  # num_zeros > 2
                 elem = 0
@@ -104,27 +98,20 @@ def do(settings, molecule):
             CI_matrix[i,j] = CI_matrix[j,i] = elem
             CI_overlap[i,j] = CI_overlap[j,i] = state_overlap
 
+    # Print the Hamiltonian and State overlaps before attemption to solve the eigenvalue problem 
+    # so we still get information if it fails
+    printf.delimited_text(settings.OutFile," NOCI output ")
+    printf.text_value(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 
+
     # Solve the generalized eigenvalue problem
+    #CI_matrix = np.array([[-76.766, 0.0172],[0.0172, -76.766]])
     energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
 
-    # TODO find a better way to do this 
-    #if settings.MP2_type == "AFTER":
-    #    for i in range(len(energies)):
-    #        for j, coeff in enumerate(wavefunctions[:,i]):
-    #            energies[i] += MP2_corrections[j] * coeff**2
-
+    # This is important as it allows the function to be more easily tested 
     molecule.NOCIEnergies = energies
     molecule.NOCIWavefunction = wavefunctions
 
-
-    # Print the results to file
-    printf.delimited_text(settings.OutFile," NOCI output ")
-
-    # printf.text_value(settings.OutFile, " Spin Flip States ", pprint_spin_flip_states(molecule.SpinFlipStates))
-
     printf.text_value(settings.OutFile, " States ", wavefunctions, " NOCI Energies ", energies)
-    if settings.PrintLevel == "VERBOSE" or settings.PrintLevel == "DEBUG" or True:
-       printf.text_value(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 
 
 #---------------------------------------------------------------------#
 #     Functions for rearranging the HF orbitals as required           #
@@ -149,8 +136,11 @@ def assemble_orbitals(occupancies, optimized):
 
     return new_MOs, new_energies
 
+def make_spin_flip_states(molecule):
 
-def reorder_orbitals(molecule):
+    # Sort the HF states by occupancy since CUHF doesn't always order them correctly
+    #for state in molecule.States:
+    #    state.Alpha.sort_orbitals(molecule.Overlap, state.Total.Density)
 
     new_states = []
     for spin_state in molecule.SpinFlipStates:
@@ -170,39 +160,46 @@ def reorder_orbitals(molecule):
         new_state.Beta.Energies = new_beta_energies
         new_state.TotalEnergy = HF_state.TotalEnergy
         new_state.Energy = HF_state.Energy
-        hf.make_density_matrices(molecule, new_state)
 
         new_states.append(new_state)
 
-    if new_states != []:
-        molecule.States = new_states
-#
+    molecule.States = new_states
+
 #---------------------------------------------------------------------#
 #  Functions for computing overlaps, densities, biorthogonalized MOs  # 
 #---------------------------------------------------------------------#
-def biorthogonalize(MOs1, MOs2, overlap, nElec):
+def biorthogonalize(old_MOs1, old_MOs2, overlap, nElec, i, j):
     # This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
     # using a singular value decomposition, as in J. Chem. Phys. 140, 114103
     # Note this only returns the MO coeffs corresponding to the occupied MOs """
 
     # Finding the overlap of the occupied MOs
-    MOs1 = MOs1[:,:nElec]
-    MOs2 = MOs2[:,:nElec]
-    det_overlap = MOs1.T.dot(overlap).dot(MOs2)
+    MOs1 = copy(old_MOs1[:,:nElec])
+    MOs2 = copy(old_MOs2[:,:nElec])
+    MO_overlaps = MOs1.T.dot(overlap).dot(MOs2)
 
-    U, _, Vt = np.linalg.svd(det_overlap)
+    # Check if the orbitals are already paried 
+    if is_biorthogonal(MOs1, MOs2, overlap):
+        return [MOs1, MOs2]
+
+    U, _sigma, Vt = np.linalg.svd(MO_overlaps)
 
     # Transforming each of the determinants into a biorthogonal basis
     new_MOs1 = MOs1.dot(U)
     new_MOs2 = MOs2.dot(Vt.T)
-
-    #Ensure the new orbitals are in phase 
-    overlaps = [orb1.dot(orb2) for orb1, orb2 in zip(new_MOs1.T, new_MOs2.T)]
-    for i, overlap in enumerate(overlaps):
-       if overlap < 0:
-           new_MOs2[:,i] *= -1 
+    new_overlaps = new_MOs1.T.dot(overlap).dot(new_MOs2)
+     
+    #assert is_biorthogonal(new_MOs1, new_MOs2, new_overlaps)
 
     return [new_MOs1, new_MOs2]
+
+def is_biorthogonal(MOs1, MOs2, AO_overlaps):
+    size = MOs1.shape[1]
+    MO_overlaps = MOs1.T.dot(AO_overlaps).dot(MOs2)
+    residuals = np.abs(MO_overlaps) - np.eye(size, size)
+    biorthogonal = residuals.max() < 1e-6
+
+    return biorthogonal
 
 def make_weighted_density(MOs, overlaps):
     nOrbs = np.shape(MOs)[1]
@@ -249,7 +246,7 @@ def no_zeros(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, b
     state = CoDensityState(molecule.NOrbitals, W_alpha, W_beta)
     hf.make_coulomb_exchange_matrices(molecule, state)
 
-    elem = inner_product(W_alpha + W_beta, state.Total.Coulomb)
+    elem = inner_product(W_alpha + W_beta, state.Total.Coulomb) 
     elem += inner_product(W_alpha, state.Alpha.Exchange)
     elem += inner_product(W_beta, state.Beta.Exchange)
     elem *= 0.5
@@ -285,47 +282,26 @@ def one_zero(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, b
 
     return elem, state
 
-
 def two_zeros(molecule, alpha, beta, zeros_list):
     i, spin = zeros_list[0]
 
     P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
     P_beta = np.outer(beta[0][:,i], beta[1][:,i])
-    P_total = P_alpha + P_beta
-    state = CoDensityState(molecule.NOrbitals, P_alpha, P_beta)
-    hf.make_coulomb_exchange_matrices(molecule, state)
-    active_exchange = state.Alpha.Exchange if spin == Spin.Alpha else state.Beta.Exchange
-    P_active = P_alpha if spin == Spin.Alpha else P_beta
-
-    elem = inner_product(P_total, state.Total.Coulomb) - inner_product(P_active, active_exchange)
-
-    return elem, state
-
-def two_zeros_old(molecule, alpha, beta, zeros_list):
-    i, spin = zeros_list[0]
-
-    P_alpha = np.outer(alpha[0][:,i], alpha[1][:,i])
-    P_beta = np.outer(beta[0][:,i], beta[1][:,i])
-    P_total = P_alpha + P_beta
     state = CoDensityState(molecule.NOrbitals, P_alpha, P_beta)
     hf.make_coulomb_exchange_matrices(molecule, state)
     active_exchange = state.Alpha.Exchange if spin == Spin.Alpha else state.Beta.Exchange
     active_P = P_alpha if spin == Spin.Alpha else P_beta
 
-    active_coulomb = np.zeros((molecule.NOrbitals, molecule.NOrbitals))
-    for a in range(0,molecule.NOrbitals):
-      for b in range(0,molecule.NOrbitals):
-        for c in range(0,molecule.NOrbitals):
-          for d in range(0,molecule.NOrbitals):
-             active_coulomb[a,b]  +=  active_P[c,d]*molecule.CoulombIntegrals[a,b,c,d]
+    #active_coulomb = np.zeros((molecule.NOrbitals, molecule.NOrbitals))
+    #for a in range(0,molecule.NOrbitals):
+    #  for b in range(0,molecule.NOrbitals):
+    #    for c in range(0,molecule.NOrbitals):
+    #      for d in range(0,molecule.NOrbitals):
+    #         active_coulomb[a,b]  +=  active_P[c,d]*molecule.CoulombIntegrals[a,b,c,d]
 
     elem = inner_product(active_P, state.Total.Coulomb) + inner_product(active_P, active_exchange)
-    #elem = inner_product(active_P, active_coulomb) + inner_product(active_P, active_exchange)
-
+    
     return elem, state
-
-def set_to_zeros(array):
-    array = np.zeros(array.shape)
 
 def inner_product(mat1, mat2):
     product = mat1.dot(mat2.T)
@@ -353,96 +329,4 @@ def pprint_array(arr, thresh=1e-8):
         print(line)
         line = "  "
     print("")
-
-def extend_biorthogonalize(orbs, molecule):
-    # Takes the set of biorthoginalized occupied orbitals and finds the 
-    # corresponding paired virtual orbitals
-    # Assumes the same number of electrons in both sets
-    # See Int. J. Quantum. Chem. 29, 31 (1986)
-    nOrbs = molecule.NOrbitals
-    nElec = orbs[0].shape[1]
-    pair1 = np.zeros((nOrbs, nOrbs))
-    pair2 = np.zeros((nOrbs, nOrbs))
-
-    pair1[:, 0:nElec] = orbs[0]
-    pair2[:, 0:nElec] = orbs[1]
-
-    # Calculate the first count virtual orbitals
-    # Idealy this will find nElec orbitals but in cases where overlap is 1, 
-    # it will be unable to find one 
-    # TODO think about overflows they're definitly going to be a problem
-    count = 0 
-    stop = min(nElec, nOrbs - nElec)
-    for i in range(stop): 
-        j = nElec + count 
-        overlap = pair1[:,i].dot(molecule.Overlap).dot(pair2[:,i])   
-        norm = np.sqrt(1-overlap**2) if abs(overlap) < 1 else 0
-        
-        if norm > 1e-5: 
-            pair1[:,j] = norm * (pair2[:,i] - overlap * pair1[:,i])
-            pair2[:,j] = norm * (pair1[:,i] - overlap * pair2[:,i])  # Assuming overlap is real 
-            count += 1 
-        else:
-            continue 
-
-    # Find the remaining nOrbs - nElec - count orbitals
-    span = pair1.T.dot(molecule.Overlap)
-    perp = np.linalg.null(span)
-
-    pair1[:,(2*nElec):] = perp
-    pair2[:,(2*nElec):] = perp
-
-    return pair1, pair2 
-
-
-########################
-
-import itertools as it 
-def generate_excitations(occupancy, excitation_level):
-    """ occupancy is a vector of 0,1 and 2 specifying the orbital occupancies 
-    excitation_level is an integer specifying the number of exciattions """
-
-
-def generate_excitations_single_set(occupancy, excitation_level, label):
-    """ occupancy should contain only 1s and 0s """
-
-
-
-
-
-# FOr now this assumes a closed shell ground state
-# and ony doubles 
-def extend_CI(molecule, exictations=2):
-    """ excitations is an integer specifying the maximum exictation 
-    level """
-
-    if exictations != 2:
-        print("Only double excitations supported")
-        import sys; sys.exit()
-
-
-    ## First we need to find the bounds of the different spaces
-
-    # The top of the flipped occupied is the number of electrons
-    flipped_occupied = molecule.NAlphaElectrons
-
-    max_spin_flip = molecule.SpinFlipStates[-1][0] 
-
-    # The top of the core space is this minus the highest spin flip 
-    core = flipped_occupied - max_spin_flip
-
-    # The top of the flipped virtual is this plus the max spin_flip 
-    flipped_virtual = flipped_occupied + max_spin_flip
-
-    # The remainder is the virtual space 
-
-    ## Now we need to construct all the different excitations
-
-
-
-
-
-
-
-
 

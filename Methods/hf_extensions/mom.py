@@ -32,7 +32,7 @@ def make_p_vector(new_MOs, other_MOs, NElectrons, overlap_matrix):
 
     return numpy.abs(P_vector)
 
-
+# See if this can be rewriten better 
 def sort_MOs(MOs, energies, p):
     """Sorts MOs and energies in decending order
     based on a vector p (the overlap vector)"""
@@ -40,5 +40,5 @@ def sort_MOs(MOs, energies, p):
     temp = sorted(temp, key = lambda pair: pair[0], reverse = True)     #sorts the elements on the basis of the p values (temp[0])
     new_MOs = numpy.array([line[1] for line in temp])
     new_energies = [line[2] for line in temp]
-    return numpy.transpose(new_MOs), new_energies
+    return new_MOs.T, numpy.array(new_energies)
 
