@@ -895,34 +895,6 @@ class Matrices:
         else:
             self.Coulomb = numpy.zeros((n_orbitals,) * 2)
 
-    # Sort MOs by occupancy number 
-    # This is a modified version of the method described in J. Phys. Chem. A 2010, 114, 8772
-    # Note that even with a stable sorting algorithm this doesn't preserve order within the different 
-    # spaces
-    def sort_orbitals(self, AO_overlaps, total_density):
-	X = AO_overlaps.dot(self.MOs)
-	occupancies = X.T.dot(total_density).dot(X).diagonal()
-	occupancies = numpy.abs(occupancies)
-	
-	# Find the indices to sort the orbitals into the substances while preserving 
-	# relative order within the subspaces
-	doubly = [] 
-	singly = []
-	unoccupied = []
-
-	for i, occ in enumerate(occupancies):
-	    if occ >= 1.99:
-		doubly.append(i)
-	    elif occ > 0.01:
-		unoccupied.append(i)
-	    else:
-		singly.append(i)
-
-	idx = doubly + singly + unoccupied
-	self.MOs = self.MOs[:,idx]
-	if self.Energies != []:
-	    self.Energies = numpy.array(self.Energies)[idx]
-    
     def sort_by_energy(self):
    	""" Seperatly sort the occupied and unoccupied MO sets by energy """
    	# Sort the occupied set 

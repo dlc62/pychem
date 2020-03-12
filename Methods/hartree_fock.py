@@ -328,14 +328,16 @@ def make_fock_matrices(molecule, this):
 
 #----------------------------------------------------------------------
 
-def find_UHF_natural_orbitals(AO_overlaps, state):
-    S = sqrtm(AO_overlaps)
+def find_UHF_natural_orbitals(state, S):
     half_density_matrix = S.dot(state.Total.Density/2).dot(S)
     NO_vals, NO_vects = numpy.linalg.eigh(half_density_matrix)  # See J. Chem. Phys. 1988, 88(8), 4926
     NO_coeffs = numpy.linalg.inv(S).dot(NO_vects)
 
     # Get the NOs in ascending order of occupancy
-    return numpy.flip(NO_coeffs, 1), numpy.flip(NO_vals,0)
+    NO_coeffs = NO_coeffs[:,::-1]
+    NO_vals = NO_vals[::-1]
+
+    return NO_coeffs, NO_vals
 
 def constrain_UHF(molecule, state):
 
@@ -345,16 +347,13 @@ def constrain_UHF(molecule, state):
     Na = numpy.count_nonzero(occupancy == 1)                    # Dimension of active space
     Nc = numpy.count_nonzero(occupancy == 2)                    # Dimension of core space
 
-    NO_coeffs, NO_vals = find_UHF_natural_orbitals(molecule.Overlap, state)
+    NO_coeffs, NO_vals = find_UHF_natural_orbitals(state, molecule.S)
     back_trans = numpy.linalg.inv(NO_coeffs)
+    core_space = range(Nc)
+    valence_space = range(Nc+Na, molecule.NOrbitals)
 
     # Calculate the expectation value of the spin operator
     state.S2 = N*(N+4)/4. - Nab - 2 * sum([x ** 2 for x in NO_vals])   # Using formula from J. Chem. Phys. 88, 4926
-
-    # Sort in order of descending occupancy
-    idx = NO_vals.argsort()[::-1]     
-    core_space = idx[:Nc]                            # Indices of the core NOs
-    valence_space = idx[(Nc + Na):]                  # Indices of the valence NOs
 
     delta = (state.Alpha.Fock - state.Beta.Fock) / 2
     delta = NO_coeffs.T.dot(delta).dot(NO_coeffs)    # Transforming delta into the NO basis

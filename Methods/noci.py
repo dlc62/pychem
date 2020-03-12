@@ -46,12 +46,8 @@ def pprint_spin_flip_states(states):
 
 def do(settings, molecule):
 
-    from copy import deepcopy 
-    mol = deepcopy(molecule)
     if "SF" in molecule.ExcitationType:
         make_spin_flip_states(molecule)
-
-    molecule.States = [molecule.States[1], molecule.States[2]]
 
     dims = len(molecule.States)              # Dimensionality of the CI space
     CI_matrix = np.zeros((dims, dims))
@@ -64,6 +60,7 @@ def do(settings, molecule):
 
             alpha = biorthogonalize(state1.Alpha.MOs, state2.Alpha.MOs, molecule.Overlap, nA, i,j)
             beta = biorthogonalize(state1.Beta.MOs, state2.Beta.MOs, molecule.Overlap, nB, i,j)
+
 
             # Calculate the core fock matrix for the state transformed into the MO basis
             alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1]) 
@@ -82,7 +79,7 @@ def do(settings, molecule):
 
             # Calculate the Hamiltonian matrix element for this pair of states
             # And find the combined state
-            #print("Num Zeros: {} || States: {}, {}".format(num_zeros, i, j))
+            #print("Num Zeros: {} || States: {}, {} || State Overlap: {}".format(num_zeros, i, j, state_overlap))
             
             if num_zeros == 0:
                 elem,state = no_zeros(molecule, alpha, beta, alpha_overlaps, beta_overlaps, alpha_core, beta_core)
@@ -104,10 +101,8 @@ def do(settings, molecule):
     printf.text_value(settings.OutFile, " Hamiltonian ", CI_matrix, " State overlaps ", CI_overlap) 
 
     # Solve the generalized eigenvalue problem
-    #CI_matrix = np.array([[-76.766, 0.0172],[0.0172, -76.766]])
     energies, wavefunctions = gen_eig(CI_matrix, CI_overlap)
 
-    # This is important as it allows the function to be more easily tested 
     molecule.NOCIEnergies = energies
     molecule.NOCIWavefunction = wavefunctions
 
@@ -127,7 +122,7 @@ def assemble_orbitals(occupancies, optimized):
             new_MOs[:,unoptimized_count] = optimized.MOs[:,i]
             new_energies[unoptimized_count] = optimized.Energies[i]
             unoptimized_count += 1 
-        elif occ == 1 and optimized.Occupancy[i] == 1:
+        elif occ == 1: # and optimized.Occupancy[i] == 1:
             new_MOs[:,optimized_count] = optimized.MOs[:,i]
             new_energies[optimized_count] = optimized.Energies[i]
             optimized_count += 1 
@@ -137,12 +132,13 @@ def assemble_orbitals(occupancies, optimized):
     return new_MOs, new_energies
 
 def make_spin_flip_states(molecule):
-
-    # Sort the HF states by occupancy since CUHF doesn't always order them correctly
-    #for state in molecule.States:
-    #    state.Alpha.sort_orbitals(molecule.Overlap, state.Total.Density)
-
     new_states = []
+
+    # Use the UHF natural orbitals in place of the natural orbitlas
+    for i, state in enumerate(molecule.States):
+        NOs, occ = hf.find_UHF_natural_orbitals(state, molecule.Overlap)
+        state.Alpha.MOs = NOs
+
     for spin_state in molecule.SpinFlipStates:
 
         # Select the required HF state
@@ -168,7 +164,7 @@ def make_spin_flip_states(molecule):
 #---------------------------------------------------------------------#
 #  Functions for computing overlaps, densities, biorthogonalized MOs  # 
 #---------------------------------------------------------------------#
-def biorthogonalize(old_MOs1, old_MOs2, overlap, nElec, i, j):
+def biorthogonalize(old_MOs1, old_MOs2, AO_overlaps, nElec, i, j):
     # This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
     # using a singular value decomposition, as in J. Chem. Phys. 140, 114103
     # Note this only returns the MO coeffs corresponding to the occupied MOs """
@@ -176,10 +172,10 @@ def biorthogonalize(old_MOs1, old_MOs2, overlap, nElec, i, j):
     # Finding the overlap of the occupied MOs
     MOs1 = copy(old_MOs1[:,:nElec])
     MOs2 = copy(old_MOs2[:,:nElec])
-    MO_overlaps = MOs1.T.dot(overlap).dot(MOs2)
+    MO_overlaps = MOs1.T.dot(AO_overlaps).dot(MOs2)
 
     # Check if the orbitals are already paried 
-    if is_biorthogonal(MOs1, MOs2, overlap):
+    if is_biorthogonal(MOs1, MOs2, AO_overlaps):
         return [MOs1, MOs2]
 
     U, _sigma, Vt = np.linalg.svd(MO_overlaps)
@@ -187,9 +183,8 @@ def biorthogonalize(old_MOs1, old_MOs2, overlap, nElec, i, j):
     # Transforming each of the determinants into a biorthogonal basis
     new_MOs1 = MOs1.dot(U)
     new_MOs2 = MOs2.dot(Vt.T)
-    new_overlaps = new_MOs1.T.dot(overlap).dot(new_MOs2)
-     
-    #assert is_biorthogonal(new_MOs1, new_MOs2, new_overlaps)
+    
+    #assert is_biorthogonal(new_MOs1, new_MOs2, AO_overlaps)
 
     return [new_MOs1, new_MOs2]
 
@@ -197,7 +192,7 @@ def is_biorthogonal(MOs1, MOs2, AO_overlaps):
     size = MOs1.shape[1]
     MO_overlaps = MOs1.T.dot(AO_overlaps).dot(MOs2)
     residuals = np.abs(MO_overlaps) - np.eye(size, size)
-    biorthogonal = residuals.max() < 1e-6
+    biorthogonal = residuals.max() < const.NOCI_thresh
 
     return biorthogonal
 
@@ -292,13 +287,6 @@ def two_zeros(molecule, alpha, beta, zeros_list):
     active_exchange = state.Alpha.Exchange if spin == Spin.Alpha else state.Beta.Exchange
     active_P = P_alpha if spin == Spin.Alpha else P_beta
 
-    #active_coulomb = np.zeros((molecule.NOrbitals, molecule.NOrbitals))
-    #for a in range(0,molecule.NOrbitals):
-    #  for b in range(0,molecule.NOrbitals):
-    #    for c in range(0,molecule.NOrbitals):
-    #      for d in range(0,molecule.NOrbitals):
-    #         active_coulomb[a,b]  +=  active_P[c,d]*molecule.CoulombIntegrals[a,b,c,d]
-
     elem = inner_product(active_P, state.Total.Coulomb) + inner_product(active_P, active_exchange)
     
     return elem, state
@@ -314,19 +302,3 @@ def noci_pt2(molecule, settings, state):
     
     return mp2_correction
     
-def pprint_array(arr, thresh=1e-8):
-    size = len(arr)
-    zero = "{:<14d}".format(0)
-    line = "\n  "
-    for i in range(size):
-        for j in range(size):
-            num = arr[i,j]
-            if abs(num) > thresh:
-                number = "{:<14.8f}".format(num)
-            else:
-                number = zero
-            line += number 
-        print(line)
-        line = "  "
-    print("")
-
