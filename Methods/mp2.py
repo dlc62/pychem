@@ -110,7 +110,6 @@ def do(settings, molecule, states=None):
 
     #if states == None: 
     #printf.text_value(settings.OutFile," State: ", state_index, " Total MP2 energy: ", MP2_Total_Energy) 
-    printf.text_value(settings.OutFile," State: ", state_index, " Total MP2 energy: ", state.TotalEnergy + MP2_Total_Energy) 
 
     mp2_energies.append(MP2_Total_Energy)
 

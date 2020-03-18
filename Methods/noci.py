@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.linalg import eigh as gen_eig
 from collections import namedtuple 
-from copy import copy
+from copy import copy, deepcopy
 # Custom code
 from Util import printf, structures
 from Util.structures import Spin 
@@ -46,21 +46,26 @@ def pprint_spin_flip_states(states):
 
 def do(settings, molecule):
 
+    MP2_corrections = []
     if "SF" in molecule.ExcitationType:
-        make_spin_flip_states(molecule)
+        make_natural_orbitals(molecule)
+        CI_states = [make_SF_NOCI_state(state, molecule.States) 
+                     for state in molecule.SpinFlipStates]
+    else:
+        CI_states = molecule.States
 
-    dims = len(molecule.States)              # Dimensionality of the CI space
+    dims = len(CI_states)              # Dimensionality of the CI space
     CI_matrix = np.zeros((dims, dims))
     CI_overlap = np.zeros((dims, dims))
     nA = molecule.NAlphaElectrons; nB = molecule.NBetaElectrons
 
     # Building the CI matrix
-    for i, state1 in enumerate(molecule.States):
-        for j, state2 in enumerate(molecule.States[:i+1]):
+    for i, state1 in enumerate(CI_states):
+        for j, state2 in enumerate(CI_states[:i+1]):
+            #print("States: {}, {}".format(i, j))
 
-            alpha = biorthogonalize(state1.Alpha.MOs, state2.Alpha.MOs, molecule.Overlap, nA, i,j)
-            beta = biorthogonalize(state1.Beta.MOs, state2.Beta.MOs, molecule.Overlap, nB, i,j)
-
+            alpha, bover = biorthogonalize(state1.Alpha.MOs, state2.Alpha.MOs, molecule.Overlap, nA)
+            beta, aover = biorthogonalize(state1.Beta.MOs, state2.Beta.MOs, molecule.Overlap, nB)
 
             # Calculate the core fock matrix for the state transformed into the MO basis
             alpha_core = alpha[0].T.dot(molecule.Core).dot(alpha[1]) 
@@ -70,10 +75,11 @@ def do(settings, molecule):
             # and the list of zero overlaps
             alpha_overlaps = np.diagonal(alpha[0].T.dot(molecule.Overlap).dot(alpha[1]))
             beta_overlaps = np.diagonal(beta[0].T.dot(molecule.Overlap).dot(beta[1]))
-            state_overlap = np.product(alpha_overlaps) * np.product(beta_overlaps)
+            state_overlap = np.product(alpha_overlaps) * np.product(beta_overlaps) * aover * bover
 
             reduced_overlap, zeros_list = process_overlaps(1, [], alpha_overlaps, Spin.Alpha)
             reduced_overlap, zeros_list = process_overlaps(reduced_overlap, zeros_list, beta_overlaps, Spin.Beta)
+            reduced_overlap *= aover * bover
 
             num_zeros = len(zeros_list)
 
@@ -112,8 +118,8 @@ def do(settings, molecule):
 #     Functions for rearranging the HF orbitals as required           #
 #---------------------------------------------------------------------#
 def assemble_orbitals(occupancies, optimized):
-    new_MOs = np.zeros(optimized.MOs.shape)
-    new_energies = np.zeros(np.shape(optimized.Energies))
+    new_MOs = np.empty(optimized.MOs.shape)
+    new_energies = np.empty(np.shape(optimized.Energies))
 
     optimized_count = 0
     unoptimized_count = sum(occupancies)
@@ -131,40 +137,66 @@ def assemble_orbitals(occupancies, optimized):
 
     return new_MOs, new_energies
 
-def make_spin_flip_states(molecule):
-    new_states = []
+def optimize_active_space(AO_overlaps, reference, nBeta, NOs):
+    # Use the doubly occupied space of the ground state as the reference orbitals 
+    overlap_operator = AO_overlaps.dot(reference[:,:nBeta])
+    B = NOs.T.dot(overlap_operator).dot(overlap_operator.T).dot(NOs)
+    _lambda, coeffs = np.linalg.eigh(B)
+    new_NOs = NOs.dot(coeffs.T)
 
-    # Use the UHF natural orbitals in place of the natural orbitlas
+    # Reverse the NOs to get them in order of assending occupancy
+    # Probably will need to calculate the overlaps and sort in general
+    new_NOs = new_NOs[:,::-1]
+
+    return new_NOs
+
+def make_natural_orbitals(molecule):
+    reference_orbitals = None
     for i, state in enumerate(molecule.States):
-        NOs, occ = hf.find_UHF_natural_orbitals(state, molecule.Overlap)
-        state.Alpha.MOs = NOs
+        NOs, occ = hf.find_UHF_natural_orbitals(state, molecule.S)
+        # Save the ground state NOs as a reference 
+        if i == 0:
+            reference_orbitals = NOs
 
-    for spin_state in molecule.SpinFlipStates:
+        # Now we need to account for degeneracy in the singly occupied space 
+        # If there is more than one singly occupied orbital we need to optimize 
+        # their overlaps with the reference orbitals
+        # Find the singly occupied orbitals
+        idx = [i for i,x in enumerate(occ) if np.isclose(x, 0.5)]
+        #idx = []
+        if len(idx) > 1:
+            NOs[:,idx] = optimize_active_space(
+                molecule.Overlap, 
+                reference_orbitals, 
+                molecule.NBetaElectrons, 
+                NOs[:,idx])
 
-        # Select the required HF state
-        HF_state = molecule.States[spin_state[0]]
-        assert HF_state.NAlpha >= HF_state.NBeta, "All high multiplicity states should have more alpha electrons than beta"
+        state.Total.MOs = NOs
+        state.Total.Energies = state.Alpha.Energies
 
-        # Now assemble the new orbitals using only the optimized alpha HF orbitals
-        new_alpha, new_alpha_energies = assemble_orbitals(spin_state[1], HF_state.Alpha)
-        new_beta, new_beta_energies = assemble_orbitals(spin_state[2], HF_state.Alpha)
+def make_SF_NOCI_state(spin_flip_state, hf_states):
+    # Select the required HF state
+    NOrbs = len(spin_flip_state[1])
+    HF_state = hf_states[spin_flip_state[0]]
 
-        new_state = structures.ElectronicState(spin_state[1], spin_state[2], molecule.NOrbitals)
-        new_state.Alpha.MOs = new_alpha
-        new_state.Alpha.Energies = new_alpha_energies
-        new_state.Beta.MOs = new_beta
-        new_state.Beta.Energies = new_beta_energies
-        new_state.TotalEnergy = HF_state.TotalEnergy
-        new_state.Energy = HF_state.Energy
+    # Now assemble the new orbitals using only the optimized alpha HF orbitals
+    new_alpha, new_alpha_energies = assemble_orbitals(spin_flip_state[1], HF_state.Total)
+    new_beta, new_beta_energies = assemble_orbitals(spin_flip_state[2], HF_state.Total)
 
-        new_states.append(new_state)
+    new_state = structures.ElectronicState(spin_flip_state[1], spin_flip_state[2], NOrbs)
+    new_state.Alpha.MOs = new_alpha
+    new_state.Alpha.Energies = new_alpha_energies
+    new_state.Beta.MOs = new_beta
+    new_state.Beta.Energies = new_beta_energies
+    new_state.TotalEnergy = HF_state.TotalEnergy
+    new_state.Energy = HF_state.Energy
 
-    molecule.States = new_states
+    return new_state
 
 #---------------------------------------------------------------------#
 #  Functions for computing overlaps, densities, biorthogonalized MOs  # 
 #---------------------------------------------------------------------#
-def biorthogonalize(old_MOs1, old_MOs2, AO_overlaps, nElec, i, j):
+def biorthogonalize(old_MOs1, old_MOs2, AO_overlaps, nElec):
     # This function finds the Lowdin Paired Orbitals for two sets of MO coefficents
     # using a singular value decomposition, as in J. Chem. Phys. 140, 114103
     # Note this only returns the MO coeffs corresponding to the occupied MOs """
@@ -176,17 +208,24 @@ def biorthogonalize(old_MOs1, old_MOs2, AO_overlaps, nElec, i, j):
 
     # Check if the orbitals are already paried 
     if is_biorthogonal(MOs1, MOs2, AO_overlaps):
-        return [MOs1, MOs2]
+        return [MOs1, MOs2], 1
 
     U, _sigma, Vt = np.linalg.svd(MO_overlaps)
 
-    # Transforming each of the determinants into a biorthogonal basis
-    new_MOs1 = MOs1.dot(U)
-    new_MOs2 = MOs2.dot(Vt.T)
-    
-    #assert is_biorthogonal(new_MOs1, new_MOs2, AO_overlaps)
+    over = np.linalg.det(U) * np.linalg.det(Vt)
 
-    return [new_MOs1, new_MOs2]
+    # Transforming each of the determinants into a biorthogonal basis
+    new_MOs1 = MOs1.dot(U) 
+    new_MOs2 = MOs2.dot(Vt.T) 
+
+    # Leave these variables for debugging for now 
+    new_overlaps = new_MOs1.T.dot(AO_overlaps).dot(new_MOs2)
+    old_det = np.linalg.det(MO_overlaps)
+    new_det = np.linalg.det(new_overlaps)
+
+    assert is_biorthogonal(new_MOs1, new_MOs2, AO_overlaps)
+
+    return [new_MOs1, new_MOs2], over
 
 def is_biorthogonal(MOs1, MOs2, AO_overlaps):
     size = MOs1.shape[1]
@@ -209,7 +248,7 @@ def process_overlaps(reduced_overlap, zeros_list, overlaps, spin):
     # Builds up the list of zero values as a list of (zero, spin) tuples
     # as well as the reduced overlap value
     for i, overlap in enumerate(overlaps):
-        if overlap > const.NOCI_thresh:
+        if np.abs(overlap) > const.NOCI_thresh:
             reduced_overlap *= overlap
         else:
             zeros_list.append(ZeroOverlap(i, spin))
@@ -301,4 +340,3 @@ def noci_pt2(molecule, settings, state):
     mp2_correction = mp2.do(settings, molecule, [state])
     
     return mp2_correction
-    
