@@ -1,0 +1,55 @@
+SETTINGS (settings.) 
+
+  Keyword                Available options
+---------------------+-------------------------------------
+  Method               HF, MP2
+  Job_Type             Energy
+  Basis_Sets           Many, must be supplied in list of strings format
+  Print_Level          Minimal, Basic, Verbose, Debug
+  Custom_Print         DIIS, MOM
+  
+ -> SCF settings (+ SCF.)
+
+      Keyword                Available options
+    ---------------------+-------------------------------------
+      Reference            RHF, UHF, CUHF
+      SCF_Guess            Read, Core
+      MO_Read_Name         NAME in pickle file NAME_BASIS.MOs        
+      MO_Read_Basis        BASIS in pickle file NAME_BASIS.MOs
+      Max_SCF_Iterations   Any integer value
+      Basis_Fit            True/False 
+      2e_Ints_Handling     Direct, InCore, OnDisk
+      
+ -> DIIS settings (+ DIIS.)
+
+      Keyword                Available options
+    ---------------------+-------------------------------------
+      Use_DIIS             True/False
+      DIIS_Size            Integer value
+      DIIS_Type            C1, C2
+      DIIS_Start           Integer value
+      DIIS_Max_Condition   Floating-point value (large)
+      
+ -> MOM settings (+ MOM.)
+
+      Keyword                Available options
+    ---------------------+-------------------------------------
+      Use_MOM              True/False
+      MOM_Reference        Mutable, Fixed
+
+
+MOLECULE (molecule.)
+  
+  Keyword                Available options
+---------------------+-------------------------------------
+  Coords               Must be specified as list of lists
+                       One atom per row, each atom specified as
+                       [atomic_symbol, nuclear_charge, x, y, z]
+  Charge               Any valid integer
+  Multiplicity         Any valid integer
+  Excitations          Single, Double,   
+  Alpha_Excitations    As above
+  Beta_Excitations     As above
+  
+  -> Atoms -> CGTFs
+  -> 
